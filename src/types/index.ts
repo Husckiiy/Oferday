@@ -19,6 +19,7 @@ export interface AppConfig {
     mlAffiliateTag: string; // e.g. "matt_tool=XXXXXXXX&matt_word=XXXXXXXXX"
     mlRedirectUri?: string;
     mlListShortUrl?: string; // Optional custom short URL for showcase / lists (e.g. "https://meli.la/...")
+    meliCookie?: string; // Mercado Livre session cookie to generate official meli.la shortlinks
     meliAccessToken?: string;
     meliAffiliateTag?: string;
     shopeeAppId?: string;

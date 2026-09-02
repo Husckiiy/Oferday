@@ -215,6 +215,77 @@ export class AffiliateService {
   }
 
   /**
+   * Generates official https://meli.la/xxxx link using Mercado Livre's Linkbuilder API if cookie is provided.
+   */
+  public async generateOfficialMeliShortLink(productUrl: string, tag: string): Promise<string | null> {
+    const config = configService.getConfig();
+    const cookie = config.affiliate?.meliCookie || process.env.ML_COOKIE || process.env.MELI_COOKIE || process.env.MERCADOLIVRE_COOKIE || '';
+
+    if (!cookie) {
+      return null;
+    }
+
+    try {
+      // 1. Get dynamic CSRF Token from Linkbuilder page
+      const pageResp = await fetch('https://www.mercadolivre.com.br/afiliados/linkbuilder', {
+        headers: {
+          'User-Agent': this.userAgent,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Cookie': cookie
+        },
+        signal: AbortSignal.timeout(6000)
+      });
+
+      if (!pageResp.ok) return null;
+
+      const html = await pageResp.text();
+      const m = html.match(/(?:csrfToken|_csrf|csrf)[\"':\s]+[\"']([^\"']+)[\"']/i);
+      const csrfToken = m ? m[1] : '';
+
+      if (!csrfToken) return null;
+
+      let apiTag = tag;
+      if (apiTag.includes('matt_word=')) {
+        const match = apiTag.match(/matt_word=([^&]+)/);
+        if (match) apiTag = match[1];
+      }
+
+      // 2. Call official Linkbuilder createLink endpoint
+      const postResp = await fetch('https://www.mercadolivre.com.br/affiliate-program/api/v2/affiliates/createLink', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json, text/plain, */*',
+          'Content-Type': 'application/json',
+          'Origin': 'https://www.mercadolivre.com.br',
+          'Referer': 'https://www.mercadolivre.com.br/afiliados/linkbuilder',
+          'User-Agent': this.userAgent,
+          'x-csrf-token': csrfToken,
+          'Cookie': cookie
+        },
+        body: JSON.stringify({
+          urls: [productUrl],
+          tag: apiTag || 'afiliado'
+        }),
+        signal: AbortSignal.timeout(8000)
+      });
+
+      if (postResp.ok) {
+        const data: any = await postResp.json();
+        if (Array.isArray(data?.urls) && data.urls.length > 0) {
+          const shortUrl = data.urls[0]?.short_url || data.urls[0]?.url;
+          if (shortUrl && (shortUrl.includes('meli.la') || shortUrl.includes('mercadolivre.com/sec'))) {
+            return shortUrl;
+          }
+        }
+      }
+    } catch (err: any) {
+      logger.warn('AFFILIATE', `Aviso ao gerar meli.la oficial via Linkbuilder: ${err.message}`);
+    }
+
+    return null;
+  }
+
+  /**
    * Official Mercado Livre Affiliate Link Generator.
    * Generates clean, official Mercado Livre canonical links or official meli.la showcase links.
    */
@@ -236,8 +307,15 @@ export class AffiliateService {
       return cleanList;
     }
 
-    // 2. Se for produto -> Formata o link canônico oficial limpo com as suas tags de afiliado
+    // 2. Se for produto -> Tenta gerar meli.la oficial ou link canônico limpo
     const cleanedProductUrl = this.cleanAndTagMercadoLivreUrl(finalUrl, tag);
+
+    const officialMeliLa = await this.generateOfficialMeliShortLink(cleanedProductUrl, tag);
+    if (officialMeliLa) {
+      logger.success('AFFILIATE', `Mercado Livre: Link curto oficial meli.la gerado com sucesso: ${officialMeliLa}`);
+      return officialMeliLa;
+    }
+
     logger.success('AFFILIATE', `Mercado Livre: Link oficial de produto gerado: ${cleanedProductUrl}`);
     return cleanedProductUrl;
   }

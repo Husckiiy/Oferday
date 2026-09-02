@@ -26,6 +26,8 @@ const DEFAULT_CONFIG: AppConfig = {
     mlSecretKey: process.env.ML_SECRET_KEY || process.env.MELI_SECRET_KEY || '',
     mlAffiliateTag: process.env.ML_AFFILIATE_TAG || process.env.MELI_AFFILIATE_TAG || '',
     mlRedirectUri: process.env.ML_REDIRECT_URI || 'https://localhost',
+    mlListShortUrl: process.env.ML_LIST_SHORT_URL || 'https://meli.la/2H1hvz6',
+    meliCookie: process.env.ML_COOKIE || process.env.MELI_COOKIE || process.env.MERCADOLIVRE_COOKIE || '',
     meliAccessToken: process.env.ML_ACCESS_TOKEN || process.env.MELI_ACCESS_TOKEN || '',
     meliAffiliateTag: process.env.ML_AFFILIATE_TAG || process.env.MELI_AFFILIATE_TAG || '',
     shopeeAppId: process.env.SHOPEE_APP_ID || '',
