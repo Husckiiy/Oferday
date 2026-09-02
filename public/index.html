@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Telegram ➔ WhatsApp Forwarder</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Top Header -->
+    <header class="header">
+      <div class="logo-group">
+        <div class="logo-icon">⚡</div>
+        <div>
+          <h1>Telegram ➔ WhatsApp Forwarder</h1>
+          <p class="subtitle">Clonador de Ofertas & Repassador Automático em Tempo Real</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div class="switch-container">
+          <label class="switch">
+            <input type="checkbox" id="forwarderActiveSwitch">
+            <span class="slider round"></span>
+          </label>
+          <span id="forwarderStatusLabel" class="switch-label">Repasse: Ativo</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Visual Pipeline Banner -->
+    <section class="pipeline-section">
+      <div class="pipeline-header">
+        <span class="pipeline-title">Fluxo de Dados em Tempo Real</span>
+        <span class="pipeline-desc">Como as mensagens trafegam da origem ao destino</span>
+      </div>
+      <div class="pipeline-flow">
+        
+        <!-- Step 1: Telegram Source -->
+        <div class="pipeline-node" id="nodeTelegram">
+          <div class="node-icon telegram-bg">✈️</div>
+          <div class="node-info">
+            <div class="node-name">1. Canal Telegram</div>
+            <div class="node-detail" id="pipeTgChannel">@não_configurado</div>
+          </div>
+          <span class="node-status" id="pipeTgBadge">Desconectado</span>
+        </div>
+
+        <!-- Connector 1 -->
+        <div class="pipeline-connector">
+          <div class="connector-line">
+            <div class="pulse-dot"></div>
+          </div>
+          <span class="connector-label">MTProto / GramJS</span>
+        </div>
+
+        <!-- Step 2: Core Processor -->
+        <div class="pipeline-node highlight-node" id="nodeProcessor">
+          <div class="node-icon core-bg">⚙️</div>
+          <div class="node-info">
+            <div class="node-name">2. Bot / Clonador</div>
+            <div class="node-detail" id="pipeProcessorStatus">Aguardando Mensagens</div>
+          </div>
+          <span class="node-status badge-connected" id="pipeProcessorBadge">Ativo</span>
+        </div>
+
+        <!-- Connector 2 -->
+        <div class="pipeline-connector">
+          <div class="connector-line">
+            <div class="pulse-dot"></div>
+          </div>
+          <span class="connector-label">Baileys Socket</span>
+        </div>
+
+        <!-- Step 3: WhatsApp Target -->
+        <div class="pipeline-node" id="nodeWhatsApp">
+          <div class="node-icon whatsapp-bg">💬</div>
+          <div class="node-info">
+            <div class="node-name">3. Destino WhatsApp</div>
+            <div class="node-detail" id="pipeWaDest">JID não configurado</div>
+          </div>
+          <span class="node-status" id="pipeWaBadge">Desconectado</span>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Main Grid -->
+    <main class="grid-container">
+      
+      <!-- Left Column: Telegram & WhatsApp Connections -->
+      <div class="column">
+        
+        <!-- Telegram Card -->
+        <section class="card" id="telegramCard">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="icon telegram-blue">✈️</span>
+              <h2>Origem: Telegram (GramJS)</h2>
+            </div>
+            <span class="badge badge-disconnected" id="tgBadge">Desconectado</span>
+          </div>
+
+          <div class="card-body">
+            <!-- Disconnected State: Credentials & Phone Form -->
+            <div id="tgAuthForm" class="auth-section">
+              <p class="info-text">Conecte sua conta pessoal do Telegram via MTProto para ingressar e escutar o canal público de ofertas.</p>
+              
+              <div class="form-group">
+                <label for="tgApiId">API ID <a href="https://my.telegram.org" target="_blank" class="link-hint">(obter grátis no my.telegram.org)</a></label>
+                <input type="number" id="tgApiId" placeholder="Ex: 12345678">
+              </div>
+
+              <div class="form-group">
+                <label for="tgApiHash">API Hash</label>
+                <input type="text" id="tgApiHash" placeholder="Ex: 0123456789abcdef0123456789abcdef">
+              </div>
+
+              <div class="form-group">
+                <label for="tgPhone">Telefone com DDI + DDD</label>
+                <input type="text" id="tgPhone" placeholder="+5511999999999">
+              </div>
+
+              <button class="btn btn-primary" id="btnTgSendCode">
+                <span class="btn-text">Enviar Código de Login</span>
+              </button>
+            </div>
+
+            <!-- Waiting Code State -->
+            <div id="tgCodeStep" class="auth-section hidden">
+              <div class="alert alert-info">
+                Código de verificação enviado para o seu aplicativo Telegram ou SMS.
+              </div>
+              <div class="form-group">
+                <label for="tgCode">Código de 5 dígitos</label>
+                <input type="text" id="tgCode" placeholder="Ex: 12345" maxlength="10">
+              </div>
+              <div class="btn-group">
+                <button class="btn btn-success" id="btnTgVerifyCode">Confirmar Código</button>
+                <button class="btn btn-secondary" id="btnTgCancelCode">Voltar</button>
+              </div>
+            </div>
+
+            <!-- Waiting 2FA Password State -->
+            <div id="tg2FaStep" class="auth-section hidden">
+              <div class="alert alert-warning">
+                Sua conta possui Senha de Nuvem (2FA ativado).
+              </div>
+              <div class="form-group">
+                <label for="tg2FaPass">Senha de Nuvem (2FA)</label>
+                <input type="password" id="tg2FaPass" placeholder="Sua senha do Telegram">
+              </div>
+              <button class="btn btn-success" id="btnTgSubmit2Fa">Autenticar 2FA</button>
+            </div>
+
+            <!-- Connected State -->
+            <div id="tgConnectedStep" class="auth-section hidden">
+              <div class="status-summary success">
+                <div class="status-row">
+                  <span class="label">Sessão MTProto:</span>
+                  <span class="val" id="tgSessionStatus">Ativa & salva em data/telegram.session</span>
+                </div>
+                <div class="status-row">
+                  <span class="label">Canal monitorado:</span>
+                  <span class="val highlight" id="tgActiveChannel">Nenhum</span>
+                </div>
+              </div>
+              <button class="btn btn-danger btn-sm" id="btnTgLogout">Desconectar Telegram</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- WhatsApp Card -->
+        <section class="card" id="whatsappCard">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="icon whatsapp-green">💬</span>
+              <h2>Destino: WhatsApp (Baileys)</h2>
+            </div>
+            <span class="badge badge-disconnected" id="waBadge">Desconectado</span>
+          </div>
+
+          <div class="card-body">
+            <!-- QR Code Container -->
+            <div id="waQrSection" class="qr-section">
+              <div class="qr-box" id="waQrBox">
+                <div class="qr-placeholder" id="waQrPlaceholder">
+                  <div class="spinner"></div>
+                  <p>Gerando QR Code do WhatsApp...</p>
+                </div>
+                <img id="waQrImg" alt="QR Code WhatsApp" class="qr-img hidden">
+              </div>
+              <p class="qr-instructions">Abra o WhatsApp no celular ➔ Menu / Configurações ➔ <strong>Aparelhos conectados</strong> ➔ <strong>Conectar um aparelho</strong> e aponte para o QR Code.</p>
+              <button class="btn btn-secondary btn-sm" id="btnWaReconnect">Gerar Novo QR Code</button>
+            </div>
+
+            <!-- Connected State -->
+            <div id="waConnectedSection" class="connected-section hidden">
+              <div class="status-summary success">
+                <div class="status-row">
+                  <span class="label">Status:</span>
+                  <span class="val">WhatsApp Conectado e Pronto</span>
+                </div>
+              </div>
+
+              <button class="btn btn-danger btn-sm" id="btnWaDisconnect">Desconectar WhatsApp</button>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- Right Column: Config, Live Cloned Feed, Simulator & Terminal -->
+      <div class="column">
+
+        <!-- Config Card -->
+        <section class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="icon">⚙️</span>
+              <h2>Configuração do Repasse</h2>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <div class="form-group">
+              <label for="cfgSourceChannel">
+                Canal de Origem (Telegram)
+                <span class="hint">@username do canal público</span>
+              </label>
+              <input type="text" id="cfgSourceChannel" placeholder="Ex: @promocoesimperdiveis">
+            </div>
+
+            <div class="form-group">
+              <label for="cfgDestJid">
+                Destino (WhatsApp)
+                <span class="hint">Link do Canal, Link do Grupo, JID ou Número</span>
+              </label>
+              <input type="text" id="cfgDestJid" placeholder="Ex: https://whatsapp.com/channel/0029Vb... ou 120363...@g.us">
+              <div id="resolvedJidBadge" class="resolved-badge hidden"></div>
+            </div>
+
+            <div class="group-select-row">
+              <button class="btn btn-secondary btn-sm" id="btnLoadChats" type="button">📋 Listar meus Grupos & Canais</button>
+              <select id="chatSelectDropdown" class="chat-select hidden">
+                <option value="">-- Selecione um grupo ou canal --</option>
+              </select>
+            </div>
+
+            <div class="jid-help-box">
+              <span class="jid-help-title">💡 Formatos aceitos automaticamente:</span>
+              <ul>
+                <li><strong>Link de Canal:</strong> <code>https://whatsapp.com/channel/0029Vb...</code> (resolvido automaticamente para <code>@newsletter</code>)</li>
+                <li><strong>Link de Grupo:</strong> <code>https://chat.whatsapp.com/...</code> (resolvido automaticamente para <code>@g.us</code>)</li>
+                <li><strong>JID direto:</strong> <code>120363024823901928@g.us</code> ou <code>120363...@newsletter</code></li>
+                <li><strong>Número com DDD:</strong> <code>5511999999999</code></li>
+              </ul>
+            </div>
+
+            <div class="oauth-box">
+              <div class="oauth-box-header">
+                <span class="oauth-title">🟡 Mercado Livre (OAuth & API v2 createLink)</span>
+                <span id="meliTokenBadge" class="badge badge-disconnected">Token Ausente</span>
+              </div>
+
+              <div class="form-group">
+                <label for="cfgMlAppId">
+                  App ID (client_id)
+                  <a href="https://developers.mercadolivre.com.br" target="_blank" class="link-hint">(Developers ML)</a>
+                </label>
+                <input type="text" id="cfgMlAppId" placeholder="Ex: 8823471724422422">
+              </div>
+
+              <div class="form-group">
+                <label for="cfgMlSecretKey">Client Secret (client_secret)</label>
+                <input type="password" id="cfgMlSecretKey" placeholder="Ex: aBcDeFgHiJkLmNoPqRsTuVwXyZ">
+              </div>
+
+              <div class="form-group">
+                <label for="cfgMlTag">
+                  Tag de Afiliado (ML_AFFILIATE_TAG)
+                  <span class="hint">Formato: matt_tool=XXXXX&matt_word=XXXXX</span>
+                </label>
+                <input type="text" id="cfgMlTag" placeholder="matt_tool=12345678&matt_word=12345678">
+              </div>
+
+              <div class="oauth-helper-box">
+                <span class="helper-title">🔑 Como obter seus tokens pela primeira vez:</span>
+                <ol class="helper-steps">
+                  <li>Preencha seu <strong>App ID</strong> e <strong>Client Secret</strong> acima.</li>
+                  <li>Clique no botão abaixo para autorizar sua conta no Mercado Livre:</li>
+                  <li>
+                    <a id="btnOpenMlAuth" href="#" target="_blank" class="btn btn-outline btn-sm" style="display:inline-block; margin: 0.35rem 0;">
+                      🔗 Abrir Autorização no Mercado Livre
+                    </a>
+                  </li>
+                  <li>Após autorizar, você será redirecionado para uma URL com <code>?code=TG-...</code></li>
+                  <li>Copie essa URL completa ou apenas o código <code>TG-...</code> e cole abaixo:</li>
+                </ol>
+                <div class="code-exchange-row">
+                  <input type="text" id="mlAuthCodeInput" placeholder="Cole aqui o link ou código TG-xxxxxxxx">
+                  <button class="btn btn-primary btn-sm" id="btnExchangeMlCode" type="button">
+                    ⚡ Gerar Tokens
+                  </button>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="cfgMlAccessToken">Access Token (Salvo automaticamente)</label>
+                <input type="password" id="cfgMlAccessToken" placeholder="APP_USR-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-xxxxxx">
+              </div>
+
+              <div class="form-group">
+                <label for="cfgMlRefreshToken">Refresh Token (Salvo automaticamente)</label>
+                <input type="password" id="cfgMlRefreshToken" placeholder="TG-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-xxxxxx">
+              </div>
+
+              <div class="token-actions-row">
+                <button class="btn btn-secondary btn-sm" id="btnRefreshMeliToken" type="button">🔄 Renovar Token Agora</button>
+                <span id="meliTokenExpireInfo" class="token-expire-info">Nenhum token salvo</span>
+              </div>
+            </div>
+
+            <div class="store-status-bar">
+              <span class="store-chip active">🟡 Mercado Livre (createLink v2)</span>
+              <span class="store-chip pending">🟠 Shopee (Função Pronta)</span>
+              <span class="store-chip pending">🔵 Magalu (Função Pronta)</span>
+              <span class="store-chip pending">🔴 AliExpress (Função Pronta)</span>
+            </div>
+
+            <div class="btn-group">
+              <button class="btn btn-success" id="btnSaveConfig">
+                <span>Salvar Configurações</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Affiliate Link Tester Card -->
+        <section class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="icon">🔗</span>
+              <h2>Testador de Link de Afiliado</h2>
+            </div>
+          </div>
+          <div class="card-body">
+            <p class="info-text">Cole qualquer link (ex: <code>meli.la/...</code> ou <code>mercadolivre.com/sec/...</code>) para testar a detecção, resolução de redirecionamento e conversão de afiliado.</p>
+            
+            <div class="form-group">
+              <input type="text" id="testAffInput" placeholder="Ex: https://meli.la/2abcde ou texto com link de oferta">
+            </div>
+
+            <button class="btn btn-primary btn-sm" id="btnTestAffiliate">
+              <span>⚡ Testar Conversão de Link</span>
+            </button>
+
+            <div id="affTestResultBox" class="aff-result-box hidden">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </section>
+
+        <!-- Live Cloned Offers Feed -->
+        <section class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="icon">📦</span>
+              <h2>Feed de Mensagens Repassadas</h2>
+            </div>
+            <span class="badge badge-connected" id="feedCountBadge">0 itens</span>
+          </div>
+
+          <div class="card-body">
+            <div class="feed-container" id="feedContainer">
+              <div class="empty-feed" id="emptyFeedMsg">
+                <div class="empty-icon">📭</div>
+                <p>Nenhuma mensagem clonada ainda.</p>
+                <span>Quando novas mensagens chegarem no canal do Telegram, elas aparecerão aqui em tempo real.</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Simulator / Fast Test -->
+        <section class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="icon">🧪</span>
+              <h2>Simulador de Oferta / Teste Rápido</h2>
+            </div>
+          </div>
+          <div class="card-body">
+            <p class="info-text">Envie uma mensagem de teste com link de oferta para validar a substituição automática e entrega no WhatsApp.</p>
+            
+            <div class="form-group">
+              <label for="simText">Texto da Oferta</label>
+              <textarea id="simText" rows="3" placeholder="🔥 Super Oferta! Fone de Ouvido Bluetooth https://meli.la/2XAbcde">🔥 [OFERTA TESTE] Fone de Ouvido Bluetooth TWS com Cancelamento de Ruído!
+💰 Por apenas R$ 89,90 com Frete Grátis!
+👉 Compre aqui: https://meli.la/1q7zY8n</textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="simImage">URL da Imagem (Opcional)</label>
+              <input type="text" id="simImage" placeholder="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500" value="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500">
+            </div>
+
+            <button class="btn btn-primary" id="btnSimulate">
+              <span>🚀 Disparar Oferta de Teste</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- Live Terminal / Logs Card -->
+        <section class="card logs-card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="icon">📜</span>
+              <h2>Terminal de Logs em Tempo Real</h2>
+            </div>
+            <div class="log-controls">
+              <label class="autoscroll-label">
+                <input type="checkbox" id="autoScrollCheck" checked> Auto-rolar
+              </label>
+              <button class="btn-icon" id="btnClearLogs" title="Limpar Logs">🗑️</button>
+            </div>
+          </div>
+
+          <div class="terminal-body" id="logTerminal">
+            <div class="log-entry system info">
+              <span class="log-time">[--:--:--]</span>
+              <span class="log-tag">[SYSTEM]</span>
+              <span class="log-msg">Iniciando console de monitoramento...</span>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
