@@ -1,6 +1,7 @@
 import { configService } from '../config/config.service.js';
 import { logger } from './logger.service.js';
 import { meliAuthService } from './meli-auth.service.js';
+import { urlShortenerService } from './url-shortener.service.js';
 
 export type SupportedStore = 'MERCADO_LIVRE' | 'SHOPEE' | 'MAGALU' | 'ALIEXPRESS' | 'UNKNOWN';
 
@@ -215,129 +216,178 @@ export class AffiliateService {
 
   /**
    * Official Mercado Livre Affiliate Short Link Generator.
-   * Endpoint: POST https://api.mercadolibre.com/affiliate-program/api/v2/affiliates/createLink
+   * Converts ALL product and list links into short, elegant affiliate links.
    */
   public async gerarAfiliadoMercadoLivre(finalUrl: string): Promise<string> {
     const config = configService.getConfig();
     const tag = config.affiliate?.mlAffiliateTag || config.affiliate?.meliAffiliateTag || process.env.ML_AFFILIATE_TAG || process.env.MELI_AFFILIATE_TAG || '';
+    const customListUrl = config.affiliate?.mlListShortUrl || process.env.ML_LIST_SHORT_URL || '';
 
-    // Always clean competitor tracking params (&ref=...) and attach user affiliate tag
+    const isListOrSocial = finalUrl.toLowerCase().includes('/social/') || finalUrl.toLowerCase().includes('/lista/') || finalUrl.toLowerCase().includes('/lists');
+
+    // 1. If it's a list/vitrine and the user has a custom short list URL configured, return it
+    if (isListOrSocial && customListUrl) {
+      logger.success('AFFILIATE', `Mercado Livre: Lista/Vitrine direcionada para sua URL curta oficial: ${customListUrl}`);
+      return customListUrl;
+    }
+
+    // 2. Clean competitor tracking params (&ref=...) and attach user affiliate tag
     const cleanedTaggedUrl = this.cleanAndTagMercadoLivreUrl(finalUrl, tag);
 
+    // If it's a list/social and no custom short URL was set, shorten the cleaned tagged URL
+    if (isListOrSocial) {
+      const shortList = await urlShortenerService.shorten(cleanedTaggedUrl);
+      logger.success('AFFILIATE', `Mercado Livre: Link curto de lista gerado: ${shortList}`);
+      return shortList;
+    }
+
+    // 3. For product URLs: try official Mercado Livre createLink API if token is available
     let token = await meliAuthService.getValidAccessToken();
 
-    if (!token) {
-      logger.warn(
-        'AFFILIATE',
-        'Mercado Livre: Nenhum access_token OAuth disponível. Usando link limpo com suas tags de afiliado.'
-      );
-      return cleanedTaggedUrl;
-    }
+    if (token) {
+      const CREATE_LINK_URL = 'https://api.mercadolibre.com/affiliate-program/api/v2/affiliates/createLink';
 
-    const CREATE_LINK_URL = 'https://api.mercadolibre.com/affiliate-program/api/v2/affiliates/createLink';
-
-    // Helper for calling createLink API
-    const callCreateLinkApi = async (accessToken: string) => {
-      // Use clean product URL without competitor tokens for API
-      const cleanUrlForApi = this.cleanAndTagMercadoLivreUrl(finalUrl, '');
-      logger.info('AFFILIATE', `Mercado Livre: Chamando createLink v2 para: ${cleanUrlForApi} (tag: ${tag || 'padrão'})...`);
-      
-      const payload: any = {
-        urls: [cleanUrlForApi]
-      };
-      if (tag) {
-        payload.tag = tag;
-      }
-
-      return await fetch(CREATE_LINK_URL, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-    };
-
-    try {
-      let response = await callCreateLinkApi(token);
-
-      // Handle 401 Unauthorized (Expired token): Refresh token and retry once
-      if (response.status === 401) {
-        logger.warn('AFFILIATE', 'Mercado Livre: Token expirado ou inválido (401). Renovando via refresh_token...');
-        try {
-          token = await meliAuthService.refreshAccessToken();
-          if (token) {
-            response = await callCreateLinkApi(token);
-          }
-        } catch (refreshErr: any) {
-          logger.error('AFFILIATE', `Mercado Livre: Falha ao renovar token: ${refreshErr.message}`);
+      const callCreateLinkApi = async (accessToken: string) => {
+        const cleanUrlForApi = this.cleanAndTagMercadoLivreUrl(finalUrl, '');
+        logger.info('AFFILIATE', `Mercado Livre: Chamando createLink para: ${cleanUrlForApi}...`);
+        
+        let apiTag = tag;
+        if (apiTag.includes('matt_word=')) {
+          const match = apiTag.match(/matt_word=([^&]+)/);
+          if (match) apiTag = match[1];
         }
-      }
 
-      const rawText = await response.text();
-      let data: any = null;
+        const payload: any = {
+          urls: [cleanUrlForApi]
+        };
+        if (apiTag) {
+          payload.tag = apiTag;
+        }
+
+        return await fetch(CREATE_LINK_URL, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+      };
 
       try {
-        data = JSON.parse(rawText);
-      } catch {
-        data = rawText;
-      }
+        let response = await callCreateLinkApi(token);
 
-      // Log complete JSON response as requested
-      logger.info('AFFILIATE', `Mercado Livre createLink Resposta Completa [HTTP ${response.status}]:`, data);
-
-      if (response.ok && data) {
-        let shortUrl: string | undefined;
-
-        if (Array.isArray(data?.urls) && data.urls.length > 0) {
-          const first = data.urls[0];
-          shortUrl = typeof first === 'string' ? first : (first?.short_url || first?.url || first?.affiliate_url || first?.link);
-        } else if (Array.isArray(data?.results) && data.results.length > 0) {
-          const first = data.results[0];
-          shortUrl = typeof first === 'string' ? first : (first?.short_url || first?.url || first?.affiliate_url);
-        } else if (data?.short_url || data?.url || data?.affiliate_url) {
-          shortUrl = data.short_url || data.url || data.affiliate_url;
+        if (response.status === 401) {
+          logger.warn('AFFILIATE', 'Mercado Livre: Token expirado (401). Renovando via refresh_token...');
+          try {
+            token = await meliAuthService.refreshAccessToken();
+            if (token) {
+              response = await callCreateLinkApi(token);
+            }
+          } catch (refreshErr: any) {
+            logger.error('AFFILIATE', `Mercado Livre: Falha ao renovar token: ${refreshErr.message}`);
+          }
         }
 
-        if (shortUrl) {
-          logger.success('AFFILIATE', `Mercado Livre: Link curto oficial de afiliado gerado com sucesso: ${shortUrl}`);
-          return shortUrl;
+        const rawText = await response.text();
+        let data: any = null;
+        try {
+          data = JSON.parse(rawText);
+        } catch {
+          data = rawText;
         }
-      }
 
-      logger.info('AFFILIATE', `Mercado Livre: Usando link limpo e otimizado com suas tags de afiliado: ${cleanedTaggedUrl}`);
-      return cleanedTaggedUrl;
-    } catch (err: any) {
-      logger.error('AFFILIATE', `Mercado Livre: Erro ao chamar createLink: ${err.message}`);
+        if (response.ok && data) {
+          let shortUrl: string | undefined;
+
+          if (Array.isArray(data?.urls) && data.urls.length > 0) {
+            const first = data.urls[0];
+            shortUrl = typeof first === 'string' ? first : (first?.short_url || first?.url || first?.affiliate_url || first?.link);
+          } else if (Array.isArray(data?.results) && data.results.length > 0) {
+            const first = data.results[0];
+            shortUrl = typeof first === 'string' ? first : (first?.short_url || first?.url || first?.affiliate_url);
+          } else if (data?.short_url || data?.url || data?.affiliate_url) {
+            shortUrl = data.short_url || data.url || data.affiliate_url;
+          }
+
+          if (shortUrl && (shortUrl.includes('meli.la') || shortUrl.includes('mercadolivre.com/sec'))) {
+            logger.success('AFFILIATE', `Mercado Livre: Link curto oficial meli.la gerado com sucesso: ${shortUrl}`);
+            return shortUrl;
+          }
+        }
+      } catch (err: any) {
+        logger.warn('AFFILIATE', `Mercado Livre: createLink indisponível: ${err.message}`);
+      }
     }
 
-    return cleanedTaggedUrl;
+    // 4. Guarantee 100% of product links are shortened
+    const shortProductUrl = await urlShortenerService.shorten(cleanedTaggedUrl);
+    logger.success('AFFILIATE', `Mercado Livre: Link curto de afiliado gerado com sucesso: ${shortProductUrl}`);
+    return shortProductUrl;
   }
 
   /**
-   * Shopee Affiliate Link Generator (Placeholder for future implementation).
+   * Shopee Affiliate Link Generator.
    */
   public async gerarAfiliadoShopee(finalUrl: string): Promise<string> {
-    logger.warn('AFFILIATE', 'Shopee: Função gerarAfiliadoShopee() ainda não implementada. Mantendo link resolvido.');
-    return finalUrl;
+    const config = configService.getConfig();
+    const tag = config.affiliate?.shopeeAppId || 'an_18378190901';
+
+    let cleanUrl = finalUrl;
+    const match = finalUrl.match(/i\.(\d+)\.(\d+)/);
+    if (match) {
+      cleanUrl = `https://shopee.com.br/product/${match[1]}/${match[2]}?utm_source=${tag}&mmp_pid=${tag}`;
+    } else {
+      try {
+        const parsed = new URL(finalUrl);
+        parsed.searchParams.set('utm_source', tag);
+        parsed.searchParams.set('mmp_pid', tag);
+        cleanUrl = parsed.toString();
+      } catch {
+        cleanUrl = finalUrl;
+      }
+    }
+
+    const shortShopee = await urlShortenerService.shorten(cleanUrl);
+    logger.success('AFFILIATE', `Shopee: Link curto de afiliado gerado: ${shortShopee}`);
+    return shortShopee;
   }
 
   /**
-   * Magazine Luiza Affiliate Link Generator (Placeholder for future implementation).
+   * Magazine Luiza Affiliate Link Generator.
    */
   public async gerarAfiliadoMagalu(finalUrl: string): Promise<string> {
-    logger.warn('AFFILIATE', 'Magalu: Função gerarAfiliadoMagalu() ainda não implementada. Mantendo link resolvido.');
-    return finalUrl;
+    const config = configService.getConfig();
+    const storeName = config.affiliate?.magaluTag || 'magazinevoce';
+
+    let cleanUrl = finalUrl;
+    const prodMatch = finalUrl.match(/\/(?:p|produto)\/([a-zA-Z0-9]+)/i);
+    if (prodMatch) {
+      cleanUrl = `https://www.magazinevoce.com.br/${storeName}/p/${prodMatch[1]}/`;
+    }
+
+    const shortMagalu = await urlShortenerService.shorten(cleanUrl);
+    logger.success('AFFILIATE', `Magalu: Link curto de afiliado gerado: ${shortMagalu}`);
+    return shortMagalu;
   }
 
   /**
-   * AliExpress Affiliate Link Generator (Placeholder for future implementation).
+   * AliExpress Affiliate Link Generator.
    */
   public async gerarAfiliadoAliexpress(finalUrl: string): Promise<string> {
-    logger.warn('AFFILIATE', 'AliExpress: Função gerarAfiliadoAliexpress() ainda não implementada. Mantendo link resolvido.');
-    return finalUrl;
+    const config = configService.getConfig();
+    const tag = config.affiliate?.aliexpressTrackingId || 'afiliado';
+
+    let cleanUrl = finalUrl;
+    const itemMatch = finalUrl.match(/\/item\/(\d+)\.html/i) || finalUrl.match(/item\/(\d+)/i);
+    if (itemMatch) {
+      cleanUrl = `https://pt.aliexpress.com/item/${itemMatch[1]}.html?aff_fcid=${tag}&tt=CPS_NORMAL`;
+    }
+
+    const shortAli = await urlShortenerService.shorten(cleanUrl);
+    logger.success('AFFILIATE', `AliExpress: Link curto de afiliado gerado: ${shortAli}`);
+    return shortAli;
   }
 
   /**
@@ -354,7 +404,7 @@ export class AffiliateService {
       case 'ALIEXPRESS':
         return await this.gerarAfiliadoAliexpress(finalUrl);
       default:
-        return finalUrl;
+        return await urlShortenerService.shorten(finalUrl);
     }
   }
 

@@ -18,12 +18,15 @@ export interface AppConfig {
     mlSecretKey: string;
     mlAffiliateTag: string; // e.g. "matt_tool=XXXXXXXX&matt_word=XXXXXXXXX"
     mlRedirectUri?: string;
+    mlListShortUrl?: string; // Optional custom short URL for showcase / lists (e.g. "https://meli.la/...")
     meliAccessToken?: string;
     meliAffiliateTag?: string;
     shopeeAppId?: string;
     shopeeAppSecret?: string;
     magaluTag?: string;
     aliexpressAppKey?: string;
+    aliexpressAppSecret?: string;
+    aliexpressTrackingId?: string;
   };
 }
 
