@@ -66,6 +66,15 @@ class ConfigService {
       } else {
         this.saveConfig(DEFAULT_CONFIG);
       }
+
+      // Check if data/cookie.txt exists
+      const cookieFile = path.join(DATA_DIR, 'cookie.txt');
+      if (fs.existsSync(cookieFile)) {
+        const c = fs.readFileSync(cookieFile, 'utf-8').trim();
+        if (c) {
+          this.config.affiliate.meliCookie = c;
+        }
+      }
     } catch (err: any) {
       logger.error('SYSTEM', `Erro ao carregar arquivo de configuração: ${err.message}`);
       this.config = { ...DEFAULT_CONFIG };

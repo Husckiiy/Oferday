@@ -227,6 +227,7 @@ export class AffiliateService {
 
     try {
       // 1. Get dynamic CSRF Token from Linkbuilder page
+      logger.info('AFFILIATE', 'Mercado Livre: Obtendo token CSRF do Linkbuilder oficial...');
       const pageResp = await fetch('https://www.mercadolivre.com.br/afiliados/linkbuilder', {
         headers: {
           'User-Agent': this.userAgent,
@@ -236,19 +237,38 @@ export class AffiliateService {
         signal: AbortSignal.timeout(6000)
       });
 
-      if (!pageResp.ok) return null;
+      if (!pageResp.ok) {
+        logger.warn('AFFILIATE', `Mercado Livre: Falha ao acessar Linkbuilder (HTTP ${pageResp.status})`);
+        return null;
+      }
 
       const html = await pageResp.text();
+      let csrfToken = '';
       const m = html.match(/(?:csrfToken|_csrf|csrf)[\"':\s]+[\"']([^\"']+)[\"']/i);
-      const csrfToken = m ? m[1] : '';
+      if (m && m[1]) {
+        csrfToken = m[1];
+      } else {
+        const cookieMatch = cookie.match(/_csrf=([^;]+)/);
+        if (cookieMatch) {
+          csrfToken = cookieMatch[1];
+        }
+      }
 
-      if (!csrfToken) return null;
+      if (!csrfToken) {
+        logger.warn('AFFILIATE', 'Mercado Livre: CSRF token não encontrado na página.');
+        return null;
+      }
 
       let apiTag = tag;
       if (apiTag.includes('matt_word=')) {
         const match = apiTag.match(/matt_word=([^&]+)/);
         if (match) apiTag = match[1];
       }
+      if (!apiTag || apiTag === '6282693331910478') {
+        apiTag = 'G20260107233651';
+      }
+
+      logger.info('AFFILIATE', `Mercado Livre: Chamando Linkbuilder com tag ${apiTag}...`);
 
       // 2. Call official Linkbuilder createLink endpoint
       const postResp = await fetch('https://www.mercadolivre.com.br/affiliate-program/api/v2/affiliates/createLink', {
@@ -264,10 +284,12 @@ export class AffiliateService {
         },
         body: JSON.stringify({
           urls: [productUrl],
-          tag: apiTag || 'afiliado'
+          tag: apiTag
         }),
         signal: AbortSignal.timeout(8000)
       });
+
+      logger.info('AFFILIATE', `Mercado Livre: Linkbuilder POST status HTTP ${postResp.status}`);
 
       if (postResp.ok) {
         const data: any = await postResp.json();
