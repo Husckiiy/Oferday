@@ -526,12 +526,83 @@ export class AffiliateService {
   }
 
   /**
+   * Generates official AliExpress short link (s.click.aliexpress.com) via Open Platform API.
+   */
+  public async generateOfficialAliexpressShortLink(targetUrl: string, trackingId: string): Promise<string | null> {
+    const config = configService.getConfig();
+    const appKey = config.affiliate?.aliexpressAppKey || process.env.ALIEXPRESS_APP_KEY || '544386';
+    const appSecret = config.affiliate?.aliexpressAppSecret || process.env.ALIEXPRESS_APP_SECRET || 'g7NPfxfXQIYYvCHFfTd7VTgRDKgBbYDz';
+
+    if (!appKey || !appSecret) {
+      return null;
+    }
+
+    try {
+      const d = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const timestamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
+      const params: Record<string, string> = {
+        app_key: appKey,
+        timestamp: timestamp,
+        format: 'json',
+        method: 'aliexpress.affiliate.link.generate',
+        sign_method: 'sha256',
+        v: '2.0',
+        promotion_link_type: '0',
+        source_values: targetUrl,
+        tracking_id: trackingId || 'ibanez'
+      };
+
+      const sortedKeys = Object.keys(params).sort();
+      let signString = '';
+      for (const k of sortedKeys) {
+        signString += `${k}${params[k]}`;
+      }
+
+      const signHmac = crypto.createHmac('sha256', appSecret).update(signString, 'utf8').digest('hex').toUpperCase();
+
+      const urlHmac = new URL('https://api-sg.aliexpress.com/sync');
+      Object.entries(params).forEach(([k, v]) => urlHmac.searchParams.set(k, v));
+      urlHmac.searchParams.set('sign', signHmac);
+
+      const resp = await fetch(urlHmac.toString(), {
+        method: 'POST',
+        signal: AbortSignal.timeout(8000)
+      });
+
+      if (resp.ok) {
+        const data: any = await resp.json();
+        const links = data?.aliexpress_affiliate_link_generate_response?.resp_result?.result?.promotion_links?.promotion_link;
+        if (Array.isArray(links) && links.length > 0) {
+          const shortUrl = links[0]?.promotion_link;
+          if (shortUrl && (shortUrl.includes('s.click.aliexpress.com') || shortUrl.includes('aliexpress.com'))) {
+            return shortUrl;
+          }
+        }
+      }
+    } catch (err: any) {
+      logger.warn('AFFILIATE', `Aviso ao gerar link curto do AliExpress via API: ${err.message}`);
+    }
+
+    return null;
+  }
+
+  /**
    * Official AliExpress Affiliate Link Generator.
    */
   public async gerarAfiliadoAliexpress(finalUrl: string): Promise<string> {
     const config = configService.getConfig();
     const tag = config.affiliate?.aliexpressTrackingId || process.env.ALIEXPRESS_AFFILIATE_TAG || 'ibanez';
 
+    // 1. Tenta gerar link oficial s.click via API
+    const officialShort = await this.generateOfficialAliexpressShortLink(finalUrl, tag);
+    if (officialShort) {
+      logger.success('AFFILIATE', `AliExpress: Link curto oficial gerado via API: ${officialShort}`);
+      return officialShort;
+    }
+
+    // 2. Fallback de link canônico oficial
     const itemMatch = finalUrl.match(/\/item\/(\d+)\.html/i) || finalUrl.match(/item\/(\d+)/i);
     if (itemMatch) {
       const aliUrl = `https://pt.aliexpress.com/item/${itemMatch[1]}.html?aff_fcid=${tag}&tt=CPS_NORMAL`;

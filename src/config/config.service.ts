@@ -35,7 +35,9 @@ const DEFAULT_CONFIG: AppConfig = {
     amazonTag: process.env.AMAZON_TAG || process.env.AMAZON_AFFILIATE_TAG || 'ibanez08-20',
     amazonCookie: process.env.AMAZON_COOKIE || '',
     magaluTag: process.env.MAGALU_TAG || process.env.MAGALU_AFFILIATE_TAG || 'magazineibanez01',
-    aliexpressAppKey: process.env.ALIEXPRESS_APP_KEY || ''
+    aliexpressAppKey: process.env.ALIEXPRESS_APP_KEY || '544386',
+    aliexpressAppSecret: process.env.ALIEXPRESS_APP_SECRET || 'g7NPfxfXQIYYvCHFfTd7VTgRDKgBbYDz',
+    aliexpressTrackingId: process.env.ALIEXPRESS_TRACKING_ID || process.env.ALIEXPRESS_AFFILIATE_TAG || 'ibanez'
   }
 };
 
