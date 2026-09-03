@@ -29,8 +29,22 @@ class ImageService {
 
   private initDefaultRules(): void {
     const mlCouponClean = path.join(BANNERS_DIR, 'alerta_cupons_ml_limpo.jpg');
+    const magaluCouponClean = path.join(BANNERS_DIR, 'alerta_cupons_magalu_limpo.jpg');
 
     this.rules = [
+      {
+        id: 'magalu_coupon_alert',
+        name: 'Alerta de Cupons Magalu',
+        keywords: [
+          'alerta de cupons magalu',
+          'cupons magalu',
+          'cupom magalu',
+          'alerta magalu',
+          'cupom magazine luiza',
+          'cupons magazine luiza'
+        ],
+        cleanImagePath: magaluCouponClean
+      },
       {
         id: 'ml_coupon_alert',
         name: 'Alerta de Cupons Mercado Livre',
