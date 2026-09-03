@@ -24,6 +24,7 @@ export interface AppConfig {
     meliAffiliateTag?: string;
     shopeeAppId?: string;
     shopeeAppSecret?: string;
+    amazonTag?: string;
     magaluTag?: string;
     aliexpressAppKey?: string;
     aliexpressAppSecret?: string;

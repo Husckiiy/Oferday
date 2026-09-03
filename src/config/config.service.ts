@@ -30,9 +30,10 @@ const DEFAULT_CONFIG: AppConfig = {
     meliCookie: process.env.ML_COOKIE || process.env.MELI_COOKIE || process.env.MERCADOLIVRE_COOKIE || '',
     meliAccessToken: process.env.ML_ACCESS_TOKEN || process.env.MELI_ACCESS_TOKEN || '',
     meliAffiliateTag: process.env.ML_AFFILIATE_TAG || process.env.MELI_AFFILIATE_TAG || '',
-    shopeeAppId: process.env.SHOPEE_APP_ID || '',
-    shopeeAppSecret: process.env.SHOPEE_APP_SECRET || '',
-    magaluTag: process.env.MAGALU_TAG || '',
+    shopeeAppId: process.env.SHOPEE_APP_ID || '18378190901',
+    shopeeAppSecret: process.env.SHOPEE_APP_SECRET || 'ITHJMNNGTV4JOSEZLT27UZ3TY7ICCC6L',
+    amazonTag: process.env.AMAZON_TAG || process.env.AMAZON_AFFILIATE_TAG || 'ibanez08-20',
+    magaluTag: process.env.MAGALU_TAG || process.env.MAGALU_AFFILIATE_TAG || 'magazineibanez01',
     aliexpressAppKey: process.env.ALIEXPRESS_APP_KEY || ''
   }
 };

@@ -1,9 +1,10 @@
+import crypto from 'crypto';
 import { configService } from '../config/config.service.js';
 import { logger } from './logger.service.js';
 import { meliAuthService } from './meli-auth.service.js';
 import { urlShortenerService } from './url-shortener.service.js';
 
-export type SupportedStore = 'MERCADO_LIVRE' | 'SHOPEE' | 'MAGALU' | 'ALIEXPRESS' | 'UNKNOWN';
+export type SupportedStore = 'MERCADO_LIVRE' | 'SHOPEE' | 'AMAZON' | 'MAGALU' | 'ALIEXPRESS' | 'UNKNOWN';
 
 export interface AffiliateResult {
   originalUrl: string;
@@ -27,8 +28,12 @@ export class AffiliateService {
       pattern: /https?:\/\/(?:www\.)?(?:s\.shopee\.com\.br|shopee\.com\.br|shopee\.com)\/[^\s<>"')]+/gi
     },
     {
+      store: 'AMAZON' as SupportedStore,
+      pattern: /https?:\/\/(?:www\.)?(?:amzn\.to|amazon\.com(?:\.br)?|a\.co)\/[^\s<>"')]+/gi
+    },
+    {
       store: 'MAGALU' as SupportedStore,
-      pattern: /https?:\/\/(?:www\.)?(?:magazineluiza\.com\.br|magazinevoce\.com\.br|(?:[a-zA-Z0-9_-]+\.)?onelink\.me|magazinevoce\.com)\/[^\s<>"')]+/gi
+      pattern: /https?:\/\/(?:www\.)?(?:magazineluiza\.com\.br|magazinevoce\.com\.br|(?:[a-zA-Z0-9_-]+\.)?onelink\.me|magalu\.me|magazinevoce\.com)\/[^\s<>"')]+/gi
     },
     {
       store: 'ALIEXPRESS' as SupportedStore,
@@ -53,9 +58,20 @@ export class AffiliateService {
       return 'SHOPEE';
     }
     if (
+      lower.includes('amazon.com') ||
+      lower.includes('amazon.com.br') ||
+      lower.includes('amzn.to') ||
+      lower.includes('a.co/') ||
+      lower.includes('//a.co')
+    ) {
+      return 'AMAZON';
+    }
+    if (
       lower.includes('magazineluiza.com.br') ||
       lower.includes('magazinevoce.com.br') ||
-      lower.includes('onelink.me')
+      lower.includes('parceiromagalu.com.br') ||
+      lower.includes('onelink.me') ||
+      lower.includes('magalu.me')
     ) {
       return 'MAGALU';
     }
@@ -343,18 +359,53 @@ export class AffiliateService {
   }
 
   /**
-   * Official Shopee Affiliate Link Generator.
+   * Official Shopee Affiliate Link Generator (uses official GraphQL API for s.shopee.com.br).
    */
   public async gerarAfiliadoShopee(finalUrl: string): Promise<string> {
     const config = configService.getConfig();
-    const tag = config.affiliate?.shopeeAppId || process.env.SHOPEE_AFFILIATE_UNIVERSAL_URL || 'an_18378190901';
+    const appId = config.affiliate?.shopeeAppId || process.env.SHOPEE_APP_ID || '18378190901';
+    const secret = config.affiliate?.shopeeAppSecret || process.env.SHOPEE_APP_SECRET || 'ITHJMNNGTV4JOSEZLT27UZ3TY7ICCC6L';
 
-    let cleanTag = tag;
-    if (cleanTag.includes('an_')) {
-      const match = cleanTag.match(/(an_\d+)/);
-      if (match) cleanTag = match[1];
+    // 1. Tenta gerar link curto oficial s.shopee.com.br via GraphQL API
+    if (appId && secret) {
+      try {
+        const timestamp = Math.floor(Date.now() / 1000);
+        const bodyStr = JSON.stringify({
+          query: `mutation {
+            generateShortLink(input: { originUrl: "${finalUrl}" }) {
+              shortLink
+            }
+          }`
+        });
+
+        const factor = `${appId}${timestamp}${bodyStr}${secret}`;
+        const signature = crypto.createHash('sha256').update(factor, 'utf8').digest('hex');
+
+        const resp = await fetch('https://open-api.affiliate.shopee.com.br/graphql', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `SHA256 Credential=${appId}, Timestamp=${timestamp}, Signature=${signature}`
+          },
+          body: bodyStr,
+          signal: AbortSignal.timeout(8000)
+        });
+
+        if (resp.ok) {
+          const data: any = await resp.json();
+          const shortLink = data?.data?.generateShortLink?.shortLink;
+          if (shortLink && (shortLink.includes('s.shopee') || shortLink.includes('shope.ee') || shortLink.includes('shopee.com'))) {
+            logger.success('AFFILIATE', `Shopee: Link curto oficial gerado via API: ${shortLink}`);
+            return shortLink;
+          }
+        }
+      } catch (err: any) {
+        logger.warn('AFFILIATE', `Aviso ao gerar link curto da Shopee via API: ${err.message}`);
+      }
     }
 
+    // 2. Fallback de parâmetros oficiais
+    const cleanTag = appId.includes('an_') ? (appId.match(/(an_\d+)/)?.[1] || 'an_18378190901') : `an_${appId}`;
     const match = finalUrl.match(/i\.(\d+)\.(\d+)/);
     if (match) {
       const shopeeUrl = `https://shopee.com.br/product/${match[1]}/${match[2]}?utm_source=${cleanTag}&mmp_pid=${cleanTag}`;
@@ -375,6 +426,32 @@ export class AffiliateService {
   }
 
   /**
+   * Official Amazon Affiliate Link Generator.
+   */
+  public async gerarAfiliadoAmazon(finalUrl: string): Promise<string> {
+    const config = configService.getConfig();
+    const tag = config.affiliate?.amazonTag || process.env.AMAZON_TAG || process.env.AMAZON_AFFILIATE_TAG || 'ibanez08-20';
+
+    const asinMatch = finalUrl.match(/\/(?:dp|gp\/product|product|ASIN)\/([A-Z0-9]{10})/i) || finalUrl.match(/\/([A-Z0-9]{10})(?:[/?]|$)/i);
+    if (asinMatch) {
+      const asin = asinMatch[1];
+      const amazonUrl = `https://www.amazon.com.br/dp/${asin}?tag=${tag}`;
+      logger.success('AFFILIATE', `Amazon: Link oficial gerado: ${amazonUrl}`);
+      return amazonUrl;
+    }
+
+    try {
+      const parsed = new URL(finalUrl);
+      parsed.searchParams.set('tag', tag);
+      const amazonUrl = parsed.toString();
+      logger.success('AFFILIATE', `Amazon: Link oficial gerado: ${amazonUrl}`);
+      return amazonUrl;
+    } catch {
+      return finalUrl;
+    }
+  }
+
+  /**
    * Official Magazine Luiza Affiliate Link Generator.
    */
   public async gerarAfiliadoMagalu(finalUrl: string): Promise<string> {
@@ -383,7 +460,7 @@ export class AffiliateService {
 
     const cleanStore = storeName.replace(/^https?:\/\//, '').replace(/magazinevoce\.com\.br\/?/, '').replace(/\//g, '') || 'magazineibanez01';
 
-    const prodMatch = finalUrl.match(/\/(?:p|produto)\/([a-zA-Z0-9]+)/i);
+    const prodMatch = finalUrl.match(/\/(?:p|produto)\/([a-zA-Z0-9]+)/i) || finalUrl.match(/sku=([a-zA-Z0-9]+)/i) || finalUrl.match(/codigo_produto=([a-zA-Z0-9]+)/i);
     if (prodMatch) {
       const magaluUrl = `https://www.magazinevoce.com.br/${cleanStore}/p/${prodMatch[1]}/`;
       logger.success('AFFILIATE', `Magalu: Link oficial gerado: ${magaluUrl}`);
@@ -435,6 +512,8 @@ export class AffiliateService {
         return await this.gerarAfiliadoMercadoLivre(finalUrl);
       case 'SHOPEE':
         return await this.gerarAfiliadoShopee(finalUrl);
+      case 'AMAZON':
+        return await this.gerarAfiliadoAmazon(finalUrl);
       case 'MAGALU':
         return await this.gerarAfiliadoMagalu(finalUrl);
       case 'ALIEXPRESS':
