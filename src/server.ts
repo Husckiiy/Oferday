@@ -9,6 +9,7 @@ import { forwarderService } from './services/forwarder.service.js';
 import { logger } from './services/logger.service.js';
 import { configService } from './config/config.service.js';
 import { meliAuthService } from './services/meli-auth.service.js';
+import { imageService } from './services/image.service.js';
 
 dotenv.config();
 
@@ -43,6 +44,13 @@ app.get('*', (req, res) => {
 app.listen(PORT, async () => {
   logger.success('SYSTEM', `Painel Web rodando em: http://localhost:${PORT}`);
   
+  // Pre-load and index banner images for instant perceptual hash matching
+  try {
+    await imageService.initialize();
+  } catch (err: any) {
+    logger.warn('IMAGE', `Aviso ao carregar imagens de referência: ${err.message}`);
+  }
+
   // Initialize Forwarder bridging service
   forwarderService.initialize();
 
