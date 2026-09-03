@@ -442,8 +442,9 @@ export class AffiliateService {
 
   /**
    * Generates official Amazon short link (link.amazon / amzn.to) via SiteStripe API.
+   * Works for all Amazon URLs (products, /prime, /deals, categories, etc.).
    */
-  public async generateOfficialAmazonShortLink(asin: string, tag: string): Promise<string | null> {
+  public async generateOfficialAmazonShortLink(longUrl: string, tag: string): Promise<string | null> {
     const config = configService.getConfig();
     const cookie = config.affiliate?.amazonCookie || process.env.AMAZON_COOKIE || '';
 
@@ -452,14 +453,13 @@ export class AffiliateService {
     }
 
     try {
-      const longUrl = `https://www.amazon.com.br/dp/${asin}?tag=${tag}&linkCode=sl2`;
       const apiUrl = `https://www.amazon.com.br/associates/sitestripe/getShortUrl?longUrl=${encodeURIComponent(longUrl)}&marketplaceId=526970&storeId=${tag}`;
 
       const res = await fetch(apiUrl, {
         headers: {
           'User-Agent': this.userAgent,
           'Accept': 'application/json, text/javascript, */*; q=0.01',
-          'Referer': `https://www.amazon.com.br/dp/${asin}`,
+          'Referer': longUrl,
           'X-Requested-With': 'XMLHttpRequest',
           'Cookie': cookie
         },
@@ -487,31 +487,32 @@ export class AffiliateService {
     const config = configService.getConfig();
     const tag = config.affiliate?.amazonTag || process.env.AMAZON_TAG || process.env.AMAZON_AFFILIATE_TAG || 'ibanez08-20';
 
+    let targetLongUrl = '';
     const asinMatch = finalUrl.match(/\/(?:dp|gp\/product|product|ASIN)\/([A-Z0-9]{10})/i) || finalUrl.match(/\/([A-Z0-9]{10})(?:[/?]|$)/i);
+
     if (asinMatch) {
       const asin = asinMatch[1];
-      // 1. Tenta gerar o link curto oficial via SiteStripe API
-      const officialShort = await this.generateOfficialAmazonShortLink(asin, tag);
-      if (officialShort) {
-        logger.success('AFFILIATE', `Amazon: Link curto oficial SiteStripe gerado: ${officialShort}`);
-        return officialShort;
+      targetLongUrl = `https://www.amazon.com.br/dp/${asin}?tag=${tag}&linkCode=sl2`;
+    } else {
+      try {
+        const parsed = new URL(finalUrl);
+        parsed.searchParams.set('tag', tag);
+        parsed.searchParams.set('linkCode', 'sl2');
+        targetLongUrl = parsed.toString();
+      } catch {
+        targetLongUrl = finalUrl;
       }
-
-      // 2. Fallback de link canônico oficial
-      const amazonUrl = `https://www.amazon.com.br/dp/${asin}?tag=${tag}`;
-      logger.success('AFFILIATE', `Amazon: Link oficial gerado: ${amazonUrl}`);
-      return amazonUrl;
     }
 
-    try {
-      const parsed = new URL(finalUrl);
-      parsed.searchParams.set('tag', tag);
-      const amazonUrl = parsed.toString();
-      logger.success('AFFILIATE', `Amazon: Link oficial gerado: ${amazonUrl}`);
-      return amazonUrl;
-    } catch {
-      return finalUrl;
+    // 1. Tenta gerar o link curto oficial via SiteStripe API
+    const officialShort = await this.generateOfficialAmazonShortLink(targetLongUrl, tag);
+    if (officialShort) {
+      logger.success('AFFILIATE', `Amazon: Link curto oficial SiteStripe gerado: ${officialShort}`);
+      return officialShort;
     }
+
+    logger.success('AFFILIATE', `Amazon: Link oficial gerado: ${targetLongUrl}`);
+    return targetLongUrl;
   }
 
   /**
