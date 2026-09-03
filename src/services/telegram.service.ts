@@ -23,6 +23,7 @@ class TelegramService extends EventEmitter {
   private status: ConnectionStatus = 'disconnected';
   private pendingAuth: TelegramAuthPending | null = null;
   private listeningChannel: string | null = null;
+  private listeningChannels: Map<string, { id?: string; username?: string; title?: string }> = new Map();
   private isConnecting: boolean = false;
   private messageHandler: ((event: NewMessageEvent) => Promise<void>) | null = null;
 
@@ -260,85 +261,106 @@ class TelegramService extends EventEmitter {
     }
   }
 
-  public async listenToChannel(channelUsernameOrLink: string): Promise<void> {
+  public async listenToChannel(channelListOrInput: string): Promise<void> {
     if (!this.client || this.status !== 'connected') {
       logger.warn('TELEGRAM', 'Não é possível entrar no canal: Telegram não está conectado.');
       return;
     }
 
-    let cleanChannel = channelUsernameOrLink.trim();
+    // Split by comma, newline, semicolon or space
+    const rawList = channelListOrInput
+      .split(/[\n,;]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
 
-    // Check for private invite links: https://t.me/+HASH or https://t.me/joinchat/HASH
-    const inviteHashMatch = cleanChannel.match(/(?:https?:\/\/)?(?:t\.me\/(?:\+|joinchat\/))([a-zA-Z0-9_-]+)/i);
-    if (inviteHashMatch && inviteHashMatch[1]) {
-      const hash = inviteHashMatch[1];
-      try {
-        logger.info('TELEGRAM', `Ingressando via link de convite privado: +${hash}...`);
-        const result: any = await this.client.invoke(new Api.messages.ImportChatInvite({ hash }));
-        const chats = result.chats || [];
-        const entity = chats[0];
-        if (entity) {
-          const name = entity.title || entity.username || hash;
-          this.listeningChannel = name;
-          this.setupEventListener(entity, name);
-          logger.success('TELEGRAM', `Escuta de novas mensagens ativada no canal privado "${name}"!`);
-          this.emit('status_change', this.getStatus());
-          return;
-        }
-      } catch (err: any) {
-        if (err.message?.includes('USER_ALREADY_PARTICIPANT')) {
-          logger.info('TELEGRAM', 'Usuário já participa do canal de convite.');
-        } else {
-          logger.error('TELEGRAM', `Erro ao ingressar no link de convite: ${err.message}`);
-        }
-      }
-    }
-
-    if (cleanChannel.startsWith('https://t.me/')) {
-      cleanChannel = cleanChannel.replace('https://t.me/', '');
-    } else if (cleanChannel.startsWith('http://t.me/')) {
-      cleanChannel = cleanChannel.replace('http://t.me/', '');
-    } else if (cleanChannel.startsWith('t.me/')) {
-      cleanChannel = cleanChannel.replace('t.me/', '');
-    }
-
-    if (cleanChannel.startsWith('@')) {
-      cleanChannel = cleanChannel.substring(1);
-    }
-
-    // Remove any trailing slashes or queries
-    cleanChannel = cleanChannel.split('/')[0].split('?')[0].trim();
-
-    if (!cleanChannel) {
-      logger.warn('TELEGRAM', 'Nome ou link de canal de origem inválido.');
+    if (rawList.length === 0) {
+      logger.warn('TELEGRAM', 'Nenhum canal de origem informado.');
       return;
     }
 
-    try {
-      logger.info('TELEGRAM', `Buscando canal de origem: @${cleanChannel}...`);
-      const entity = await this.client.getEntity(cleanChannel);
+    this.listeningChannels.clear();
 
-      // Join channel if not joined
-      try {
-        await this.client.invoke(new Api.channels.JoinChannel({ channel: entity }));
-        logger.info('TELEGRAM', `Canal @${cleanChannel} verificado e ingressado com sucesso.`);
-      } catch (err: any) {
-        // May fail if already joined or public, which is fine
-        if (!err.message?.includes('USER_ALREADY_PARTICIPANT')) {
-          logger.info('TELEGRAM', `Entrada no canal: ${err.message}`);
+    for (const raw of rawList) {
+      let cleanChannel = raw.trim();
+
+      // 1. Check for private invite links: https://t.me/+HASH or https://t.me/joinchat/HASH
+      const inviteHashMatch = cleanChannel.match(/(?:https?:\/\/)?(?:t\.me\/(?:\+|joinchat\/))([a-zA-Z0-9_-]+)/i);
+      if (inviteHashMatch && inviteHashMatch[1]) {
+        const hash = inviteHashMatch[1];
+        try {
+          logger.info('TELEGRAM', `Ingressando via link de convite privado: +${hash}...`);
+          const result: any = await this.client.invoke(new Api.messages.ImportChatInvite({ hash }));
+          const chats = result.chats || [];
+          const entity = chats[0];
+          if (entity) {
+            const id = entity.id?.toString();
+            const username = entity.username?.toLowerCase() || '';
+            const title = entity.title || hash;
+            this.listeningChannels.set(id || hash, { id, username, title });
+            logger.success('TELEGRAM', `Escuta de novas mensagens ativada no canal privado "${title}"!`);
+            continue;
+          }
+        } catch (err: any) {
+          if (err.message?.includes('USER_ALREADY_PARTICIPANT')) {
+            logger.info('TELEGRAM', `Usuário já participa do canal de convite +${hash}.`);
+          } else {
+            logger.warn('TELEGRAM', `Aviso ao entrar no canal de convite +${hash}: ${err.message}`);
+          }
         }
       }
 
-      this.listeningChannel = cleanChannel;
-      this.setupEventListener(entity, cleanChannel);
-      logger.success('TELEGRAM', `Escuta de novas mensagens ativada com sucesso no canal @${cleanChannel}!`);
-      this.emit('status_change', this.getStatus());
-    } catch (err: any) {
-      logger.error('TELEGRAM', `Erro ao acessar o canal @${cleanChannel}: ${err.message}`);
+      // 2. Clean public channel link or username
+      if (cleanChannel.startsWith('https://t.me/')) {
+        cleanChannel = cleanChannel.replace('https://t.me/', '');
+      } else if (cleanChannel.startsWith('http://t.me/')) {
+        cleanChannel = cleanChannel.replace('http://t.me/', '');
+      } else if (cleanChannel.startsWith('t.me/')) {
+        cleanChannel = cleanChannel.replace('t.me/', '');
+      }
+
+      if (cleanChannel.startsWith('@')) {
+        cleanChannel = cleanChannel.substring(1);
+      }
+
+      // Remove any trailing slashes or queries
+      cleanChannel = cleanChannel.split('/')[0].split('?')[0].trim();
+
+      if (!cleanChannel) {
+        continue;
+      }
+
+      try {
+        logger.info('TELEGRAM', `Buscando canal de origem: @${cleanChannel}...`);
+        const entity: any = await this.client.getEntity(cleanChannel);
+
+        // Join channel if not joined
+        try {
+          await this.client.invoke(new Api.channels.JoinChannel({ channel: entity }));
+          logger.info('TELEGRAM', `Canal @${cleanChannel} verificado e ingressado.`);
+        } catch (err: any) {
+          if (!err.message?.includes('USER_ALREADY_PARTICIPANT')) {
+            logger.info('TELEGRAM', `Entrada no canal: ${err.message}`);
+          }
+        }
+
+        const id = entity?.id?.toString();
+        const username = entity?.username?.toLowerCase() || cleanChannel.toLowerCase();
+        const title = entity?.title || cleanChannel;
+        this.listeningChannels.set(id || cleanChannel, { id, username, title });
+        logger.success('TELEGRAM', `Escuta ativada no canal @${cleanChannel} ("${title}")!`);
+      } catch (err: any) {
+        logger.error('TELEGRAM', `Erro ao acessar o canal @${cleanChannel}: ${err.message}`);
+      }
     }
+
+    const channelNames = Array.from(this.listeningChannels.values()).map((c) => `@${c.username || c.title}`);
+    this.listeningChannel = channelNames.join(', ') || channelListOrInput;
+    this.setupEventListener();
+    logger.success('TELEGRAM', `Monitorando ${this.listeningChannels.size} canal(is) de origem em tempo real: ${this.listeningChannel}`);
+    this.emit('status_change', this.getStatus());
   }
 
-  private setupEventListener(channelEntity: any, channelUsername: string): void {
+  private setupEventListener(): void {
     if (!this.client) return;
 
     // Remove previous handler if any
@@ -350,30 +372,39 @@ class TelegramService extends EventEmitter {
       }
     }
 
-    const targetChannelId = channelEntity?.id?.toString();
-
     this.messageHandler = async (event: NewMessageEvent) => {
       try {
         const msg = event.message;
         if (!msg) return;
 
-        // Verify if message comes from the target channel
+        // Verify if message comes from any of the target channels
         const chat = await msg.getChat().catch(() => null);
         const chatUsername = (chat as any)?.username?.toLowerCase();
         const chatId = (chat as any)?.id?.toString();
 
-        const matchesChannel =
-          (chatUsername && chatUsername === channelUsername.toLowerCase()) ||
-          (chatId && targetChannelId && chatId === targetChannelId);
+        let matches = false;
+        let matchedTitle = '';
 
-        if (!matchesChannel) {
+        for (const [key, ch] of this.listeningChannels.entries()) {
+          if (
+            (chatUsername && ch.username && chatUsername === ch.username.toLowerCase()) ||
+            (chatId && ch.id && chatId === ch.id) ||
+            (key && (key === chatId || key === chatUsername))
+          ) {
+            matches = true;
+            matchedTitle = ch.title || ch.username || key;
+            break;
+          }
+        }
+
+        if (!matches && this.listeningChannels.size > 0) {
           return;
         }
 
         const text = msg.message || '';
         const hasMedia = !!msg.media;
 
-        logger.info('TELEGRAM', `Nova mensagem recebida do canal @${this.listeningChannel}! (Tamanho do texto: ${text.length} caracteres, Possui mídia: ${hasMedia ? 'Sim' : 'Não'})`);
+        logger.info('TELEGRAM', `Nova mensagem recebida do canal "${matchedTitle || this.listeningChannel}"! (Tamanho: ${text.length} caracteres, Mídia: ${hasMedia ? 'Sim' : 'Não'})`);
 
         let mediaBuffer: Buffer | null = null;
         if (hasMedia) {
@@ -395,7 +426,8 @@ class TelegramService extends EventEmitter {
           id: msg.id,
           text,
           mediaBuffer,
-          date: msg.date
+          date: msg.date,
+          channel: matchedTitle || this.listeningChannel
         });
       } catch (err: any) {
         logger.error('TELEGRAM', `Erro ao processar mensagem recebida: ${err.message}`);

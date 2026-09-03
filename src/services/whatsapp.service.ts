@@ -66,6 +66,7 @@ class WhatsAppService extends EventEmitter {
           creds: state.creds,
           keys: makeCacheableSignalKeyStore(state.keys, this.pinoLogger)
         },
+        browser: ['Oferday', 'Chrome', '1.0.0'],
         generateHighQualityLinkPreview: true,
         syncFullHistory: false
       });
