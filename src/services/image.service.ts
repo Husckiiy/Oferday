@@ -69,7 +69,10 @@ class ImageService {
           'alerta magalu',
           'magazine luiza cupom',
           'cupons magazine luiza',
-          'cupom magazine'
+          'cupom magazine',
+          'desconto no magalu',
+          'cupom de desconto no magalu',
+          'novo cupom de desconto no magalu'
         ],
         cleanImagePath: magaluClean,
         referenceImages: [magaluComp, magaluClean]
@@ -83,7 +86,12 @@ class ImageService {
           'cupons mercado livre',
           'cupom mercado livre',
           'economizandocomjp',
-          'alerta cupom'
+          'alerta cupom',
+          'novo cupom de desconto',
+          'cupom de desconto no mercado livre',
+          'desconto no mercado livre',
+          'salve seu cupom',
+          'novo cupom'
         ],
         cleanImagePath: mlClean,
         referenceImages: [mlComp, mlClean]
@@ -133,7 +141,7 @@ class ImageService {
       if (incomingFingerprint && rule.cachedFingerprints && rule.cachedFingerprints.length > 0) {
         for (const refFp of rule.cachedFingerprints) {
           const similarity = this.calculateSimilarity(incomingFingerprint, refFp);
-          if (similarity >= 82.0) {
+          if (similarity >= 75.0) {
             isMatch = true;
             matchReason = `Similaridade visual de ${similarity.toFixed(1)}% com o banner ${rule.name}`;
             break;
