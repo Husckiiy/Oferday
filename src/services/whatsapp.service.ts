@@ -39,8 +39,11 @@ class WhatsAppService extends EventEmitter {
     };
   }
 
+  private presenceInterval: NodeJS.Timeout | null = null;
+
   public async initialize(): Promise<void> {
     if (this.isConnecting || this.status === 'connected') {
+      logger.info('WHATSAPP', 'Cliente WhatsApp já está conectado ou conectando.');
       return;
     }
 
@@ -68,8 +71,11 @@ class WhatsAppService extends EventEmitter {
         },
         browser: ['Oferday', 'Chrome', '1.0.0'],
         markOnlineOnConnect: false,
+        syncFullHistory: false,
         generateHighQualityLinkPreview: true,
-        syncFullHistory: false
+        fireInitQueries: false,
+        emitOwnEvents: false,
+        shouldIgnoreJid: (jid: string) => !jid.includes('@newsletter') && !jid.includes('@g.us')
       });
 
       this.sock.ev.on('creds.update', saveCreds);
@@ -91,6 +97,11 @@ class WhatsAppService extends EventEmitter {
 
         if (connection === 'close') {
           this.isConnecting = false;
+          if (this.presenceInterval) {
+            clearInterval(this.presenceInterval);
+            this.presenceInterval = null;
+          }
+
           const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
           const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
@@ -114,13 +125,19 @@ class WhatsAppService extends EventEmitter {
           const userJid = this.sock?.user?.id || 'Conectado';
           logger.success('WHATSAPP', `Conexão do WhatsApp estabelecida com sucesso! (${userJid})`);
           
-          // Keep the session invisible/offline so mobile notifications continue working 100%
-          try {
-            await this.sock?.sendPresenceUpdate('unavailable');
-            logger.info('WHATSAPP', 'Presença definida como Invisível (Offline) para manter todas as notificações no celular.');
-          } catch {
-            // ignore
-          }
+          // Enforce unavailable presence immediately and every 30s to keep mobile notifications 100% active
+          const enforceUnavailable = async () => {
+            try {
+              if (this.sock && this.status === 'connected') {
+                await this.sock.sendPresenceUpdate('unavailable');
+              }
+            } catch {}
+          };
+
+          await enforceUnavailable();
+          if (this.presenceInterval) clearInterval(this.presenceInterval);
+          this.presenceInterval = setInterval(enforceUnavailable, 30000);
+          logger.info('WHATSAPP', 'Modo silencioso/invisível ativo: notificações push do celular liberadas 100%.');
 
           this.emit('status_change', this.getStatus());
         }
@@ -135,6 +152,10 @@ class WhatsAppService extends EventEmitter {
 
   public async disconnect(): Promise<void> {
     logger.info('WHATSAPP', 'Desconectando sessão do WhatsApp...');
+    if (this.presenceInterval) {
+      clearInterval(this.presenceInterval);
+      this.presenceInterval = null;
+    }
     try {
       if (this.sock) {
         await this.sock.logout().catch(() => {});
