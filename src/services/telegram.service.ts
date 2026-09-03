@@ -267,9 +267,9 @@ class TelegramService extends EventEmitter {
       return;
     }
 
-    // Split by comma, newline, semicolon or space
+    // Split by comma, newline, semicolon, or whitespace/spaces
     const rawList = channelListOrInput
-      .split(/[\n,;]+/)
+      .split(/[\n,;\s]+/)
       .map((s) => s.trim())
       .filter(Boolean);
 
