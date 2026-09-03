@@ -44,10 +44,10 @@ class ForwarderService extends EventEmitter {
       }
     }
 
-    // Process image replacement (e.g. Alerta de Cupons clean image)
+    // Process image replacement (e.g. Alerta de Cupons clean image via visual comparison)
     let finalMediaBuffer = data.mediaBuffer;
     try {
-      finalMediaBuffer = imageService.processImageReplacement(data.text, data.mediaBuffer);
+      finalMediaBuffer = await imageService.processImageReplacement(data.text, data.mediaBuffer);
     } catch (imgErr: any) {
       logger.warn('FORWARDER', `Aviso ao processar substituição de imagem: ${imgErr.message}`);
     }
@@ -136,10 +136,21 @@ class ForwarderService extends EventEmitter {
         const res = await fetch(imageUrl);
         const arrayBuffer = await res.arrayBuffer();
         mediaBuffer = Buffer.from(arrayBuffer);
-        mediaBase64 = `data:image/jpeg;base64,${mediaBuffer.toString('base64')}`;
       } catch (err: any) {
         logger.warn('FORWARDER', `Não foi possível carregar imagem do simulador: ${err.message}`);
       }
+    }
+
+    // Process image replacement (e.g. Alerta de Cupons clean image)
+    let finalMediaBuffer = mediaBuffer;
+    try {
+      finalMediaBuffer = await imageService.processImageReplacement(text, mediaBuffer);
+    } catch (imgErr: any) {
+      logger.warn('FORWARDER', `Aviso ao processar substituição de imagem: ${imgErr.message}`);
+    }
+
+    if (finalMediaBuffer && finalMediaBuffer.length > 0) {
+      mediaBase64 = `data:image/jpeg;base64,${finalMediaBuffer.toString('base64')}`;
     }
 
     // Process text through Affiliate Service
@@ -158,7 +169,7 @@ class ForwarderService extends EventEmitter {
       telegramMessageId: Math.floor(Math.random() * 90000) + 10000,
       channel: config.telegram.sourceChannel || '@simulador_teste',
       text: processedText,
-      hasMedia: !!mediaBuffer,
+      hasMedia: !!finalMediaBuffer,
       mediaBase64,
       destinationJid: destinationJid || 'Não configurado',
       timestamp: new Date().toLocaleTimeString('pt-BR', { hour12: false }),
@@ -175,7 +186,7 @@ class ForwarderService extends EventEmitter {
     }
 
     try {
-      await whatsappService.sendMessage(destinationJid, processedText, mediaBuffer);
+      await whatsappService.sendMessage(destinationJid, processedText, finalMediaBuffer);
       item.status = 'success';
       this.emit('message_updated', item);
       logger.success('FORWARDER', `Mensagem de teste/simulada repassada para ${destinationJid} com sucesso!`);

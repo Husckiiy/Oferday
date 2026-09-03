@@ -26,6 +26,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@types/sharp": "^0.31.1",
     "@whiskeysockets/baileys": "^6.7.13",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
@@ -33,6 +34,7 @@
     "pino": "^9.6.0",
     "pm2": "^7.0.4",
     "qrcode": "^1.5.4",
+    "sharp": "^0.35.4",
     "telegram": "^2.26.16"
   },
   "devDependencies": {
