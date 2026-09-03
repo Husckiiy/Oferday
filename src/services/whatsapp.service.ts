@@ -67,6 +67,7 @@ class WhatsAppService extends EventEmitter {
           keys: makeCacheableSignalKeyStore(state.keys, this.pinoLogger)
         },
         browser: ['Oferday', 'Chrome', '1.0.0'],
+        markOnlineOnConnect: false,
         generateHighQualityLinkPreview: true,
         syncFullHistory: false
       });
@@ -112,6 +113,15 @@ class WhatsAppService extends EventEmitter {
           this.qrCodeDataUrl = null;
           const userJid = this.sock?.user?.id || 'Conectado';
           logger.success('WHATSAPP', `Conexão do WhatsApp estabelecida com sucesso! (${userJid})`);
+          
+          // Keep the session invisible/offline so mobile notifications continue working 100%
+          try {
+            await this.sock?.sendPresenceUpdate('unavailable');
+            logger.info('WHATSAPP', 'Presença definida como Invisível (Offline) para manter todas as notificações no celular.');
+          } catch {
+            // ignore
+          }
+
           this.emit('status_change', this.getStatus());
         }
       });
