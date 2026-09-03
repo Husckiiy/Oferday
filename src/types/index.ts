@@ -39,7 +39,7 @@ export interface LogEntry {
   id: string;
   timestamp: string;
   level: 'info' | 'warn' | 'error' | 'success';
-  module: 'TELEGRAM' | 'WHATSAPP' | 'FORWARDER' | 'AFFILIATE' | 'SYSTEM';
+  module: 'TELEGRAM' | 'WHATSAPP' | 'FORWARDER' | 'AFFILIATE' | 'IMAGE' | 'SYSTEM';
   message: string;
   data?: any;
 }

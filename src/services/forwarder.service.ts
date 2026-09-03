@@ -6,6 +6,7 @@ import { logger } from './logger.service.js';
 import { ForwardedMessageItem } from '../types/index.js';
 
 import { affiliateService } from './affiliate.service.js';
+import { imageService } from './image.service.js';
 
 class ForwarderService extends EventEmitter {
   private initialized = false;
@@ -16,7 +17,7 @@ class ForwarderService extends EventEmitter {
     if (this.initialized) return;
     this.initialized = true;
 
-    telegramService.on('new_message', async (data: { id: number; text: string; mediaBuffer: Buffer | null; date: number }) => {
+    telegramService.on('new_message', async (data: { id: number; text: string; mediaBuffer: Buffer | null; date: number; channel?: string }) => {
       await this.handleTelegramMessage(data);
     });
 
@@ -27,9 +28,9 @@ class ForwarderService extends EventEmitter {
     return [...this.recentMessages];
   }
 
-  private async handleTelegramMessage(data: { id: number; text: string; mediaBuffer: Buffer | null; date: number }): Promise<void> {
+  private async handleTelegramMessage(data: { id: number; text: string; mediaBuffer: Buffer | null; date: number; channel?: string }): Promise<void> {
     const config = configService.getConfig();
-    const channel = config.telegram.sourceChannel || '@canal';
+    const channel = data.channel || config.telegram.sourceChannel || '@canal';
     const destinationJid = config.whatsapp.destinationJid;
 
     // Process text through Affiliate Service to convert store links
@@ -43,10 +44,18 @@ class ForwarderService extends EventEmitter {
       }
     }
 
+    // Process image replacement (e.g. Alerta de Cupons clean image)
+    let finalMediaBuffer = data.mediaBuffer;
+    try {
+      finalMediaBuffer = imageService.processImageReplacement(data.text, data.mediaBuffer);
+    } catch (imgErr: any) {
+      logger.warn('FORWARDER', `Aviso ao processar substituição de imagem: ${imgErr.message}`);
+    }
+
     let mediaBase64: string | null = null;
-    if (data.mediaBuffer && data.mediaBuffer.length > 0) {
+    if (finalMediaBuffer && finalMediaBuffer.length > 0) {
       // Create thumbnail / preview data URL (JPEG/PNG)
-      mediaBase64 = `data:image/jpeg;base64,${data.mediaBuffer.toString('base64')}`;
+      mediaBase64 = `data:image/jpeg;base64,${finalMediaBuffer.toString('base64')}`;
     }
 
     const item: ForwardedMessageItem = {
@@ -54,7 +63,7 @@ class ForwarderService extends EventEmitter {
       telegramMessageId: data.id,
       channel,
       text: processedText,
-      hasMedia: !!data.mediaBuffer,
+      hasMedia: !!finalMediaBuffer,
       mediaBase64,
       destinationJid: destinationJid || 'Não configurado',
       timestamp: new Date().toLocaleTimeString('pt-BR', { hour12: false }),
@@ -94,7 +103,7 @@ class ForwarderService extends EventEmitter {
       const previewText = processedText ? (processedText.length > 80 ? processedText.substring(0, 80) + '...' : processedText) : '[Sem texto / Apenas mídia]';
       logger.info('FORWARDER', `Prévia do conteúdo: "${previewText}"`);
 
-      await whatsappService.sendMessage(destinationJid, processedText, data.mediaBuffer);
+      await whatsappService.sendMessage(destinationJid, processedText, finalMediaBuffer);
       
       item.status = 'success';
       this.emit('message_updated', item);
