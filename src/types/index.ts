@@ -25,6 +25,7 @@ export interface AppConfig {
     shopeeAppId?: string;
     shopeeAppSecret?: string;
     amazonTag?: string;
+    amazonCookie?: string;
     magaluTag?: string;
     aliexpressAppKey?: string;
     aliexpressAppSecret?: string;

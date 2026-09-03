@@ -33,6 +33,7 @@ const DEFAULT_CONFIG: AppConfig = {
     shopeeAppId: process.env.SHOPEE_APP_ID || '18378190901',
     shopeeAppSecret: process.env.SHOPEE_APP_SECRET || 'ITHJMNNGTV4JOSEZLT27UZ3TY7ICCC6L',
     amazonTag: process.env.AMAZON_TAG || process.env.AMAZON_AFFILIATE_TAG || 'ibanez08-20',
+    amazonCookie: process.env.AMAZON_COOKIE || '',
     magaluTag: process.env.MAGALU_TAG || process.env.MAGALU_AFFILIATE_TAG || 'magazineibanez01',
     aliexpressAppKey: process.env.ALIEXPRESS_APP_KEY || ''
   }
@@ -68,12 +69,21 @@ class ConfigService {
         this.saveConfig(DEFAULT_CONFIG);
       }
 
-      // Check if data/cookie.txt exists
+      // Check if data/cookie.txt exists (Mercado Livre)
       const cookieFile = path.join(DATA_DIR, 'cookie.txt');
       if (fs.existsSync(cookieFile)) {
         const c = fs.readFileSync(cookieFile, 'utf-8').trim();
         if (c) {
           this.config.affiliate.meliCookie = c;
+        }
+      }
+
+      // Check if data/amazon_cookie.txt exists (Amazon SiteStripe)
+      const amazonCookieFile = path.join(DATA_DIR, 'amazon_cookie.txt');
+      if (fs.existsSync(amazonCookieFile)) {
+        const ac = fs.readFileSync(amazonCookieFile, 'utf-8').trim();
+        if (ac) {
+          this.config.affiliate.amazonCookie = ac;
         }
       }
     } catch (err: any) {

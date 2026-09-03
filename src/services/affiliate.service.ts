@@ -426,6 +426,46 @@ export class AffiliateService {
   }
 
   /**
+   * Generates official Amazon short link (link.amazon / amzn.to) via SiteStripe API.
+   */
+  public async generateOfficialAmazonShortLink(asin: string, tag: string): Promise<string | null> {
+    const config = configService.getConfig();
+    const cookie = config.affiliate?.amazonCookie || process.env.AMAZON_COOKIE || '';
+
+    if (!cookie) {
+      return null;
+    }
+
+    try {
+      const longUrl = `https://www.amazon.com.br/dp/${asin}?tag=${tag}&linkCode=sl2`;
+      const apiUrl = `https://www.amazon.com.br/associates/sitestripe/getShortUrl?longUrl=${encodeURIComponent(longUrl)}&marketplaceId=526970&storeId=${tag}`;
+
+      const res = await fetch(apiUrl, {
+        headers: {
+          'User-Agent': this.userAgent,
+          'Accept': 'application/json, text/javascript, */*; q=0.01',
+          'Referer': `https://www.amazon.com.br/dp/${asin}`,
+          'X-Requested-With': 'XMLHttpRequest',
+          'Cookie': cookie
+        },
+        signal: AbortSignal.timeout(8000)
+      });
+
+      if (res.ok) {
+        const data: any = await res.json();
+        const shortUrl = data.shortUrl || data.url;
+        if (shortUrl && (shortUrl.includes('amazon') || shortUrl.includes('amzn.to'))) {
+          return shortUrl;
+        }
+      }
+    } catch (err: any) {
+      logger.warn('AFFILIATE', `Aviso ao gerar link curto da Amazon via SiteStripe: ${err.message}`);
+    }
+
+    return null;
+  }
+
+  /**
    * Official Amazon Affiliate Link Generator.
    */
   public async gerarAfiliadoAmazon(finalUrl: string): Promise<string> {
@@ -435,6 +475,14 @@ export class AffiliateService {
     const asinMatch = finalUrl.match(/\/(?:dp|gp\/product|product|ASIN)\/([A-Z0-9]{10})/i) || finalUrl.match(/\/([A-Z0-9]{10})(?:[/?]|$)/i);
     if (asinMatch) {
       const asin = asinMatch[1];
+      // 1. Tenta gerar o link curto oficial via SiteStripe API
+      const officialShort = await this.generateOfficialAmazonShortLink(asin, tag);
+      if (officialShort) {
+        logger.success('AFFILIATE', `Amazon: Link curto oficial SiteStripe gerado: ${officialShort}`);
+        return officialShort;
+      }
+
+      // 2. Fallback de link canônico oficial
       const amazonUrl = `https://www.amazon.com.br/dp/${asin}?tag=${tag}`;
       logger.success('AFFILIATE', `Amazon: Link oficial gerado: ${amazonUrl}`);
       return amazonUrl;
