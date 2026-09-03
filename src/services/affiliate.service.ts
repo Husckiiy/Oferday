@@ -220,7 +220,8 @@ export class AffiliateService {
             parsed.searchParams.set(k, v);
           }
         } else {
-          parsed.searchParams.set('matt_tool', tag);
+          parsed.searchParams.set('matt_word', tag);
+          parsed.searchParams.set('matt_tool', '3120588434');
         }
       }
 
