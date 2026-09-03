@@ -360,8 +360,30 @@ class TelegramService extends EventEmitter {
     this.emit('status_change', this.getStatus());
   }
 
+  private keepAliveInterval: NodeJS.Timeout | null = null;
+
+  private setupKeepAlive(): void {
+    if (this.keepAliveInterval) {
+      clearInterval(this.keepAliveInterval);
+    }
+    this.keepAliveInterval = setInterval(async () => {
+      if (this.client && this.status === 'connected') {
+        try {
+          await this.client.invoke(new Api.updates.GetState());
+        } catch (err: any) {
+          logger.warn('TELEGRAM', `Watchdog: Tentando reconectar socket do Telegram... (${err.message})`);
+          try {
+            await this.client.connect();
+          } catch {}
+        }
+      }
+    }, 30000);
+  }
+
   private setupEventListener(): void {
     if (!this.client) return;
+
+    this.setupKeepAlive();
 
     // Remove previous handler if any
     if (this.messageHandler) {
@@ -372,31 +394,64 @@ class TelegramService extends EventEmitter {
       }
     }
 
+    const normalize = (val?: string | number | null): string => {
+      if (!val) return '';
+      return val.toString().replace(/^-100/, '').replace(/^-/, '').toLowerCase().trim();
+    };
+
     this.messageHandler = async (event: NewMessageEvent) => {
       try {
         const msg = event.message;
         if (!msg) return;
 
-        // Verify if message comes from any of the target channels
-        const chat = await msg.getChat().catch(() => null);
-        const chatUsername = (chat as any)?.username?.toLowerCase();
-        const chatId = (chat as any)?.id?.toString();
+        // Collect all possible identifier clues for the source chat
+        const rawChatId = msg.chatId?.toString() || '';
+        const peerChannelId = (msg.peerId as any)?.channelId?.toString() || '';
+        const peerChatId = (msg.peerId as any)?.chatId?.toString() || '';
+
+        const normRawChatId = normalize(rawChatId);
+        const normPeerChannelId = normalize(peerChannelId);
+        const normPeerChatId = normalize(peerChatId);
+
+        let chatUsername = '';
+        let chatTitle = '';
+
+        try {
+          const chat: any = await msg.getChat().catch(() => null);
+          if (chat) {
+            chatUsername = normalize(chat.username);
+            chatTitle = chat.title || '';
+          }
+        } catch {
+          // ignore
+        }
 
         let matches = false;
         let matchedTitle = '';
 
         for (const [key, ch] of this.listeningChannels.entries()) {
-          if (
-            (chatUsername && ch.username && chatUsername === ch.username.toLowerCase()) ||
-            (chatId && ch.id && chatId === ch.id) ||
-            (key && (key === chatId || key === chatUsername))
-          ) {
+          const normKey = normalize(key);
+          const normChId = normalize(ch.id);
+          const normChUser = normalize(ch.username);
+
+          const idMatches = (
+            (normChId && (normChId === normRawChatId || normChId === normPeerChannelId || normChId === normPeerChatId)) ||
+            (normKey && (normKey === normRawChatId || normKey === normPeerChannelId || normKey === normPeerChatId))
+          );
+
+          const userMatches = (
+            (normChUser && chatUsername && normChUser === chatUsername) ||
+            (normKey && chatUsername && normKey === chatUsername)
+          );
+
+          if (idMatches || userMatches) {
             matches = true;
             matchedTitle = ch.title || ch.username || key;
             break;
           }
         }
 
+        // If no specific channels matched but listening channels list is configured, skip
         if (!matches && this.listeningChannels.size > 0) {
           return;
         }
@@ -404,7 +459,7 @@ class TelegramService extends EventEmitter {
         const text = msg.message || '';
         const hasMedia = !!msg.media;
 
-        logger.info('TELEGRAM', `Nova mensagem recebida do canal "${matchedTitle || this.listeningChannel}"! (Tamanho: ${text.length} caracteres, Mídia: ${hasMedia ? 'Sim' : 'Não'})`);
+        logger.info('TELEGRAM', `Nova mensagem recebida do canal "${matchedTitle || chatTitle || this.listeningChannel}"! (Tamanho: ${text.length} caracteres, Mídia: ${hasMedia ? 'Sim' : 'Não'})`);
 
         let mediaBuffer: Buffer | null = null;
         if (hasMedia) {
@@ -427,7 +482,7 @@ class TelegramService extends EventEmitter {
           text,
           mediaBuffer,
           date: msg.date,
-          channel: matchedTitle || this.listeningChannel
+          channel: matchedTitle || chatTitle || this.listeningChannel
         });
       } catch (err: any) {
         logger.error('TELEGRAM', `Erro ao processar mensagem recebida: ${err.message}`);
