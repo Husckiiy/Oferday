@@ -432,24 +432,23 @@ export class AffiliateService {
     const config = configService.getConfig();
     const tag = config.affiliate?.amazonTag || process.env.AMAZON_TAG || process.env.AMAZON_AFFILIATE_TAG || 'ibanez08-20';
 
-    let amazonUrl = finalUrl;
     const asinMatch = finalUrl.match(/\/(?:dp|gp\/product|product|ASIN)\/([A-Z0-9]{10})/i) || finalUrl.match(/\/([A-Z0-9]{10})(?:[/?]|$)/i);
     if (asinMatch) {
       const asin = asinMatch[1];
-      amazonUrl = `https://www.amazon.com.br/dp/${asin}?tag=${tag}`;
-    } else {
-      try {
-        const parsed = new URL(finalUrl);
-        parsed.searchParams.set('tag', tag);
-        amazonUrl = parsed.toString();
-      } catch {
-        amazonUrl = finalUrl;
-      }
+      const amazonUrl = `https://www.amazon.com.br/dp/${asin}?tag=${tag}`;
+      logger.success('AFFILIATE', `Amazon: Link oficial gerado: ${amazonUrl}`);
+      return amazonUrl;
     }
 
-    const short = await urlShortenerService.shorten(amazonUrl);
-    logger.success('AFFILIATE', `Amazon: Link de afiliado encurtado gerado: ${short}`);
-    return short;
+    try {
+      const parsed = new URL(finalUrl);
+      parsed.searchParams.set('tag', tag);
+      const amazonUrl = parsed.toString();
+      logger.success('AFFILIATE', `Amazon: Link oficial gerado: ${amazonUrl}`);
+      return amazonUrl;
+    } catch {
+      return finalUrl;
+    }
   }
 
   /**
@@ -461,22 +460,21 @@ export class AffiliateService {
 
     const cleanStore = storeName.replace(/^https?:\/\//, '').replace(/magazinevoce\.com\.br\/?/, '').replace(/\//g, '') || 'magazineibanez01';
 
-    let magaluUrl = finalUrl;
     const prodMatch = finalUrl.match(/\/(?:p|produto)\/([a-zA-Z0-9]+)/i) || finalUrl.match(/sku=([a-zA-Z0-9]+)/i) || finalUrl.match(/codigo_produto=([a-zA-Z0-9]+)/i);
     if (prodMatch) {
-      magaluUrl = `https://www.magazinevoce.com.br/${cleanStore}/p/${prodMatch[1]}/`;
-    } else {
-      try {
-        const parsed = new URL(finalUrl);
-        magaluUrl = `https://www.magazinevoce.com.br/${cleanStore}${parsed.pathname}`;
-      } catch {
-        magaluUrl = finalUrl;
-      }
+      const magaluUrl = `https://www.magazinevoce.com.br/${cleanStore}/p/${prodMatch[1]}/`;
+      logger.success('AFFILIATE', `Magalu: Link oficial gerado: ${magaluUrl}`);
+      return magaluUrl;
     }
 
-    const short = await urlShortenerService.shorten(magaluUrl);
-    logger.success('AFFILIATE', `Magalu: Link de afiliado encurtado gerado: ${short}`);
-    return short;
+    try {
+      const parsed = new URL(finalUrl);
+      const magaluUrl = `https://www.magazinevoce.com.br/${cleanStore}${parsed.pathname}`;
+      logger.success('AFFILIATE', `Magalu: Link oficial gerado: ${magaluUrl}`);
+      return magaluUrl;
+    } catch {
+      return finalUrl;
+    }
   }
 
   /**
