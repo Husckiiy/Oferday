@@ -267,15 +267,50 @@ class TelegramService extends EventEmitter {
     }
 
     let cleanChannel = channelUsernameOrLink.trim();
+
+    // Check for private invite links: https://t.me/+HASH or https://t.me/joinchat/HASH
+    const inviteHashMatch = cleanChannel.match(/(?:https?:\/\/)?(?:t\.me\/(?:\+|joinchat\/))([a-zA-Z0-9_-]+)/i);
+    if (inviteHashMatch && inviteHashMatch[1]) {
+      const hash = inviteHashMatch[1];
+      try {
+        logger.info('TELEGRAM', `Ingressando via link de convite privado: +${hash}...`);
+        const result: any = await this.client.invoke(new Api.messages.ImportChatInvite({ hash }));
+        const chats = result.chats || [];
+        const entity = chats[0];
+        if (entity) {
+          const name = entity.title || entity.username || hash;
+          this.listeningChannel = name;
+          this.setupEventListener(entity, name);
+          logger.success('TELEGRAM', `Escuta de novas mensagens ativada no canal privado "${name}"!`);
+          this.emit('status_change', this.getStatus());
+          return;
+        }
+      } catch (err: any) {
+        if (err.message?.includes('USER_ALREADY_PARTICIPANT')) {
+          logger.info('TELEGRAM', 'Usuário já participa do canal de convite.');
+        } else {
+          logger.error('TELEGRAM', `Erro ao ingressar no link de convite: ${err.message}`);
+        }
+      }
+    }
+
     if (cleanChannel.startsWith('https://t.me/')) {
       cleanChannel = cleanChannel.replace('https://t.me/', '');
+    } else if (cleanChannel.startsWith('http://t.me/')) {
+      cleanChannel = cleanChannel.replace('http://t.me/', '');
+    } else if (cleanChannel.startsWith('t.me/')) {
+      cleanChannel = cleanChannel.replace('t.me/', '');
     }
+
     if (cleanChannel.startsWith('@')) {
       cleanChannel = cleanChannel.substring(1);
     }
 
+    // Remove any trailing slashes or queries
+    cleanChannel = cleanChannel.split('/')[0].split('?')[0].trim();
+
     if (!cleanChannel) {
-      logger.warn('TELEGRAM', 'Nome de canal de origem inválido.');
+      logger.warn('TELEGRAM', 'Nome ou link de canal de origem inválido.');
       return;
     }
 

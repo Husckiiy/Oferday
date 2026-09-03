@@ -110,6 +110,14 @@ class ConfigService {
 
     try {
       fs.writeFileSync(CONFIG_FILE, JSON.stringify(this.config, null, 2), 'utf-8');
+
+      if (newConfig.affiliate?.meliCookie) {
+        fs.writeFileSync(path.join(DATA_DIR, 'cookie.txt'), newConfig.affiliate.meliCookie.trim(), 'utf-8');
+      }
+      if (newConfig.affiliate?.amazonCookie) {
+        fs.writeFileSync(path.join(DATA_DIR, 'amazon_cookie.txt'), newConfig.affiliate.amazonCookie.trim(), 'utf-8');
+      }
+
       logger.info('SYSTEM', 'Configurações salvas em data/config.json com sucesso.');
     } catch (err: any) {
       logger.error('SYSTEM', `Erro ao salvar config.json: ${err.message}`);

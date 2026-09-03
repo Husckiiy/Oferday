@@ -274,16 +274,39 @@ function updateConfigUI(config) {
   if (config.telegram.apiHash) tgApiHash.value = config.telegram.apiHash;
   if (config.telegram.phoneNumber) tgPhone.value = config.telegram.phoneNumber;
 
-  const cfgMlAppId = document.getElementById('cfgMlAppId');
-  const cfgMlSecretKey = document.getElementById('cfgMlSecretKey');
+  // Shopee
+  const cfgShopeeAppId = document.getElementById('cfgShopeeAppId');
+  const cfgShopeeAppSecret = document.getElementById('cfgShopeeAppSecret');
+  if (cfgShopeeAppId && config.affiliate?.shopeeAppId) cfgShopeeAppId.value = config.affiliate.shopeeAppId;
+  if (cfgShopeeAppSecret && config.affiliate?.shopeeAppSecret) cfgShopeeAppSecret.value = config.affiliate.shopeeAppSecret;
+
+  // Mercado Livre
   const cfgMlTag = document.getElementById('cfgMlTag');
-  if (cfgMlAppId && config.affiliate?.mlAppId) cfgMlAppId.value = config.affiliate.mlAppId;
-  if (cfgMlSecretKey && config.affiliate?.mlSecretKey) cfgMlSecretKey.value = config.affiliate.mlSecretKey;
+  const cfgMlListUrl = document.getElementById('cfgMlListUrl');
+  const cfgMlCookie = document.getElementById('cfgMlCookie');
   if (cfgMlTag && (config.affiliate?.mlAffiliateTag || config.affiliate?.meliAffiliateTag)) {
     cfgMlTag.value = config.affiliate.mlAffiliateTag || config.affiliate.meliAffiliateTag;
   }
+  if (cfgMlListUrl && config.affiliate?.mlListShortUrl) cfgMlListUrl.value = config.affiliate.mlListShortUrl;
+  if (cfgMlCookie && config.affiliate?.meliCookie) cfgMlCookie.value = config.affiliate.meliCookie;
 
-  loadMeliTokenStatus();
+  // Amazon
+  const cfgAmazonTag = document.getElementById('cfgAmazonTag');
+  const cfgAmazonCookie = document.getElementById('cfgAmazonCookie');
+  if (cfgAmazonTag && config.affiliate?.amazonTag) cfgAmazonTag.value = config.affiliate.amazonTag;
+  if (cfgAmazonCookie && config.affiliate?.amazonCookie) cfgAmazonCookie.value = config.affiliate.amazonCookie;
+
+  // Magalu
+  const cfgMagaluTag = document.getElementById('cfgMagaluTag');
+  if (cfgMagaluTag && config.affiliate?.magaluTag) cfgMagaluTag.value = config.affiliate.magaluTag;
+
+  // AliExpress
+  const cfgAliAppKey = document.getElementById('cfgAliAppKey');
+  const cfgAliAppSecret = document.getElementById('cfgAliAppSecret');
+  const cfgAliTrackingId = document.getElementById('cfgAliTrackingId');
+  if (cfgAliAppKey && config.affiliate?.aliexpressAppKey) cfgAliAppKey.value = config.affiliate.aliexpressAppKey;
+  if (cfgAliAppSecret && config.affiliate?.aliexpressAppSecret) cfgAliAppSecret.value = config.affiliate.aliexpressAppSecret;
+  if (cfgAliTrackingId && config.affiliate?.aliexpressTrackingId) cfgAliTrackingId.value = config.affiliate.aliexpressTrackingId;
 
   forwarderActiveSwitch.checked = !!config.forwarder.active;
   forwarderStatusLabel.textContent = config.forwarder.active ? 'Repasse: Ativo' : 'Repasse: Pausado';
@@ -537,53 +560,39 @@ const btnLoadChats = document.getElementById('btnLoadChats');
 const chatSelectDropdown = document.getElementById('chatSelectDropdown');
 const resolvedJidBadge = document.getElementById('resolvedJidBadge');
 
-// Load User's WhatsApp Groups & Channels
+// Load User's WhatsApp Channels (Exclusively Channels)
 btnLoadChats?.addEventListener('click', async () => {
   btnLoadChats.disabled = true;
-  btnLoadChats.textContent = 'Carregando...';
+  btnLoadChats.textContent = 'Buscando canais...';
   try {
     const res = await fetch('/api/whatsapp/chats');
     const json = await res.json();
     if (json.success && json.chats && json.chats.length > 0) {
-      chatSelectDropdown.innerHTML = '<option value="">-- Selecione um grupo ou canal --</option>';
+      chatSelectDropdown.innerHTML = '<option value="">-- Selecione um Canal do WhatsApp --</option>';
 
-      const channels = json.chats.filter((c) => c.type === 'channel');
-      const groups = json.chats.filter((c) => c.type === 'group');
+      // Filter exclusively channels (@newsletter)
+      const channels = json.chats.filter((c) => c.type === 'channel' || c.id.endsWith('@newsletter'));
 
       if (channels.length > 0) {
-        const optGroupChannels = document.createElement('optgroup');
-        optGroupChannels.label = `📢 CANAIS (${channels.length})`;
         channels.forEach((chat) => {
           const opt = document.createElement('option');
           opt.value = chat.id;
-          opt.textContent = `📢 ${chat.name}`;
-          optGroupChannels.appendChild(opt);
+          opt.textContent = `${chat.name || chat.id}`;
+          chatSelectDropdown.appendChild(opt);
         });
-        chatSelectDropdown.appendChild(optGroupChannels);
+        chatSelectDropdown.classList.remove('hidden');
+        showToast(`${channels.length} canais do WhatsApp encontrados!`, 'success');
+      } else {
+        showToast('Nenhum canal do WhatsApp encontrado na sua conta.', 'warning');
       }
-
-      if (groups.length > 0) {
-        const optGroupGroups = document.createElement('optgroup');
-        optGroupGroups.label = `👥 GRUPOS (${groups.length})`;
-        groups.forEach((chat) => {
-          const opt = document.createElement('option');
-          opt.value = chat.id;
-          opt.textContent = `👥 ${chat.name}`;
-          optGroupGroups.appendChild(opt);
-        });
-        chatSelectDropdown.appendChild(optGroupGroups);
-      }
-
-      chatSelectDropdown.classList.remove('hidden');
-      showToast(`${json.chats.length} destinos carregados (${channels.length} canais, ${groups.length} grupos)!`, 'success');
     } else {
-      showToast('Nenhum grupo ou canal encontrado.', 'warning');
+      showToast('Nenhum canal encontrado. Verifique se o WhatsApp está conectado.', 'warning');
     }
   } catch (err) {
-    showToast(`Erro ao carregar lista: ${err.message}`, 'error');
+    showToast(`Erro ao carregar lista de canais: ${err.message}`, 'error');
   } finally {
     btnLoadChats.disabled = false;
-    btnLoadChats.textContent = '📋 Listar meus Grupos & Canais';
+    btnLoadChats.textContent = '📢 Listar Meus Canais';
   }
 });
 
@@ -777,27 +786,22 @@ btnSaveConfig.addEventListener('click', async () => {
   const destinationJid = cfgDestJid.value.trim();
   const active = forwarderActiveSwitch.checked;
 
-  const mlAppId = document.getElementById('cfgMlAppId')?.value.trim() || '';
-  const mlSecretKey = document.getElementById('cfgMlSecretKey')?.value.trim() || '';
+  const shopeeAppId = document.getElementById('cfgShopeeAppId')?.value.trim() || '';
+  const shopeeAppSecret = document.getElementById('cfgShopeeAppSecret')?.value.trim() || '';
   const mlAffiliateTag = document.getElementById('cfgMlTag')?.value.trim() || '';
-  const accessToken = cfgMlAccessToken?.value.trim() || '';
-  const refreshToken = cfgMlRefreshToken?.value.trim() || '';
+  const mlListShortUrl = document.getElementById('cfgMlListUrl')?.value.trim() || '';
+  const meliCookie = document.getElementById('cfgMlCookie')?.value.trim() || '';
+  const amazonTag = document.getElementById('cfgAmazonTag')?.value.trim() || '';
+  const amazonCookie = document.getElementById('cfgAmazonCookie')?.value.trim() || '';
+  const magaluTag = document.getElementById('cfgMagaluTag')?.value.trim() || '';
+  const aliexpressAppKey = document.getElementById('cfgAliAppKey')?.value.trim() || '';
+  const aliexpressAppSecret = document.getElementById('cfgAliAppSecret')?.value.trim() || '';
+  const aliexpressTrackingId = document.getElementById('cfgAliTrackingId')?.value.trim() || '';
+
+  btnSaveConfig.disabled = true;
+  btnSaveConfig.textContent = 'Salvando...';
 
   try {
-    // If access_token or refresh_token was provided in inputs, save them
-    if (accessToken || refreshToken) {
-      await fetch('/api/meli/tokens', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          access_token: accessToken,
-          refresh_token: refreshToken
-        })
-      });
-      if (cfgMlAccessToken) cfgMlAccessToken.value = '';
-      if (cfgMlRefreshToken) cfgMlRefreshToken.value = '';
-    }
-
     // Resolve destination if it's a channel/group invite link
     let resolvedDest = destinationJid;
     if (destinationJid.includes('whatsapp.com/')) {
@@ -810,7 +814,7 @@ btnSaveConfig.addEventListener('click', async () => {
       if (jsonResolve.success && jsonResolve.jid) {
         resolvedDest = jsonResolve.jid;
         cfgDestJid.value = resolvedDest;
-        showToast(`Link resolvido para: ${jsonResolve.jid}`, 'success');
+        showToast(`Canal resolvido para: ${jsonResolve.jid}`, 'success');
       }
     }
 
@@ -822,22 +826,32 @@ btnSaveConfig.addEventListener('click', async () => {
         whatsapp: { destinationJid: resolvedDest },
         forwarder: { active },
         affiliate: {
-          mlAppId,
-          mlSecretKey,
+          shopeeAppId,
+          shopeeAppSecret,
           mlAffiliateTag,
-          meliAffiliateTag: mlAffiliateTag
+          meliAffiliateTag: mlAffiliateTag,
+          mlListShortUrl,
+          meliCookie,
+          amazonTag,
+          amazonCookie,
+          magaluTag,
+          aliexpressAppKey,
+          aliexpressAppSecret,
+          aliexpressTrackingId
         }
       })
     });
     const json = await res.json();
     if (json.success) {
-      showToast('Configurações salvas com sucesso!', 'success');
-      loadMeliTokenStatus();
+      showToast('Todas as configurações e tokens foram salvos com sucesso!', 'success');
     } else {
       showToast(`Erro ao salvar: ${json.error}`, 'error');
     }
   } catch (err) {
     showToast(`Erro: ${err.message}`, 'error');
+  } finally {
+    btnSaveConfig.disabled = false;
+    btnSaveConfig.innerHTML = '<span>💾 Salvar Todas as Configurações</span>';
   }
 });
 

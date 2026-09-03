@@ -222,7 +222,7 @@
           <div class="card-header">
             <div class="card-title">
               <span class="icon">⚙️</span>
-              <h2>Configuração do Repasse</h2>
+              <h2>Roteamento de Ofertas</h2>
             </div>
           </div>
 
@@ -230,111 +230,150 @@
             <div class="form-group">
               <label for="cfgSourceChannel">
                 Canal de Origem (Telegram)
-                <span class="hint">@username do canal público</span>
+                <span class="hint">Link completo (https://t.me/...) ou @username</span>
               </label>
-              <input type="text" id="cfgSourceChannel" placeholder="Ex: @promocoesimperdiveis">
+              <input type="text" id="cfgSourceChannel" placeholder="Ex: https://t.me/PortalDOSsachadinhos ou @canal">
             </div>
 
             <div class="form-group">
               <label for="cfgDestJid">
-                Destino (WhatsApp)
-                <span class="hint">Link do Canal, Link do Grupo, JID ou Número</span>
+                Destino (Canal do WhatsApp)
+                <span class="hint">Link do Canal (https://whatsapp.com/channel/...) ou JID @newsletter</span>
               </label>
-              <input type="text" id="cfgDestJid" placeholder="Ex: https://whatsapp.com/channel/0029Vb... ou 120363...@g.us">
+              <input type="text" id="cfgDestJid" placeholder="Ex: https://whatsapp.com/channel/0029Vb... ou 120363...@newsletter">
               <div id="resolvedJidBadge" class="resolved-badge hidden"></div>
             </div>
 
             <div class="group-select-row">
-              <button class="btn btn-secondary btn-sm" id="btnLoadChats" type="button">📋 Listar meus Grupos & Canais</button>
+              <button class="btn btn-secondary btn-sm" id="btnLoadChats" type="button">📢 Listar Meus Canais</button>
               <select id="chatSelectDropdown" class="chat-select hidden">
-                <option value="">-- Selecione um grupo ou canal --</option>
+                <option value="">-- Selecione um Canal do WhatsApp --</option>
               </select>
             </div>
 
             <div class="jid-help-box">
-              <span class="jid-help-title">💡 Formatos aceitos automaticamente:</span>
+              <span class="jid-help-title">💡 Formatos aceitos:</span>
               <ul>
-                <li><strong>Link de Canal:</strong> <code>https://whatsapp.com/channel/0029Vb...</code> (resolvido automaticamente para <code>@newsletter</code>)</li>
-                <li><strong>Link de Grupo:</strong> <code>https://chat.whatsapp.com/...</code> (resolvido automaticamente para <code>@g.us</code>)</li>
-                <li><strong>JID direto:</strong> <code>120363024823901928@g.us</code> ou <code>120363...@newsletter</code></li>
-                <li><strong>Número com DDD:</strong> <code>5511999999999</code></li>
+                <li><strong>Link de Canal do WhatsApp:</strong> <code>https://whatsapp.com/channel/0029Va...</code> (resolvido automaticamente para <code>@newsletter</code>)</li>
+                <li><strong>JID Direto:</strong> <code>120363409015820792@newsletter</code></li>
               </ul>
             </div>
+          </div>
+        </section>
 
-            <div class="oauth-box">
-              <div class="oauth-box-header">
-                <span class="oauth-title">🟡 Mercado Livre (OAuth & API v2 createLink)</span>
-                <span id="meliTokenBadge" class="badge badge-disconnected">Token Ausente</span>
+        <!-- Tokens & Affiliate Platforms Card -->
+        <section class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="icon">🔑</span>
+              <h2>Tokens & Plataformas de Afiliados</h2>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <!-- 1. Shopee -->
+            <div class="store-box shopee-box">
+              <div class="store-box-header">
+                <span class="store-title">🟠 Shopee (API Oficial GraphQL - s.shopee.com.br)</span>
+                <span class="badge badge-connected">API Ativa</span>
               </div>
-
-              <div class="form-group">
-                <label for="cfgMlAppId">
-                  App ID (client_id)
-                  <a href="https://developers.mercadolivre.com.br" target="_blank" class="link-hint">(Developers ML)</a>
-                </label>
-                <input type="text" id="cfgMlAppId" placeholder="Ex: 8823471724422422">
-              </div>
-
-              <div class="form-group">
-                <label for="cfgMlSecretKey">Client Secret (client_secret)</label>
-                <input type="password" id="cfgMlSecretKey" placeholder="Ex: aBcDeFgHiJkLmNoPqRsTuVwXyZ">
-              </div>
-
-              <div class="form-group">
-                <label for="cfgMlTag">
-                  Tag de Afiliado (ML_AFFILIATE_TAG)
-                  <span class="hint">Formato: matt_tool=XXXXX&matt_word=XXXXX</span>
-                </label>
-                <input type="text" id="cfgMlTag" placeholder="matt_tool=12345678&matt_word=12345678">
-              </div>
-
-              <div class="oauth-helper-box">
-                <span class="helper-title">🔑 Como obter seus tokens pela primeira vez:</span>
-                <ol class="helper-steps">
-                  <li>Preencha seu <strong>App ID</strong> e <strong>Client Secret</strong> acima.</li>
-                  <li>Clique no botão abaixo para autorizar sua conta no Mercado Livre:</li>
-                  <li>
-                    <a id="btnOpenMlAuth" href="#" target="_blank" class="btn btn-outline btn-sm" style="display:inline-block; margin: 0.35rem 0;">
-                      🔗 Abrir Autorização no Mercado Livre
-                    </a>
-                  </li>
-                  <li>Após autorizar, você será redirecionado para uma URL com <code>?code=TG-...</code></li>
-                  <li>Copie essa URL completa ou apenas o código <code>TG-...</code> e cole abaixo:</li>
-                </ol>
-                <div class="code-exchange-row">
-                  <input type="text" id="mlAuthCodeInput" placeholder="Cole aqui o link ou código TG-xxxxxxxx">
-                  <button class="btn btn-primary btn-sm" id="btnExchangeMlCode" type="button">
-                    ⚡ Gerar Tokens
-                  </button>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="cfgShopeeAppId">Shopee App ID</label>
+                  <input type="text" id="cfgShopeeAppId" placeholder="Ex: 18378190901">
+                </div>
+                <div class="form-group">
+                  <label for="cfgShopeeAppSecret">Shopee Secret Key / Senha</label>
+                  <input type="password" id="cfgShopeeAppSecret" placeholder="Sua Secret Key da Shopee">
                 </div>
               </div>
+            </div>
 
-              <div class="form-group">
-                <label for="cfgMlAccessToken">Access Token (Salvo automaticamente)</label>
-                <input type="password" id="cfgMlAccessToken" placeholder="APP_USR-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-xxxxxx">
+            <!-- 2. Mercado Livre -->
+            <div class="store-box ml-box">
+              <div class="store-box-header">
+                <span class="store-title">🟡 Mercado Livre (Linkbuilder Oficial - meli.la)</span>
+                <span class="badge badge-connected">Meli.la Ativo</span>
               </div>
-
-              <div class="form-group">
-                <label for="cfgMlRefreshToken">Refresh Token (Salvo automaticamente)</label>
-                <input type="password" id="cfgMlRefreshToken" placeholder="TG-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-xxxxxx">
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="cfgMlTag">
+                    Tag de Afiliado (ML_AFFILIATE_TAG)
+                  </label>
+                  <input type="text" id="cfgMlTag" placeholder="Ex: G20260107233651 ou matt_tool=...">
+                </div>
+                <div class="form-group">
+                  <label for="cfgMlListUrl">
+                    Link da sua Vitrine / Lista (meli.la)
+                  </label>
+                  <input type="text" id="cfgMlListUrl" placeholder="Ex: https://meli.la/2H1hvz6">
+                </div>
               </div>
-
-              <div class="token-actions-row">
-                <button class="btn btn-secondary btn-sm" id="btnRefreshMeliToken" type="button">🔄 Renovar Token Agora</button>
-                <span id="meliTokenExpireInfo" class="token-expire-info">Nenhum token salvo</span>
+              <div class="form-group">
+                <label for="cfgMlCookie">
+                  Cookie de Sessão do Mercado Livre
+                  <span class="hint">(Necessário para gerar links curtos meli.la de produtos)</span>
+                </label>
+                <textarea id="cfgMlCookie" rows="2" placeholder="Cole o seu cookie do Mercado Livre aqui..."></textarea>
               </div>
             </div>
 
-            <div class="store-status-bar">
-              <span class="store-chip active">🟡 Mercado Livre (createLink v2)</span>
-              <span class="store-chip pending">🟠 Shopee (Função Pronta)</span>
-              <span class="store-chip pending">🔵 Magalu (Função Pronta)</span>
-              <span class="store-chip pending">🔴 AliExpress (Função Pronta)</span>
+            <!-- 3. Amazon -->
+            <div class="store-box amazon-box">
+              <div class="store-box-header">
+                <span class="store-title">📦 Amazon (SiteStripe Oficial - link.amazon)</span>
+                <span class="badge badge-connected">SiteStripe Ativo</span>
+              </div>
+              <div class="form-group">
+                <label for="cfgAmazonTag">Tag de Associado Amazon</label>
+                <input type="text" id="cfgAmazonTag" placeholder="Ex: ibanez08-20">
+              </div>
+              <div class="form-group">
+                <label for="cfgAmazonCookie">
+                  Cookie de Sessão do Amazon SiteStripe
+                  <span class="hint">(Necessário para gerar links curtos link.amazon / amzn.to)</span>
+                </label>
+                <textarea id="cfgAmazonCookie" rows="2" placeholder="Cole o seu cookie do SiteStripe da Amazon aqui..."></textarea>
+              </div>
             </div>
 
-            <div class="btn-group">
+            <!-- 4. Magazine Luiza -->
+            <div class="store-box magalu-box">
+              <div class="store-box-header">
+                <span class="store-title">🔵 Magazine Luiza (Parceiro Magalu / Magazine Você)</span>
+                <span class="badge badge-connected">Loja Ativa</span>
+              </div>
+              <div class="form-group">
+                <label for="cfgMagaluTag">Nome da Loja Magazine Você / Tag</label>
+                <input type="text" id="cfgMagaluTag" placeholder="Ex: magazineibanez01">
+              </div>
+            </div>
+
+            <!-- 5. AliExpress -->
+            <div class="store-box ali-box">
+              <div class="store-box-header">
+                <span class="store-title">🔴 AliExpress (Open Platform API - s.click.aliexpress.com)</span>
+                <span class="badge badge-connected">API Ativa</span>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="cfgAliAppKey">AliExpress App Key</label>
+                  <input type="text" id="cfgAliAppKey" placeholder="Ex: 544386">
+                </div>
+                <div class="form-group">
+                  <label for="cfgAliTrackingId">AliExpress Tracking ID</label>
+                  <input type="text" id="cfgAliTrackingId" placeholder="Ex: ibanez">
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="cfgAliAppSecret">AliExpress App Secret</label>
+                <input type="password" id="cfgAliAppSecret" placeholder="Sua App Secret da AliExpress">
+              </div>
+            </div>
+
+            <div class="btn-group" style="margin-top: 1rem;">
               <button class="btn btn-success" id="btnSaveConfig">
-                <span>Salvar Configurações</span>
+                <span>💾 Salvar Todas as Configurações</span>
               </button>
             </div>
           </div>

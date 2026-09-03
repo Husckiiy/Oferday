@@ -15,6 +15,7 @@ import pino from 'pino';
 import { EventEmitter } from 'events';
 import { logger } from './logger.service.js';
 import { ConnectionStatus } from '../types/index.js';
+import { configService } from '../config/config.service.js';
 
 const AUTH_DIR = path.resolve(process.cwd(), 'data', 'auth_whatsapp');
 
@@ -248,28 +249,14 @@ class WhatsAppService extends EventEmitter {
     return { jid: raw, type: 'unknown' };
   }
 
-  public async getAvailableChats(): Promise<{ id: string; name: string; type: 'group' | 'channel'; role?: string }[]> {
+  public async getAvailableChannels(): Promise<{ id: string; name: string; type: 'channel'; role?: string }[]> {
     if (!this.sock || this.status !== 'connected') {
       return [];
     }
 
-    const chats: { id: string; name: string; type: 'group' | 'channel'; role?: string }[] = [];
+    const channels: { id: string; name: string; type: 'channel'; role?: string }[] = [];
 
-    // 1. Fetch participating Groups
-    try {
-      const groups = await this.sock.groupFetchAllParticipating();
-      for (const [id, group] of Object.entries(groups)) {
-        chats.push({
-          id,
-          name: group.subject || 'Grupo sem nome',
-          type: 'group'
-        });
-      }
-    } catch (err: any) {
-      logger.warn('WHATSAPP', `Erro ao buscar grupos participantes: ${err.message}`);
-    }
-
-    // 2. Fetch subscribed/administered Channels (Newsletters)
+    // Fetch subscribed/administered Channels (Newsletters)
     try {
       const result = await (this.sock as any).query({
         tag: 'iq',
@@ -282,11 +269,11 @@ class WhatsAppService extends EventEmitter {
       });
 
       const subscribedNode = getBinaryNodeChild(result, 'subscribed') || result;
-      const newsletterNodes = getBinaryNodeChildren(subscribedNode, 'newsletter');
+      const newsletterNodes = getBinaryNodeChildren(subscribedNode, 'newsletter') || [];
 
       for (const node of newsletterNodes) {
         const jid = node.attrs?.jid || node.attrs?.id;
-        const role = node.attrs?.role || 'viewer';
+        const role = node.attrs?.role || 'admin';
         if (jid) {
           let name = '';
           try {
@@ -295,9 +282,9 @@ class WhatsAppService extends EventEmitter {
           } catch {
             name = `Canal (${jid.split('@')[0]})`;
           }
-          chats.push({
+          channels.push({
             id: jid,
-            name: name ? `${name} [${role}]` : `Canal ${jid.split('@')[0]} [${role}]`,
+            name: name ? `📢 ${name}` : `📢 Canal ${jid.split('@')[0]}`,
             type: 'channel',
             role
           });
@@ -307,19 +294,34 @@ class WhatsAppService extends EventEmitter {
       logger.warn('WHATSAPP', `Aviso ao buscar canais inscritos: ${err.message}`);
     }
 
+    // Add destination channel from config if it's a channel
+    const currentDest = configService.getConfig().whatsapp.destinationJid;
+    if (currentDest && currentDest.endsWith('@newsletter') && !channels.some(c => c.id === currentDest)) {
+      channels.unshift({
+        id: currentDest,
+        name: `📢 Canal Atual (${currentDest})`,
+        type: 'channel',
+        role: 'admin'
+      });
+    }
+
     // Add cached resolved channels
     for (const [key, jid] of this.resolvedJidCache.entries()) {
-      if (jid.endsWith('@newsletter') && !chats.some(c => c.id === jid)) {
-        chats.unshift({
+      if (jid.endsWith('@newsletter') && !channels.some(c => c.id === jid)) {
+        channels.unshift({
           id: jid,
-          name: `Canal (${jid})`,
+          name: `📢 Canal (${jid})`,
           type: 'channel',
           role: 'admin'
         });
       }
     }
 
-    return chats;
+    return channels;
+  }
+
+  public async getAvailableChats(): Promise<{ id: string; name: string; type: 'group' | 'channel'; role?: string }[]> {
+    return this.getAvailableChannels();
   }
 
   public async sendMessage(
