@@ -65,17 +65,9 @@ class WhatsAppService extends EventEmitter {
         version,
         logger: this.pinoLogger,
         printQRInTerminal: false,
-        auth: {
-          creds: state.creds,
-          keys: makeCacheableSignalKeyStore(state.keys, this.pinoLogger)
-        },
-        browser: ['Oferday', 'Safari', '17.0'],
-        markOnlineOnConnect: false,
-        syncFullHistory: false,
-        generateHighQualityLinkPreview: true,
-        fireInitQueries: false,
-        emitOwnEvents: false,
-        shouldIgnoreJid: () => true
+        auth: state,
+        browser: ['OferdayBot', 'Chrome', '1.0.0'],
+        markOnlineOnConnect: false
       });
 
       this.sock.ev.on('creds.update', saveCreds);
