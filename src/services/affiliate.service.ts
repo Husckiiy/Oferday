@@ -50,11 +50,17 @@ export class AffiliateService {
       lower.includes('meli.la') ||
       lower.includes('mercadolivre.com') ||
       lower.includes('mercadolibre.com') ||
-      lower.includes('mercadolivre.com.br')
+      lower.includes('mercadolivre.com.br') ||
+      lower.includes('ml.app.link')
     ) {
       return 'MERCADO_LIVRE';
     }
-    if (lower.includes('shopee.com') || lower.includes('shopee.com.br')) {
+    if (
+      lower.includes('shopee.com') ||
+      lower.includes('shopee.com.br') ||
+      lower.includes('shp.ee') ||
+      lower.includes('shope.ee')
+    ) {
       return 'SHOPEE';
     }
     if (
@@ -68,14 +74,22 @@ export class AffiliateService {
     }
     if (
       lower.includes('magazineluiza.com.br') ||
+      lower.includes('magazineluiza.com') ||
       lower.includes('magazinevoce.com.br') ||
+      lower.includes('magazinevoce.com') ||
       lower.includes('parceiromagalu.com.br') ||
+      lower.includes('parceiromagalu.com') ||
+      lower.includes('divulgador.magalu.com') ||
       lower.includes('onelink.me') ||
       lower.includes('magalu.me')
     ) {
       return 'MAGALU';
     }
-    if (lower.includes('aliexpress.com')) {
+    if (
+      lower.includes('aliexpress.com') ||
+      lower.includes('s.click.aliexpress.com') ||
+      lower.includes('a.aliexpress.com')
+    ) {
       return 'ALIEXPRESS';
     }
     return 'UNKNOWN';
@@ -655,36 +669,40 @@ export class AffiliateService {
     const results: AffiliateResult[] = [];
     let updatedText = text;
 
-    // Extract all URLs matching any store pattern
-    const matchedUrls = new Set<string>();
+    // Extract ALL HTTP/HTTPS URLs from the text
+    const urlRegex = /(https?:\/\/[^\s<>"')]+)/gi;
+    const allMatches = text.match(urlRegex) || [];
+    const uniqueUrls = Array.from(new Set(allMatches.map((u) => u.trim().replace(/[.,;!?]+$/, ''))));
 
-    for (const { pattern } of this.STORE_PATTERNS) {
-      const matches = text.match(pattern);
-      if (matches) {
-        matches.forEach((m) => matchedUrls.add(m.trim().replace(/[.,;!?]+$/, '')));
-      }
-    }
-
-    if (matchedUrls.size === 0) {
+    if (uniqueUrls.length === 0) {
       return { text, results: [] };
     }
 
-    logger.info('AFFILIATE', `Detectado(s) ${matchedUrls.size} link(s) de loja(s) na mensagem.`);
+    logger.info('AFFILIATE', `Detectado(s) ${uniqueUrls.length} link(s) na mensagem.`);
 
-    for (const originalUrl of matchedUrls) {
-      const store = this.identifyStore(originalUrl);
-      logger.info('AFFILIATE', `Link original encontrado: ${originalUrl}`);
-      logger.info('AFFILIATE', `Loja identificada: ${store}`);
-
+    for (const originalUrl of uniqueUrls) {
       try {
+        logger.info('AFFILIATE', `Processando link original: ${originalUrl}`);
         const finalResolvedUrl = await this.resolveFinalUrl(originalUrl);
         logger.info('AFFILIATE', `Link final resolvido: ${finalResolvedUrl}`);
 
+        // Identify store from BOTH the final expanded destination URL and the original URL
+        let store = this.identifyStore(finalResolvedUrl);
+        if (store === 'UNKNOWN') {
+          store = this.identifyStore(originalUrl);
+        }
+
+        if (store === 'UNKNOWN') {
+          logger.info('AFFILIATE', `Link ${originalUrl} não pertence a nenhuma das 5 lojas suportadas. Mantendo original.`);
+          continue;
+        }
+
+        logger.info('AFFILIATE', `Loja identificada: ${store}`);
         const affiliateUrl = await this.generateAffiliateUrl(store, finalResolvedUrl);
 
         if (affiliateUrl && affiliateUrl !== originalUrl) {
-          logger.success('AFFILIATE', `Substituindo link original pelo link de afiliado: ${affiliateUrl}`);
-          // Replace only the specific instance of originalUrl in updatedText
+          logger.success('AFFILIATE', `Substituindo [${store}]: ${originalUrl} -> ${affiliateUrl}`);
+          // Replace all instances of originalUrl with affiliateUrl
           updatedText = updatedText.split(originalUrl).join(affiliateUrl);
         }
 
@@ -692,14 +710,14 @@ export class AffiliateService {
           originalUrl,
           store,
           finalResolvedUrl,
-          affiliateUrl,
-          replaced: affiliateUrl !== originalUrl
+          affiliateUrl: affiliateUrl || originalUrl,
+          replaced: !!affiliateUrl && affiliateUrl !== originalUrl
         });
       } catch (err: any) {
         logger.error('AFFILIATE', `Erro ao processar link ${originalUrl}: ${err.message}`);
         results.push({
           originalUrl,
-          store,
+          store: 'UNKNOWN',
           finalResolvedUrl: originalUrl,
           affiliateUrl: originalUrl,
           replaced: false

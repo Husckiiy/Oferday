@@ -69,13 +69,13 @@ class WhatsAppService extends EventEmitter {
           creds: state.creds,
           keys: makeCacheableSignalKeyStore(state.keys, this.pinoLogger)
         },
-        browser: ['Oferday', 'Chrome', '1.0.0'],
+        browser: ['Oferday', 'Safari', '17.0'],
         markOnlineOnConnect: false,
         syncFullHistory: false,
         generateHighQualityLinkPreview: true,
         fireInitQueries: false,
         emitOwnEvents: false,
-        shouldIgnoreJid: (jid: string) => !jid.includes('@newsletter') && !jid.includes('@g.us')
+        shouldIgnoreJid: () => true
       });
 
       this.sock.ev.on('creds.update', saveCreds);
@@ -97,11 +97,6 @@ class WhatsAppService extends EventEmitter {
 
         if (connection === 'close') {
           this.isConnecting = false;
-          if (this.presenceInterval) {
-            clearInterval(this.presenceInterval);
-            this.presenceInterval = null;
-          }
-
           const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
           const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
@@ -125,19 +120,13 @@ class WhatsAppService extends EventEmitter {
           const userJid = this.sock?.user?.id || 'Conectado';
           logger.success('WHATSAPP', `Conexão do WhatsApp estabelecida com sucesso! (${userJid})`);
           
-          // Enforce unavailable presence immediately and every 30s to keep mobile notifications 100% active
-          const enforceUnavailable = async () => {
-            try {
-              if (this.sock && this.status === 'connected') {
-                await this.sock.sendPresenceUpdate('unavailable');
-              }
-            } catch {}
-          };
-
-          await enforceUnavailable();
-          if (this.presenceInterval) clearInterval(this.presenceInterval);
-          this.presenceInterval = setInterval(enforceUnavailable, 30000);
-          logger.info('WHATSAPP', 'Modo silencioso/invisível ativo: notificações push do celular liberadas 100%.');
+          // Send offline/unavailable presence once on connect so WhatsApp servers never show user as active
+          try {
+            await this.sock?.sendPresenceUpdate('unavailable');
+            logger.info('WHATSAPP', 'Modo silencioso ativo (Offline / Unavailable): notificações no celular 100% liberadas.');
+          } catch {
+            // ignore
+          }
 
           this.emit('status_change', this.getStatus());
         }
