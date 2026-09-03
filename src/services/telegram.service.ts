@@ -355,12 +355,34 @@ class TelegramService extends EventEmitter {
 
     const channelNames = Array.from(this.listeningChannels.values()).map((c) => `@${c.username || c.title}`);
     this.listeningChannel = channelNames.join(', ') || channelListOrInput;
+
+    // Seed initial message IDs so poller does not re-forward past historical messages
+    for (const [key, ch] of this.listeningChannels.entries()) {
+      try {
+        const entity = ch.username || ch.id || key;
+        const initialMsgs = await this.client.getMessages(entity, { limit: 5 });
+        for (const msg of initialMsgs) {
+          const normChatId = this.normalize(msg.chatId || (msg.peerId as any)?.channelId || ch.id || key);
+          this.processedMessageKeys.add(`${normChatId}_${msg.id}`);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     this.setupEventListener();
-    logger.success('TELEGRAM', `Monitorando ${this.listeningChannels.size} canal(is) de origem em tempo real: ${this.listeningChannel}`);
+    logger.success('TELEGRAM', `Monitorando ${this.listeningChannels.size} canal(is) de origem em tempo real (Push + Poller Ativo): ${this.listeningChannel}`);
     this.emit('status_change', this.getStatus());
   }
 
+  private processedMessageKeys: Set<string> = new Set<string>();
   private keepAliveInterval: NodeJS.Timeout | null = null;
+  private pollerInterval: NodeJS.Timeout | null = null;
+
+  private normalize(val?: string | number | null): string {
+    if (!val) return '';
+    return val.toString().replace(/^-100/, '').replace(/^-/, '').toLowerCase().trim();
+  }
 
   private setupKeepAlive(): void {
     if (this.keepAliveInterval) {
@@ -380,10 +402,91 @@ class TelegramService extends EventEmitter {
     }, 30000);
   }
 
+  private setupPoller(): void {
+    if (this.pollerInterval) {
+      clearInterval(this.pollerInterval);
+    }
+
+    // Active sync poller running every 8 seconds across all channels
+    this.pollerInterval = setInterval(async () => {
+      if (!this.client || this.status !== 'connected' || this.listeningChannels.size === 0) {
+        return;
+      }
+
+      for (const [key, ch] of this.listeningChannels.entries()) {
+        try {
+          const target = ch.username || ch.id || key;
+          const msgs = await this.client.getMessages(target, { limit: 2 });
+          for (const msg of msgs) {
+            const normChatId = this.normalize(msg.chatId || (msg.peerId as any)?.channelId || ch.id || key);
+            const msgKey = `${normChatId}_${msg.id}`;
+            if (!this.processedMessageKeys.has(msgKey)) {
+              await this.dispatchMessage(msg, ch.title || ch.username || key);
+            }
+          }
+        } catch {
+          // ignore rate limits or channel read hiccups
+        }
+      }
+    }, 8000);
+  }
+
+  private async dispatchMessage(msg: any, channelTitle: string): Promise<void> {
+    try {
+      if (!msg) return;
+
+      const normChatId = this.normalize(msg.chatId || (msg.peerId as any)?.channelId || '');
+      const msgKey = `${normChatId}_${msg.id}`;
+
+      if (this.processedMessageKeys.has(msgKey)) {
+        return;
+      }
+      this.processedMessageKeys.add(msgKey);
+
+      // Keep set bounded
+      if (this.processedMessageKeys.size > 3000) {
+        const first = this.processedMessageKeys.values().next().value;
+        if (first) this.processedMessageKeys.delete(first);
+      }
+
+      const text = msg.message || '';
+      const hasMedia = !!msg.media;
+
+      logger.info('TELEGRAM', `Nova mensagem recebida do canal "${channelTitle || this.listeningChannel}"! (ID #${msg.id}, Tamanho: ${text.length} caracteres, Mídia: ${hasMedia ? 'Sim' : 'Não'})`);
+
+      let mediaBuffer: Buffer | null = null;
+      if (hasMedia) {
+        try {
+          logger.info('TELEGRAM', 'Baixando mídia da mensagem do Telegram...');
+          const downloaded = await this.client?.downloadMedia(msg, {});
+          if (downloaded && Buffer.isBuffer(downloaded)) {
+            mediaBuffer = downloaded;
+            logger.info('TELEGRAM', `Mídia baixada com sucesso (${(mediaBuffer.length / 1024).toFixed(1)} KB).`);
+          } else if (downloaded && typeof downloaded === 'string') {
+            mediaBuffer = fs.readFileSync(downloaded);
+          }
+        } catch (mediaErr: any) {
+          logger.warn('TELEGRAM', `Não foi possível baixar mídia: ${mediaErr.message}`);
+        }
+      }
+
+      this.emit('new_message', {
+        id: msg.id,
+        text,
+        mediaBuffer,
+        date: msg.date,
+        channel: channelTitle || this.listeningChannel
+      });
+    } catch (err: any) {
+      logger.error('TELEGRAM', `Erro ao despachar mensagem #${msg?.id}: ${err.message}`);
+    }
+  }
+
   private setupEventListener(): void {
     if (!this.client) return;
 
     this.setupKeepAlive();
+    this.setupPoller();
 
     // Remove previous handler if any
     if (this.messageHandler) {
@@ -393,11 +496,6 @@ class TelegramService extends EventEmitter {
         // ignore
       }
     }
-
-    const normalize = (val?: string | number | null): string => {
-      if (!val) return '';
-      return val.toString().replace(/^-100/, '').replace(/^-/, '').toLowerCase().trim();
-    };
 
     this.messageHandler = async (event: NewMessageEvent) => {
       try {
@@ -409,9 +507,9 @@ class TelegramService extends EventEmitter {
         const peerChannelId = (msg.peerId as any)?.channelId?.toString() || '';
         const peerChatId = (msg.peerId as any)?.chatId?.toString() || '';
 
-        const normRawChatId = normalize(rawChatId);
-        const normPeerChannelId = normalize(peerChannelId);
-        const normPeerChatId = normalize(peerChatId);
+        const normRawChatId = this.normalize(rawChatId);
+        const normPeerChannelId = this.normalize(peerChannelId);
+        const normPeerChatId = this.normalize(peerChatId);
 
         let chatUsername = '';
         let chatTitle = '';
@@ -419,7 +517,7 @@ class TelegramService extends EventEmitter {
         try {
           const chat: any = await msg.getChat().catch(() => null);
           if (chat) {
-            chatUsername = normalize(chat.username);
+            chatUsername = this.normalize(chat.username);
             chatTitle = chat.title || '';
           }
         } catch {
@@ -430,9 +528,9 @@ class TelegramService extends EventEmitter {
         let matchedTitle = '';
 
         for (const [key, ch] of this.listeningChannels.entries()) {
-          const normKey = normalize(key);
-          const normChId = normalize(ch.id);
-          const normChUser = normalize(ch.username);
+          const normKey = this.normalize(key);
+          const normChId = this.normalize(ch.id);
+          const normChUser = this.normalize(ch.username);
 
           const idMatches = (
             (normChId && (normChId === normRawChatId || normChId === normPeerChannelId || normChId === normPeerChatId)) ||
@@ -456,34 +554,7 @@ class TelegramService extends EventEmitter {
           return;
         }
 
-        const text = msg.message || '';
-        const hasMedia = !!msg.media;
-
-        logger.info('TELEGRAM', `Nova mensagem recebida do canal "${matchedTitle || chatTitle || this.listeningChannel}"! (Tamanho: ${text.length} caracteres, Mídia: ${hasMedia ? 'Sim' : 'Não'})`);
-
-        let mediaBuffer: Buffer | null = null;
-        if (hasMedia) {
-          try {
-            logger.info('TELEGRAM', 'Baixando mídia da mensagem do Telegram...');
-            const downloaded = await this.client?.downloadMedia(msg, {});
-            if (downloaded && Buffer.isBuffer(downloaded)) {
-              mediaBuffer = downloaded;
-              logger.info('TELEGRAM', `Mídia baixada com sucesso (${(mediaBuffer.length / 1024).toFixed(1)} KB).`);
-            } else if (downloaded && typeof downloaded === 'string') {
-              mediaBuffer = fs.readFileSync(downloaded);
-            }
-          } catch (mediaErr: any) {
-            logger.warn('TELEGRAM', `Não foi possível baixar mídia: ${mediaErr.message}`);
-          }
-        }
-
-        this.emit('new_message', {
-          id: msg.id,
-          text,
-          mediaBuffer,
-          date: msg.date,
-          channel: matchedTitle || chatTitle || this.listeningChannel
-        });
+        await this.dispatchMessage(msg, matchedTitle || chatTitle || this.listeningChannel || '');
       } catch (err: any) {
         logger.error('TELEGRAM', `Erro ao processar mensagem recebida: ${err.message}`);
       }
@@ -494,6 +565,14 @@ class TelegramService extends EventEmitter {
 
   public async logout(): Promise<void> {
     logger.info('TELEGRAM', 'Encerrando sessão do Telegram...');
+    if (this.keepAliveInterval) {
+      clearInterval(this.keepAliveInterval);
+      this.keepAliveInterval = null;
+    }
+    if (this.pollerInterval) {
+      clearInterval(this.pollerInterval);
+      this.pollerInterval = null;
+    }
     try {
       if (this.client) {
         await this.client.disconnect();
