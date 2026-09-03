@@ -360,15 +360,15 @@ export class AffiliateService {
       return cleanList;
     }
 
-    // 2. Se for produto -> Tenta gerar meli.la oficial ou link canônico limpo
-    const cleanedProductUrl = this.cleanAndTagMercadoLivreUrl(finalUrl, tag);
-
-    const officialMeliLa = await this.generateOfficialMeliShortLink(cleanedProductUrl, tag);
+    // 2. Se for produto -> Tenta gerar meli.la oficial usando a URL canônica limpa
+    const rawCleanUrl = this.cleanAndTagMercadoLivreUrl(finalUrl, '');
+    const officialMeliLa = await this.generateOfficialMeliShortLink(rawCleanUrl, tag);
     if (officialMeliLa) {
       logger.success('AFFILIATE', `Mercado Livre: Link curto oficial meli.la gerado com sucesso: ${officialMeliLa}`);
       return officialMeliLa;
     }
 
+    const cleanedProductUrl = this.cleanAndTagMercadoLivreUrl(finalUrl, tag);
     logger.success('AFFILIATE', `Mercado Livre: Link oficial de produto gerado: ${cleanedProductUrl}`);
     return cleanedProductUrl;
   }
