@@ -1,9 +1,19 @@
 import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
+import crypto from 'crypto';
 import { logger } from './logger.service.js';
 
 const BANNERS_DIR = path.resolve(process.cwd(), 'data', 'banners');
+
+export interface CachedImageReference {
+  path: string;
+  sha256: string;
+  md5: string;
+  dHashBinary: string;
+  dHashHex: string;
+  pixelBuffer: Buffer | null;
+}
 
 export interface BannerRule {
   id: string;
@@ -11,7 +21,7 @@ export interface BannerRule {
   keywords: string[];
   cleanImagePath: string;
   referenceImages: string[];
-  cachedFingerprints?: Buffer[];
+  cachedRefs?: CachedImageReference[];
 }
 
 class ImageService {
@@ -29,7 +39,41 @@ class ImageService {
     }
   }
 
-  private async getNormalizedPixels(buffer: Buffer): Promise<Buffer | null> {
+  /**
+   * Computes Perceptual Difference Hash (dHash) 64-bit binary and hex
+   */
+  public async computeDHash(buffer: Buffer): Promise<{ binary: string; hex: string } | null> {
+    try {
+      const raw = await sharp(buffer)
+        .resize(9, 8, { fit: 'fill' })
+        .grayscale()
+        .raw()
+        .toBuffer();
+
+      let binary = '';
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          const left = raw[row * 9 + col];
+          const right = raw[row * 9 + col + 1];
+          binary += left > right ? '1' : '0';
+        }
+      }
+
+      let hex = '';
+      for (let i = 0; i < 64; i += 4) {
+        hex += parseInt(binary.substring(i, i + 4), 2).toString(16);
+      }
+
+      return { binary, hex };
+    } catch (err: any) {
+      return null;
+    }
+  }
+
+  /**
+   * Computes normalized 32x32 grayscale pixel buffer for structural comparison
+   */
+  public async getNormalizedPixels(buffer: Buffer): Promise<Buffer | null> {
     try {
       return await sharp(buffer)
         .resize(32, 32, { fit: 'fill' })
@@ -41,7 +85,7 @@ class ImageService {
     }
   }
 
-  private calculateSimilarity(buf1: Buffer, buf2: Buffer): number {
+  public calculateSimilarity(buf1: Buffer, buf2: Buffer): number {
     if (buf1.length !== buf2.length) return 0;
     let diff = 0;
     for (let i = 0; i < buf1.length; i++) {
@@ -49,6 +93,40 @@ class ImageService {
     }
     const maxDiff = 255 * buf1.length;
     return (1 - diff / maxDiff) * 100;
+  }
+
+  public hammingDistance(bin1: string, bin2: string): number {
+    if (bin1.length !== bin2.length) return 64;
+    let diff = 0;
+    for (let i = 0; i < bin1.length; i++) {
+      if (bin1[i] !== bin2[i]) diff++;
+    }
+    return diff;
+  }
+
+  private async processReferenceImage(filePath: string): Promise<CachedImageReference | null> {
+    if (!fs.existsSync(filePath)) return null;
+    try {
+      const buf = fs.readFileSync(filePath);
+      const sha256 = crypto.createHash('sha256').update(buf).digest('hex');
+      const md5 = crypto.createHash('md5').update(buf).digest('hex');
+      const dHash = await this.computeDHash(buf);
+      const pixelBuffer = await this.getNormalizedPixels(buf);
+
+      if (!dHash) return null;
+
+      return {
+        path: filePath,
+        sha256,
+        md5,
+        dHashBinary: dHash.binary,
+        dHashHex: dHash.hex,
+        pixelBuffer
+      };
+    } catch (err: any) {
+      logger.error('IMAGE', `Erro ao indexar imagem de referência (${filePath}): ${err.message}`);
+      return null;
+    }
   }
 
   private async initDefaultRules(): Promise<void> {
@@ -72,7 +150,8 @@ class ImageService {
           'cupom magazine',
           'desconto no magalu',
           'cupom de desconto no magalu',
-          'novo cupom de desconto no magalu'
+          'novo cupom de desconto no magalu',
+          'salve seu cupom magalu'
         ],
         cleanImagePath: magaluClean,
         referenceImages: [magaluComp, magaluClean]
@@ -98,14 +177,13 @@ class ImageService {
       }
     ];
 
-    // Pre-cache fingerprints
     for (const rule of this.rules) {
-      rule.cachedFingerprints = [];
+      rule.cachedRefs = [];
       for (const refPath of rule.referenceImages) {
-        if (fs.existsSync(refPath)) {
-          const buf = fs.readFileSync(refPath);
-          const fp = await this.getNormalizedPixels(buf);
-          if (fp) rule.cachedFingerprints.push(fp);
+        const refObj = await this.processReferenceImage(refPath);
+        if (refObj) {
+          rule.cachedRefs.push(refObj);
+          logger.info('IMAGE', `Banner indexado [${rule.name}]: dHash=${refObj.dHashHex}, MD5=${refObj.md5}`);
         }
       }
     }
@@ -114,8 +192,7 @@ class ImageService {
   }
 
   /**
-   * Checks if incoming message text or image matches a banner replacement rule.
-   * Compares both visual image fingerprint AND text keywords.
+   * Process image replacement with multi-tier hash and visual matching
    */
   public async processImageReplacement(text: string, originalBuffer: Buffer | null): Promise<Buffer | null> {
     if (!originalBuffer && !text) {
@@ -127,34 +204,61 @@ class ImageService {
     }
 
     const lowerText = (text || '').toLowerCase();
-    let incomingFingerprint: Buffer | null = null;
+
+    let inSha256 = '';
+    let inMd5 = '';
+    let inDHash: { binary: string; hex: string } | null = null;
+    let inPixels: Buffer | null = null;
 
     if (originalBuffer && originalBuffer.length > 0) {
-      incomingFingerprint = await this.getNormalizedPixels(originalBuffer);
+      inSha256 = crypto.createHash('sha256').update(originalBuffer).digest('hex');
+      inMd5 = crypto.createHash('md5').update(originalBuffer).digest('hex');
+      inDHash = await this.computeDHash(originalBuffer);
+      inPixels = await this.getNormalizedPixels(originalBuffer);
     }
 
     for (const rule of this.rules) {
       let isMatch = false;
       let matchReason = '';
 
-      // 1. Visual Comparison by Image Pixel Fingerprint (sharp)
-      if (incomingFingerprint && rule.cachedFingerprints && rule.cachedFingerprints.length > 0) {
-        for (const refFp of rule.cachedFingerprints) {
-          const similarity = this.calculateSimilarity(incomingFingerprint, refFp);
-          if (similarity >= 75.0) {
+      if (rule.cachedRefs && rule.cachedRefs.length > 0) {
+        for (const ref of rule.cachedRefs) {
+          // 1. Exact MD5 / SHA-256 Hash Match
+          if (inSha256 && (inSha256 === ref.sha256 || inMd5 === ref.md5)) {
             isMatch = true;
-            matchReason = `Similaridade visual de ${similarity.toFixed(1)}% com o banner ${rule.name}`;
+            matchReason = `Hash exato idêntico (MD5: ${inMd5})`;
             break;
+          }
+
+          // 2. Perceptual dHash Match (Hamming distance <= 14 bits out of 64)
+          if (inDHash && ref.dHashBinary) {
+            const dist = this.hammingDistance(inDHash.binary, ref.dHashBinary);
+            if (dist <= 14) {
+              const hashMatchPct = (((64 - dist) / 64) * 100).toFixed(1);
+              isMatch = true;
+              matchReason = `Perceptual dHash correspondente (${hashMatchPct}% de precisão, distância ${dist}/64 bits)`;
+              break;
+            }
+          }
+
+          // 3. Grayscale Pixel Similarity (>= 72%)
+          if (inPixels && ref.pixelBuffer) {
+            const similarity = this.calculateSimilarity(inPixels, ref.pixelBuffer);
+            if (similarity >= 72.0) {
+              isMatch = true;
+              matchReason = `Similaridade visual de pixels de ${similarity.toFixed(1)}%`;
+              break;
+            }
           }
         }
       }
 
-      // 2. Keyword fallback in text
+      // 4. Keyword Fallback in Text
       if (!isMatch && lowerText) {
         const matchedKeyword = rule.keywords.some((kw) => lowerText.includes(kw));
         if (matchedKeyword) {
           isMatch = true;
-          matchReason = `Palavra-chave detectada no texto da mensagem`;
+          matchReason = `Palavra-chave identificada no texto da oferta`;
         }
       }
 
@@ -163,10 +267,10 @@ class ImageService {
         if (fs.existsSync(rule.cleanImagePath)) {
           try {
             const cleanBuffer = fs.readFileSync(rule.cleanImagePath);
-            logger.success('IMAGE', `🎯 Regra acionada [${rule.name}] (${matchReason})! Imagem substituída com precisão visual pelo banner limpo.`);
+            logger.success('IMAGE', `🎯 Regra acionada [${rule.name}] via ${matchReason}! Imagem substituída com sucesso pelo banner limpo.`);
             return cleanBuffer;
           } catch (err: any) {
-            logger.error('IMAGE', `Erro ao carregar banner limpo (${rule.cleanImagePath}): ${err.message}`);
+            logger.error('IMAGE', `Erro ao carregar imagem limpa (${rule.cleanImagePath}): ${err.message}`);
           }
         }
       }
