@@ -22,14 +22,14 @@ const DEFAULT_CONFIG: AppConfig = {
     active: true
   },
   affiliate: {
-    mlAppId: process.env.ML_APP_ID || process.env.MELI_APP_ID || '',
-    mlSecretKey: process.env.ML_SECRET_KEY || process.env.MELI_SECRET_KEY || '',
-    mlAffiliateTag: process.env.ML_AFFILIATE_TAG || process.env.MELI_AFFILIATE_TAG || '',
+    mlAppId: process.env.ML_APP_ID || process.env.MELI_APP_ID || '5288380056275392',
+    mlSecretKey: process.env.ML_SECRET_KEY || process.env.MELI_SECRET_KEY || 'ZOsYifTD0e6TSksppgKagbgBKM45dih3',
+    mlAffiliateTag: process.env.ML_AFFILIATE_TAG || process.env.MELI_AFFILIATE_TAG || 'G20260107233651',
     mlRedirectUri: process.env.ML_REDIRECT_URI || 'https://localhost',
     mlListShortUrl: process.env.ML_LIST_SHORT_URL || 'https://meli.la/2H1hvz6',
     meliCookie: process.env.ML_COOKIE || process.env.MELI_COOKIE || process.env.MERCADOLIVRE_COOKIE || '',
-    meliAccessToken: process.env.ML_ACCESS_TOKEN || process.env.MELI_ACCESS_TOKEN || '',
-    meliAffiliateTag: process.env.ML_AFFILIATE_TAG || process.env.MELI_AFFILIATE_TAG || '',
+    meliAccessToken: process.env.ML_ACCESS_TOKEN || process.env.MELI_ACCESS_TOKEN || '6282693331910478',
+    meliAffiliateTag: process.env.ML_AFFILIATE_TAG || process.env.MELI_AFFILIATE_TAG || 'G20260107233651',
     shopeeAppId: process.env.SHOPEE_APP_ID || '18378190901',
     shopeeAppSecret: process.env.SHOPEE_APP_SECRET || 'ITHJMNNGTV4JOSEZLT27UZ3TY7ICCC6L',
     amazonTag: process.env.AMAZON_TAG || process.env.AMAZON_AFFILIATE_TAG || 'ibanez08-20',
@@ -101,11 +101,32 @@ class ConfigService {
 
   public saveConfig(newConfig: Partial<AppConfig>): AppConfig {
     this.ensureDataDir();
+
+    const currentAff = this.config.affiliate;
+    const incomingAff = (newConfig.affiliate || {}) as Partial<AppConfig['affiliate']>;
+
+    const cleanAffiliate = {
+      ...currentAff,
+      ...incomingAff,
+      shopeeAppId: incomingAff.shopeeAppId || currentAff.shopeeAppId || DEFAULT_CONFIG.affiliate.shopeeAppId,
+      shopeeAppSecret: incomingAff.shopeeAppSecret || currentAff.shopeeAppSecret || DEFAULT_CONFIG.affiliate.shopeeAppSecret,
+      mlAffiliateTag: incomingAff.mlAffiliateTag || currentAff.mlAffiliateTag || DEFAULT_CONFIG.affiliate.mlAffiliateTag,
+      meliAffiliateTag: incomingAff.meliAffiliateTag || incomingAff.mlAffiliateTag || currentAff.meliAffiliateTag || DEFAULT_CONFIG.affiliate.meliAffiliateTag,
+      mlListShortUrl: incomingAff.mlListShortUrl || currentAff.mlListShortUrl || DEFAULT_CONFIG.affiliate.mlListShortUrl,
+      amazonTag: incomingAff.amazonTag || currentAff.amazonTag || DEFAULT_CONFIG.affiliate.amazonTag,
+      magaluTag: incomingAff.magaluTag || currentAff.magaluTag || DEFAULT_CONFIG.affiliate.magaluTag,
+      aliexpressAppKey: incomingAff.aliexpressAppKey || currentAff.aliexpressAppKey || DEFAULT_CONFIG.affiliate.aliexpressAppKey,
+      aliexpressAppSecret: incomingAff.aliexpressAppSecret || currentAff.aliexpressAppSecret || DEFAULT_CONFIG.affiliate.aliexpressAppSecret,
+      aliexpressTrackingId: incomingAff.aliexpressTrackingId || currentAff.aliexpressTrackingId || DEFAULT_CONFIG.affiliate.aliexpressTrackingId,
+      meliCookie: incomingAff.meliCookie || currentAff.meliCookie,
+      amazonCookie: incomingAff.amazonCookie || currentAff.amazonCookie
+    };
+
     this.config = {
       telegram: { ...this.config.telegram, ...(newConfig.telegram || {}) },
       whatsapp: { ...this.config.whatsapp, ...(newConfig.whatsapp || {}) },
       forwarder: { ...this.config.forwarder, ...(newConfig.forwarder || {}) },
-      affiliate: { ...this.config.affiliate, ...(newConfig.affiliate || {}) }
+      affiliate: cleanAffiliate
     };
 
     try {

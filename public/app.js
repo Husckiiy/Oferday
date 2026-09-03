@@ -995,7 +995,21 @@ btnClearLogs.addEventListener('click', async () => {
   }
 });
 
+async function loadConfigDirectly() {
+  try {
+    const res = await fetch('/api/config');
+    const config = await res.json();
+    if (config) {
+      appState.config = config;
+      updateConfigUI(config);
+    }
+  } catch (err) {
+    console.error('Erro ao carregar config diretamente:', err);
+  }
+}
+
 // Initialize on load
 window.addEventListener('DOMContentLoaded', () => {
+  loadConfigDirectly();
   setupSSE();
 });
