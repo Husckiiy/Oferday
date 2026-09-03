@@ -1,0 +1,8 @@
+{
+  "access_token": "APP_USR-5288380056275392-090201-4253eda40fdf774602c19238e546e5a4-3120588434",
+  "refresh_token": "TG-6a97ae2cf369a30001f7c56a-3120588434",
+  "expires_at": 1788346721082,
+  "token_type": "Bearer",
+  "scope": "offline_access read urn:global:admin:info:/read-only urn:global:admin:info:/read-write urn:global:admin:oauth:/read-only urn:global:admin:oauth:/read-write urn:global:admin:users:/read-only urn:global:admin:users:/read-write urn:ml:mktp:offers:/read-write write",
+  "user_id": 3120588434
+}
