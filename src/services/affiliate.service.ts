@@ -389,13 +389,27 @@ export class AffiliateService {
         }
       }
 
-      if (resp.ok) {
-        const data: any = await resp.json();
+      const rawText = await resp.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        data = rawText;
+      }
+
+      logger.info('AFFILIATE', `Mercado Livre OAuth createLink [HTTP ${resp.status}]:`, data);
+
+      if (resp.ok && data) {
         if (Array.isArray(data?.urls) && data.urls.length > 0) {
-          const shortUrl = data.urls[0]?.short_url || data.urls[0]?.url;
+          const shortUrl = data.urls[0]?.short_url || data.urls[0]?.url || data.urls[0]?.affiliate_url;
           if (shortUrl && (shortUrl.includes('meli.la') || shortUrl.includes('mercadolivre.com/sec'))) {
             return shortUrl;
           }
+        } else if (Array.isArray(data?.results) && data.results.length > 0) {
+          const shortUrl = data.results[0]?.short_url || data.results[0]?.url || data.results[0]?.affiliate_url;
+          if (shortUrl) return shortUrl;
+        } else if (data?.short_url || data?.url) {
+          return data.short_url || data.url;
         }
       }
     } catch (err: any) {
