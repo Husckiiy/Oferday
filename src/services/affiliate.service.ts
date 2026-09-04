@@ -339,6 +339,47 @@ export class AffiliateService {
   }
 
   /**
+   * Extracts the underlying featured product from a Mercado Livre social recommendation page
+   */
+  public async extractProductFromSocialPage(socialUrl: string): Promise<string | null> {
+    try {
+      const res = await fetch(socialUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        },
+        signal: AbortSignal.timeout(6000)
+      });
+      if (!res.ok) return null;
+      const html = await res.text();
+
+      // 1. Check for item_id in pdp_filters
+      const pdpMatch = html.match(/item_id%3A(MLB-?\d+)/i) || html.match(/item_id=(MLB-?\d+)/i);
+      if (pdpMatch) {
+        const mlb = pdpMatch[1].replace('-', '');
+        return `https://produto.mercadolivre.com.br/${mlb}`;
+      }
+
+      // 2. Check for featured product link in recommendations / card-featured
+      const featuredMatch = html.match(/href=["'](https?:\/\/www\.mercadolivre\.com\.br\/[^"']+\/up\/MLBU[^"']+)["']/i) ||
+                            html.match(/href=["'](https?:\/\/produto\.mercadolivre\.com\.br\/MLB[^"']+)["']/i) ||
+                            html.match(/href=["'](https?:\/\/www\.mercadolivre\.com\.br\/p\/MLB[^"']+)["']/i);
+      if (featuredMatch && featuredMatch[1]) {
+        return featuredMatch[1].replace(/&amp;/g, '&').split('?')[0];
+      }
+
+      // 3. Check for wid=MLB...
+      const widMatch = html.match(/wid=(MLB\d+)/i);
+      if (widMatch) {
+        return `https://produto.mercadolivre.com.br/${widMatch[1]}`;
+      }
+    } catch (err: any) {
+      logger.warn('AFFILIATE', `Aviso ao extrair produto da página social: ${err.message}`);
+    }
+    return null;
+  }
+
+  /**
    * Official Mercado Livre Affiliate Link Generator.
    * Generates clean, official Mercado Livre canonical links or official meli.la showcase links.
    */
@@ -347,28 +388,31 @@ export class AffiliateService {
     const tag = config.affiliate?.mlAffiliateTag || config.affiliate?.meliAffiliateTag || process.env.ML_AFFILIATE_TAG || process.env.MELI_AFFILIATE_TAG || '';
     const customListUrl = config.affiliate?.mlListShortUrl || process.env.ML_LIST_SHORT_URL || 'https://meli.la/2H1hvz6';
 
+    let targetUrl = finalUrl;
     const isListOrSocial = finalUrl.toLowerCase().includes('/social/') || finalUrl.toLowerCase().includes('/lista/') || finalUrl.toLowerCase().includes('/lists');
 
-    // 1. Se for lista ou vitrine social -> direciona para o link oficial da sua lista/vitrine meli.la
+    // 1. Se for link social/recomendação -> extrai o produto real destacado da página
     if (isListOrSocial) {
-      if (customListUrl) {
-        logger.success('AFFILIATE', `Mercado Livre: Lista/Vitrine convertida para sua vitrine oficial: ${customListUrl}`);
+      logger.info('AFFILIATE', 'Mercado Livre: Link social/vitrine detectado. Extraindo produto real da página...');
+      const extractedProduct = await this.extractProductFromSocialPage(finalUrl);
+      if (extractedProduct) {
+        logger.success('AFFILIATE', `Mercado Livre: Produto real extraído com sucesso: ${extractedProduct}`);
+        targetUrl = extractedProduct;
+      } else if (customListUrl) {
+        logger.success('AFFILIATE', `Mercado Livre: Vitrine geral convertida para sua vitrine oficial: ${customListUrl}`);
         return customListUrl;
       }
-      const cleanList = this.cleanAndTagMercadoLivreUrl(finalUrl, tag);
-      logger.success('AFFILIATE', `Mercado Livre: Link oficial de lista gerado: ${cleanList}`);
-      return cleanList;
     }
 
-    // 2. Se for produto -> Tenta gerar meli.la oficial usando a URL canônica limpa
-    const rawCleanUrl = this.cleanAndTagMercadoLivreUrl(finalUrl, '');
+    // 2. Tenta gerar meli.la oficial usando a URL canônica limpa do produto
+    const rawCleanUrl = this.cleanAndTagMercadoLivreUrl(targetUrl, '');
     const officialMeliLa = await this.generateOfficialMeliShortLink(rawCleanUrl, tag);
     if (officialMeliLa) {
       logger.success('AFFILIATE', `Mercado Livre: Link curto oficial meli.la gerado com sucesso: ${officialMeliLa}`);
       return officialMeliLa;
     }
 
-    const cleanedProductUrl = this.cleanAndTagMercadoLivreUrl(finalUrl, tag);
+    const cleanedProductUrl = this.cleanAndTagMercadoLivreUrl(targetUrl, tag);
     logger.success('AFFILIATE', `Mercado Livre: Link oficial de produto gerado: ${cleanedProductUrl}`);
     return cleanedProductUrl;
   }
