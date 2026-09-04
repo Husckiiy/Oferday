@@ -7,6 +7,21 @@ let appState = {
   autoScroll: true
 };
 
+// --- Tab Switching Navigation ---
+document.querySelectorAll('.nav-tab').forEach((tabBtn) => {
+  tabBtn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-tab').forEach((t) => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach((c) => c.classList.remove('active'));
+
+    tabBtn.classList.add('active');
+    const targetId = tabBtn.getAttribute('data-tab');
+    const targetEl = document.getElementById(targetId);
+    if (targetEl) {
+      targetEl.classList.add('active');
+    }
+  });
+});
+
 // DOM Elements
 const tgBadge = document.getElementById('tgBadge');
 const tgAuthForm = document.getElementById('tgAuthForm');
@@ -18,7 +33,6 @@ const tgApiHash = document.getElementById('tgApiHash');
 const tgPhone = document.getElementById('tgPhone');
 const tgCode = document.getElementById('tgCode');
 const tg2FaPass = document.getElementById('tg2FaPass');
-const tgActiveChannel = document.getElementById('tgActiveChannel');
 
 const btnTgSendCode = document.getElementById('btnTgSendCode');
 const btnTgVerifyCode = document.getElementById('btnTgVerifyCode');
@@ -39,6 +53,14 @@ const forwarderStatusLabel = document.getElementById('forwarderStatusLabel');
 const cfgSourceChannel = document.getElementById('cfgSourceChannel');
 const cfgDestJid = document.getElementById('cfgDestJid');
 const btnSaveConfig = document.getElementById('btnSaveConfig');
+const btnSaveConfigRouting = document.getElementById('btnSaveConfigRouting');
+
+// Navbar Status Pills DOM
+const pillTgText = document.getElementById('pillTgText');
+const pillWaText = document.getElementById('pillWaText');
+const pillMeliText = document.getElementById('pillMeliText');
+const pillTelegram = document.getElementById('pillTelegram');
+const pillWhatsApp = document.getElementById('pillWhatsApp');
 
 // Pipeline DOM
 const nodeTelegram = document.getElementById('nodeTelegram');
@@ -153,8 +175,8 @@ function triggerPulseAnimation() {
   pipeProcessorStatus.textContent = '⚡ Repassando mensagem...';
   setTimeout(() => {
     nodeProcessor.classList.remove('active');
-    pipeProcessorStatus.textContent = 'Aguardando Mensagens';
-  }, 2000);
+    pipeProcessorStatus.textContent = 'Monitorando 24h';
+  }, 2500);
 }
 
 // --- Log Rendering ---
@@ -283,18 +305,18 @@ function updateConfigUI(config) {
   // Mercado Livre
   const cfgMlTag = document.getElementById('cfgMlTag');
   const cfgMlListUrl = document.getElementById('cfgMlListUrl');
-  const cfgMlCookie = document.getElementById('cfgMlCookie');
+  const cfgMlAppId = document.getElementById('cfgMlAppId');
+  const cfgMlSecretKey = document.getElementById('cfgMlSecretKey');
   if (cfgMlTag && (config.affiliate?.mlAffiliateTag || config.affiliate?.meliAffiliateTag)) {
     cfgMlTag.value = config.affiliate.mlAffiliateTag || config.affiliate.meliAffiliateTag;
   }
   if (cfgMlListUrl && config.affiliate?.mlListShortUrl) cfgMlListUrl.value = config.affiliate.mlListShortUrl;
-  if (cfgMlCookie && config.affiliate?.meliCookie) cfgMlCookie.value = config.affiliate.meliCookie;
+  if (cfgMlAppId && config.affiliate?.mlAppId) cfgMlAppId.value = config.affiliate.mlAppId;
+  if (cfgMlSecretKey && config.affiliate?.mlSecretKey) cfgMlSecretKey.value = config.affiliate.mlSecretKey;
 
   // Amazon
   const cfgAmazonTag = document.getElementById('cfgAmazonTag');
-  const cfgAmazonCookie = document.getElementById('cfgAmazonCookie');
   if (cfgAmazonTag && config.affiliate?.amazonTag) cfgAmazonTag.value = config.affiliate.amazonTag;
-  if (cfgAmazonCookie && config.affiliate?.amazonCookie) cfgAmazonCookie.value = config.affiliate.amazonCookie;
 
   // Magalu
   const cfgMagaluTag = document.getElementById('cfgMagaluTag');
@@ -316,10 +338,10 @@ function updateConfigUI(config) {
 
   if (!config.forwarder.active) {
     pipeProcessorBadge.textContent = 'Pausado';
-    pipeProcessorBadge.className = 'node-status badge-disconnected';
+    pipeProcessorBadge.className = 'box-badge badge-gray';
   } else {
     pipeProcessorBadge.textContent = 'Ativo';
-    pipeProcessorBadge.className = 'node-status badge-connected';
+    pipeProcessorBadge.className = 'box-badge badge-green';
   }
 }
 
@@ -335,38 +357,46 @@ function updateTelegramUI(statusObj) {
 
   if (status === 'connected') {
     tgBadge.textContent = 'Conectado';
-    tgBadge.className = 'badge badge-connected';
+    tgBadge.className = 'badge badge-green';
     tgConnectedStep.classList.remove('hidden');
-    tgActiveChannel.textContent = statusObj.channel ? `@${statusObj.channel}` : 'Nenhum canal ativo';
+
+    pillTgText.textContent = 'Conectado';
+    pillTelegram.querySelector('.dot').className = 'dot dot-green';
 
     nodeTelegram.classList.add('active');
     pipeTgBadge.textContent = 'Conectado';
-    pipeTgBadge.className = 'node-status badge-connected';
+    pipeTgBadge.className = 'box-badge badge-green';
   } else if (status === 'waiting_code') {
     tgBadge.textContent = 'Aguardando Código';
     tgBadge.className = 'badge badge-connecting';
     tgCodeStep.classList.remove('hidden');
+
+    pillTgText.textContent = 'Código';
+    pillTelegram.querySelector('.dot').className = 'dot dot-yellow';
+
     pipeTgBadge.textContent = 'Aguardando Código';
-    pipeTgBadge.className = 'node-status';
+    pipeTgBadge.className = 'box-badge badge-connecting';
   } else if (status === 'waiting_2fa') {
     tgBadge.textContent = 'Aguardando 2FA';
     tgBadge.className = 'badge badge-connecting';
     tg2FaStep.classList.remove('hidden');
+
+    pillTgText.textContent = '2FA';
+    pillTelegram.querySelector('.dot').className = 'dot dot-yellow';
+
     pipeTgBadge.textContent = 'Aguardando 2FA';
-    pipeTgBadge.className = 'node-status';
-  } else if (status === 'connecting') {
-    tgBadge.textContent = 'Conectando...';
-    tgBadge.className = 'badge badge-connecting';
-    tgAuthForm.classList.remove('hidden');
-    pipeTgBadge.textContent = 'Conectando...';
-    pipeTgBadge.className = 'node-status';
+    pipeTgBadge.className = 'box-badge badge-connecting';
   } else {
     tgBadge.textContent = 'Desconectado';
-    tgBadge.className = 'badge badge-disconnected';
+    tgBadge.className = 'badge badge-gray';
     tgAuthForm.classList.remove('hidden');
+
+    pillTgText.textContent = 'Desconectado';
+    pillTelegram.querySelector('.dot').className = 'dot dot-gray';
+
     nodeTelegram.classList.remove('active');
     pipeTgBadge.textContent = 'Desconectado';
-    pipeTgBadge.className = 'node-status';
+    pipeTgBadge.className = 'box-badge badge-gray';
   }
 }
 
@@ -377,13 +407,16 @@ function updateWhatsAppUI(statusObj) {
 
   if (status === 'connected') {
     waBadge.textContent = 'Conectado';
-    waBadge.className = 'badge badge-connected';
+    waBadge.className = 'badge badge-green';
     waQrSection.classList.add('hidden');
     waConnectedSection.classList.remove('hidden');
 
+    pillWaText.textContent = 'Conectado';
+    pillWhatsApp.querySelector('.dot').className = 'dot dot-green';
+
     nodeWhatsApp.classList.add('active');
     pipeWaBadge.textContent = 'Conectado';
-    pipeWaBadge.className = 'node-status badge-connected';
+    pipeWaBadge.className = 'box-badge badge-green';
   } else if (status === 'connecting') {
     waBadge.textContent = 'Aguardando QR';
     waBadge.className = 'badge badge-connecting';
@@ -392,18 +425,25 @@ function updateWhatsAppUI(statusObj) {
     if (statusObj.qrCode) {
       renderQr(statusObj.qrCode);
     }
+    pillWaText.textContent = 'QR Code';
+    pillWhatsApp.querySelector('.dot').className = 'dot dot-yellow';
+
     pipeWaBadge.textContent = 'Aguardando QR';
-    pipeWaBadge.className = 'node-status';
+    pipeWaBadge.className = 'box-badge badge-connecting';
   } else {
     waBadge.textContent = 'Desconectado';
-    waBadge.className = 'badge badge-disconnected';
+    waBadge.className = 'badge badge-gray';
     waQrSection.classList.remove('hidden');
     waConnectedSection.classList.add('hidden');
     waQrImg.classList.add('hidden');
     waQrPlaceholder.classList.remove('hidden');
+
+    pillWaText.textContent = 'Desconectado';
+    pillWhatsApp.querySelector('.dot').className = 'dot dot-gray';
+
     nodeWhatsApp.classList.remove('active');
     pipeWaBadge.textContent = 'Desconectado';
-    pipeWaBadge.className = 'node-status';
+    pipeWaBadge.className = 'box-badge badge-gray';
   }
 }
 
@@ -416,7 +456,7 @@ function renderQr(dataUrl) {
 // --- Event Handlers ---
 
 // Telegram: Send Login Code
-btnTgSendCode.addEventListener('click', async () => {
+btnTgSendCode?.addEventListener('click', async () => {
   const apiId = tgApiId.value.trim();
   const apiHash = tgApiHash.value.trim();
   const phoneNumber = tgPhone.value.trim();
@@ -450,7 +490,7 @@ btnTgSendCode.addEventListener('click', async () => {
 });
 
 // Telegram: Verify Code
-btnTgVerifyCode.addEventListener('click', async () => {
+btnTgVerifyCode?.addEventListener('click', async () => {
   const code = tgCode.value.trim();
   if (!code) {
     showToast('Digite o código de verificação recebido.', 'error');
@@ -483,15 +523,15 @@ btnTgVerifyCode.addEventListener('click', async () => {
 });
 
 // Telegram: Cancel Code input
-btnTgCancelCode.addEventListener('click', () => {
+btnTgCancelCode?.addEventListener('click', () => {
   tgCodeStep.classList.add('hidden');
   tgAuthForm.classList.remove('hidden');
   tgBadge.textContent = 'Desconectado';
-  tgBadge.className = 'badge badge-disconnected';
+  tgBadge.className = 'badge badge-gray';
 });
 
 // Telegram: Submit 2FA Password
-btnTgSubmit2Fa.addEventListener('click', async () => {
+btnTgSubmit2Fa?.addEventListener('click', async () => {
   const password = tg2FaPass.value.trim();
   if (!password) {
     showToast('Digite sua senha de 2 etapas (2FA).', 'error');
@@ -522,7 +562,7 @@ btnTgSubmit2Fa.addEventListener('click', async () => {
 });
 
 // Telegram: Logout
-btnTgLogout.addEventListener('click', async () => {
+btnTgLogout?.addEventListener('click', async () => {
   if (!confirm('Deseja realmente desconectar o Telegram?')) return;
   try {
     await fetch('/api/telegram/logout', { method: 'POST' });
@@ -533,7 +573,7 @@ btnTgLogout.addEventListener('click', async () => {
 });
 
 // WhatsApp: Reconnect / Regenerate QR
-btnWaReconnect.addEventListener('click', async () => {
+btnWaReconnect?.addEventListener('click', async () => {
   waQrPlaceholder.classList.remove('hidden');
   waQrImg.classList.add('hidden');
   try {
@@ -545,7 +585,7 @@ btnWaReconnect.addEventListener('click', async () => {
 });
 
 // WhatsApp: Disconnect
-btnWaDisconnect.addEventListener('click', async () => {
+btnWaDisconnect?.addEventListener('click', async () => {
   if (!confirm('Deseja realmente desconectar o WhatsApp?')) return;
   try {
     await fetch('/api/whatsapp/disconnect', { method: 'POST' });
@@ -628,7 +668,7 @@ async function checkAndResolveJid(val) {
   }
 }
 
-cfgDestJid.addEventListener('blur', () => {
+cfgDestJid?.addEventListener('blur', () => {
   checkAndResolveJid(cfgDestJid.value.trim());
 });
 
@@ -636,107 +676,32 @@ cfgDestJid.addEventListener('blur', () => {
 const meliTokenBadge = document.getElementById('meliTokenBadge');
 const meliTokenExpireInfo = document.getElementById('meliTokenExpireInfo');
 const btnRefreshMeliToken = document.getElementById('btnRefreshMeliToken');
-const cfgMlAccessToken = document.getElementById('cfgMlAccessToken');
-const cfgMlRefreshToken = document.getElementById('cfgMlRefreshToken');
-const btnOpenMlAuth = document.getElementById('btnOpenMlAuth');
-const btnExchangeMlCode = document.getElementById('btnExchangeMlCode');
-const mlAuthCodeInput = document.getElementById('mlAuthCodeInput');
-
-function updateMeliAuthLink() {
-  const appId = document.getElementById('cfgMlAppId')?.value.trim() || '6282693331910478';
-  if (btnOpenMlAuth) {
-    btnOpenMlAuth.href = `https://auth.mercadolibre.com/authorization?response_type=code&client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent('https://localhost')}`;
-  }
-}
-
-document.getElementById('cfgMlAppId')?.addEventListener('input', updateMeliAuthLink);
-
-btnExchangeMlCode?.addEventListener('click', async () => {
-  let raw = mlAuthCodeInput?.value.trim() || '';
-  if (!raw) {
-    showToast('Cole o código TG-... ou a URL de redirecionamento.', 'error');
-    return;
-  }
-
-  // If user pasted full URL: extract code param
-  if (raw.includes('code=')) {
-    try {
-      const url = new URL(raw.startsWith('http') ? raw : `https://${raw}`);
-      raw = url.searchParams.get('code') || raw;
-    } catch {
-      const match = raw.match(/code=([^&]+)/);
-      if (match) raw = match[1];
-    }
-  }
-
-  const clientId = document.getElementById('cfgMlAppId')?.value.trim();
-  const clientSecret = document.getElementById('cfgMlSecretKey')?.value.trim();
-
-  if (!clientId || !clientSecret) {
-    showToast('Preencha seu App ID e Client Secret antes de gerar tokens.', 'error');
-    return;
-  }
-
-  btnExchangeMlCode.disabled = true;
-  btnExchangeMlCode.textContent = 'Gerando...';
-
-  try {
-    // First save App ID & Client Secret
-    await fetch('/api/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        affiliate: {
-          mlAppId: clientId,
-          mlSecretKey: clientSecret
-        }
-      })
-    });
-
-    const res = await fetch('/api/meli/auth-code', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        code: raw,
-        redirectUri: 'https://localhost'
-      })
-    });
-
-    const json = await res.json();
-    if (json.success) {
-      showToast('Tokens gerados e salvos com sucesso no Mercado Livre!', 'success');
-      if (mlAuthCodeInput) mlAuthCodeInput.value = '';
-      loadMeliTokenStatus();
-    } else {
-      showToast(`Erro ao gerar tokens: ${json.error}`, 'error');
-    }
-  } catch (err) {
-    showToast(`Erro: ${err.message}`, 'error');
-  } finally {
-    btnExchangeMlCode.disabled = false;
-    btnExchangeMlCode.textContent = '⚡ Gerar Tokens';
-  }
-});
 
 async function loadMeliTokenStatus() {
-  updateMeliAuthLink();
   try {
     const res = await fetch('/api/meli/tokens');
     const json = await res.json();
     if (json.success && json.status) {
       const st = json.status;
       if (st.hasAccessToken && !st.isExpired) {
-        meliTokenBadge.textContent = `Token Ativo (${Math.floor(st.expiresInMinutes / 60)}h ${st.expiresInMinutes % 60}m)`;
-        meliTokenBadge.className = 'badge badge-connected';
-        meliTokenExpireInfo.textContent = `Expira em: ${st.expiresAtDate}`;
+        if (meliTokenBadge) {
+          meliTokenBadge.textContent = `OAuth Ativo (${Math.floor(st.expiresInMinutes / 60)}h ${st.expiresInMinutes % 60}m)`;
+          meliTokenBadge.className = 'badge badge-green';
+        }
+        if (meliTokenExpireInfo) meliTokenExpireInfo.textContent = `Expira em: ${st.expiresAtDate} (Renovando 24h automaticamente)`;
+        if (pillMeliText) pillMeliText.textContent = 'Ativo (24h)';
       } else if (st.hasAccessToken && st.isExpired) {
-        meliTokenBadge.textContent = 'Token Expirado (Renovável)';
-        meliTokenBadge.className = 'badge badge-connecting';
-        meliTokenExpireInfo.textContent = 'Clique em "Renovar Token" para atualizar';
+        if (meliTokenBadge) {
+          meliTokenBadge.textContent = 'Token Expirado (Renovável)';
+          meliTokenBadge.className = 'badge badge-connecting';
+        }
+        if (meliTokenExpireInfo) meliTokenExpireInfo.textContent = 'Clique em "Renovar Token" para atualizar';
       } else {
-        meliTokenBadge.textContent = 'Token Ausente';
-        meliTokenBadge.className = 'badge badge-disconnected';
-        meliTokenExpireInfo.textContent = 'Informe os tokens ou gere via botão acima';
+        if (meliTokenBadge) {
+          meliTokenBadge.textContent = 'Token Ausente';
+          meliTokenBadge.className = 'badge badge-gray';
+        }
+        if (meliTokenExpireInfo) meliTokenExpireInfo.textContent = 'Autorize seu aplicativo para ativar a API';
       }
     }
   } catch {
@@ -745,8 +710,6 @@ async function loadMeliTokenStatus() {
 }
 
 btnRefreshMeliToken?.addEventListener('click', async () => {
-  const refreshToken = cfgMlRefreshToken?.value.trim() || '';
-  const accessToken = cfgMlAccessToken?.value.trim() || '';
   const clientId = document.getElementById('cfgMlAppId')?.value.trim() || '';
   const clientSecret = document.getElementById('cfgMlSecretKey')?.value.trim() || '';
 
@@ -757,17 +720,13 @@ btnRefreshMeliToken?.addEventListener('click', async () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        refresh_token: refreshToken,
-        access_token: accessToken,
         client_id: clientId,
         client_secret: clientSecret
       })
     });
     const json = await res.json();
     if (json.success) {
-      showToast('Token renovado com sucesso via OAuth!', 'success');
-      if (cfgMlAccessToken) cfgMlAccessToken.value = '';
-      if (cfgMlRefreshToken) cfgMlRefreshToken.value = '';
+      showToast('Token renovado com sucesso via OAuth 2.0!', 'success');
       loadMeliTokenStatus();
     } else {
       showToast(`Erro na renovação: ${json.error}`, 'error');
@@ -780,8 +739,8 @@ btnRefreshMeliToken?.addEventListener('click', async () => {
   }
 });
 
-// Save Config
-btnSaveConfig.addEventListener('click', async () => {
+// Save Config Helper
+async function saveAllConfig(sourceBtn) {
   const sourceChannel = cfgSourceChannel.value.trim();
   const destinationJid = cfgDestJid.value.trim();
   const active = forwarderActiveSwitch.checked;
@@ -790,19 +749,20 @@ btnSaveConfig.addEventListener('click', async () => {
   const shopeeAppSecret = document.getElementById('cfgShopeeAppSecret')?.value.trim() || '';
   const mlAffiliateTag = document.getElementById('cfgMlTag')?.value.trim() || '';
   const mlListShortUrl = document.getElementById('cfgMlListUrl')?.value.trim() || '';
-  const meliCookie = document.getElementById('cfgMlCookie')?.value.trim() || '';
+  const mlAppId = document.getElementById('cfgMlAppId')?.value.trim() || '';
+  const mlSecretKey = document.getElementById('cfgMlSecretKey')?.value.trim() || '';
   const amazonTag = document.getElementById('cfgAmazonTag')?.value.trim() || '';
-  const amazonCookie = document.getElementById('cfgAmazonCookie')?.value.trim() || '';
   const magaluTag = document.getElementById('cfgMagaluTag')?.value.trim() || '';
   const aliexpressAppKey = document.getElementById('cfgAliAppKey')?.value.trim() || '';
   const aliexpressAppSecret = document.getElementById('cfgAliAppSecret')?.value.trim() || '';
   const aliexpressTrackingId = document.getElementById('cfgAliTrackingId')?.value.trim() || '';
 
-  btnSaveConfig.disabled = true;
-  btnSaveConfig.textContent = 'Salvando...';
+  if (sourceBtn) {
+    sourceBtn.disabled = true;
+    sourceBtn.textContent = 'Salvando...';
+  }
 
   try {
-    // Resolve destination if it's a channel/group invite link
     let resolvedDest = destinationJid;
     if (destinationJid.includes('whatsapp.com/')) {
       const resResolve = await fetch('/api/whatsapp/resolve-jid', {
@@ -831,9 +791,9 @@ btnSaveConfig.addEventListener('click', async () => {
           mlAffiliateTag,
           meliAffiliateTag: mlAffiliateTag,
           mlListShortUrl,
-          meliCookie,
+          mlAppId,
+          mlSecretKey,
           amazonTag,
-          amazonCookie,
           magaluTag,
           aliexpressAppKey,
           aliexpressAppSecret,
@@ -843,17 +803,22 @@ btnSaveConfig.addEventListener('click', async () => {
     });
     const json = await res.json();
     if (json.success) {
-      showToast('Todas as configurações e tokens foram salvos com sucesso!', 'success');
+      showToast('Configurações e tokens salvos com sucesso!', 'success');
     } else {
       showToast(`Erro ao salvar: ${json.error}`, 'error');
     }
   } catch (err) {
     showToast(`Erro: ${err.message}`, 'error');
   } finally {
-    btnSaveConfig.disabled = false;
-    btnSaveConfig.innerHTML = '<span>💾 Salvar Todas as Configurações</span>';
+    if (sourceBtn) {
+      sourceBtn.disabled = false;
+      sourceBtn.innerHTML = '<span>💾 Salvar Configurações</span>';
+    }
   }
-});
+}
+
+btnSaveConfig?.addEventListener('click', () => saveAllConfig(btnSaveConfig));
+btnSaveConfigRouting?.addEventListener('click', () => saveAllConfig(btnSaveConfigRouting));
 
 // Affiliate Link Tester
 const btnTestAffiliate = document.getElementById('btnTestAffiliate');
@@ -868,7 +833,7 @@ btnTestAffiliate?.addEventListener('click', async () => {
   }
 
   btnTestAffiliate.disabled = true;
-  btnTestAffiliate.textContent = 'Processando e resolvendo redirecionamento...';
+  btnTestAffiliate.textContent = 'Processando...';
 
   try {
     const res = await fetch('/api/affiliate/test', {
@@ -899,7 +864,7 @@ btnTestAffiliate?.addEventListener('click', async () => {
               <span class="aff-res-val">${escapeHtml(r.originalUrl)}</span>
             </div>
             <div class="aff-res-row">
-              <span class="aff-res-label">Link Final Resolvido (após redirects):</span>
+              <span class="aff-res-label">Link Final Resolvido:</span>
               <span class="aff-res-val">${escapeHtml(r.finalResolvedUrl)}</span>
             </div>
             <div class="aff-res-row">
@@ -911,14 +876,14 @@ btnTestAffiliate?.addEventListener('click', async () => {
         });
         html += `
           <div class="aff-res-row">
-            <span class="aff-res-label">Texto Final da Mensagem:</span>
+            <span class="aff-res-label">Texto Final Formatado:</span>
             <span class="aff-res-val" style="white-space: pre-wrap;">${escapeHtml(json.text)}</span>
           </div>
         `;
         affTestResultBox.innerHTML = html;
       }
       affTestResultBox.classList.remove('hidden');
-      showToast('Conversão de link testada com sucesso!', 'success');
+      showToast('Link testado com sucesso!', 'success');
     } else {
       showToast(`Erro: ${json.error}`, 'error');
     }
@@ -931,12 +896,12 @@ btnTestAffiliate?.addEventListener('click', async () => {
 });
 
 // Simulator / Quick Test
-btnSimulate.addEventListener('click', async () => {
+btnSimulate?.addEventListener('click', async () => {
   const text = simText.value.trim();
   const imageUrl = simImage.value.trim();
 
   if (!cfgDestJid.value.trim()) {
-    showToast('Informe o JID de Destino no formulário acima antes de testar.', 'error');
+    showToast('Informe o Canal de Destino antes de disparar o teste.', 'error');
     return;
   }
 
@@ -951,7 +916,7 @@ btnSimulate.addEventListener('click', async () => {
     });
     const json = await res.json();
     if (json.success) {
-      showToast('Oferta de teste enviada com sucesso!', 'success');
+      showToast('Oferta de teste disparada com sucesso no WhatsApp!', 'success');
     } else {
       showToast(`Erro no envio: ${json.error}`, 'error');
     }
@@ -959,12 +924,12 @@ btnSimulate.addEventListener('click', async () => {
     showToast(`Erro ao simular: ${err.message}`, 'error');
   } finally {
     btnSimulate.disabled = false;
-    btnSimulate.textContent = '🚀 Disparar Oferta de Teste';
+    btnSimulate.textContent = '🚀 Disparar Oferta de Teste no WhatsApp';
   }
 });
 
 // Forwarder Switch
-forwarderActiveSwitch.addEventListener('change', async () => {
+forwarderActiveSwitch?.addEventListener('change', async () => {
   const active = forwarderActiveSwitch.checked;
   forwarderStatusLabel.textContent = active ? 'Repasse: Ativo' : 'Repasse: Pausado';
   try {
@@ -982,12 +947,12 @@ forwarderActiveSwitch.addEventListener('change', async () => {
 });
 
 // Auto-scroll checkbox
-autoScrollCheck.addEventListener('change', () => {
+autoScrollCheck?.addEventListener('change', () => {
   appState.autoScroll = autoScrollCheck.checked;
 });
 
 // Clear Logs
-btnClearLogs.addEventListener('click', async () => {
+btnClearLogs?.addEventListener('click', async () => {
   try {
     await fetch('/api/logs/clear', { method: 'POST' });
   } catch (err) {
@@ -1004,12 +969,13 @@ async function loadConfigDirectly() {
       updateConfigUI(config);
     }
   } catch (err) {
-    console.error('Erro ao carregar config diretamente:', err);
+    console.error('Erro ao carregar config:', err);
   }
 }
 
 // Initialize on load
 window.addEventListener('DOMContentLoaded', () => {
   loadConfigDirectly();
+  loadMeliTokenStatus();
   setupSSE();
 });
