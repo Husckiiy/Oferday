@@ -8,10 +8,20 @@ import { ForwardedMessageItem } from '../types/index.js';
 import { affiliateService } from './affiliate.service.js';
 import { imageService } from './image.service.js';
 
+import crypto from 'crypto';
+
+interface SentOfferRecord {
+  fingerprint: string;
+  channel: string;
+  sentAt: number;
+}
+
 class ForwarderService extends EventEmitter {
   private initialized = false;
   private recentMessages: ForwardedMessageItem[] = [];
   private maxHistory = 50;
+  private sentOffers: Map<string, SentOfferRecord> = new Map();
+  private readonly DEDUP_WINDOW_MS = 4 * 60 * 60 * 1000; // 4 hours deduplication window
 
   public initialize(): void {
     if (this.initialized) return;
@@ -21,11 +31,20 @@ class ForwarderService extends EventEmitter {
       await this.handleTelegramMessage(data);
     });
 
-    logger.info('FORWARDER', 'Serviço de repasse (Telegram -> WhatsApp) inicializado e pronto.');
+    logger.info('FORWARDER', 'Serviço de repasse (Telegram -> WhatsApp) inicializado e pronto (Filtro Anti-Duplicidade Ativo).');
   }
 
   public getRecentMessages(): ForwardedMessageItem[] {
     return [...this.recentMessages];
+  }
+
+  private cleanOldSentOffers(): void {
+    const now = Date.now();
+    for (const [key, record] of this.sentOffers.entries()) {
+      if (now - record.sentAt > this.DEDUP_WINDOW_MS) {
+        this.sentOffers.delete(key);
+      }
+    }
   }
 
   private async handleTelegramMessage(data: { id: number; text: string; mediaBuffer: Buffer | null; date: number; channel?: string }): Promise<void> {
@@ -33,14 +52,55 @@ class ForwarderService extends EventEmitter {
     const channel = data.channel || config.telegram.sourceChannel || '@canal';
     const destinationJid = config.whatsapp.destinationJid;
 
+    this.cleanOldSentOffers();
+
     // Process text through Affiliate Service to convert store links
     let processedText = data.text;
+    let affResults: any[] = [];
     if (data.text) {
       try {
         const affResult = await affiliateService.processMessageText(data.text);
         processedText = affResult.text;
+        affResults = affResult.results || [];
       } catch (affErr: any) {
         logger.warn('FORWARDER', `Aviso ao processar links de afiliado: ${affErr.message}`);
+      }
+    }
+
+    // --- ANTI-DUPLICATE DETECTION (CROSS-CHANNEL) ---
+    let duplicateFingerprint: string | null = null;
+    let prevSentRecord: SentOfferRecord | null = null;
+
+    // 1. Check Product ID / SKU fingerprints (Mercado Livre MLB, Amazon ASIN, Magalu SKU, Shopee ID)
+    for (const res of affResults) {
+      const fp = affiliateService.extractProductFingerprint(res.finalResolvedUrl) || affiliateService.extractProductFingerprint(res.originalUrl);
+      if (fp && this.sentOffers.has(fp)) {
+        const record = this.sentOffers.get(fp)!;
+        if (Date.now() - record.sentAt < this.DEDUP_WINDOW_MS) {
+          duplicateFingerprint = fp;
+          prevSentRecord = record;
+          break;
+        }
+      }
+    }
+
+    // 2. Check normalized text hash for coupon announcements without specific product URLs
+    if (!duplicateFingerprint && data.text) {
+      const cleanText = data.text
+        .replace(/https?:\/\/[^\s]+/g, '')
+        .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚãõÃÕâêîôûÂÊÎÔÛçÇ]/g, '')
+        .toLowerCase()
+        .trim();
+
+      if (cleanText.length > 25) {
+        const textFp = `text_${crypto.createHash('md5').update(cleanText).digest('hex')}`;
+        if (this.sentOffers.has(textFp)) {
+          const record = this.sentOffers.get(textFp)!;
+          if (Date.now() - record.sentAt < this.DEDUP_WINDOW_MS) {
+            duplicateFingerprint = textFp;
+            prevSentRecord = record;
+          }
+        }
       }
     }
 
@@ -54,7 +114,6 @@ class ForwarderService extends EventEmitter {
 
     let mediaBase64: string | null = null;
     if (finalMediaBuffer && finalMediaBuffer.length > 0) {
-      // Create thumbnail / preview data URL (JPEG/PNG)
       mediaBase64 = `data:image/jpeg;base64,${finalMediaBuffer.toString('base64')}`;
     }
 
@@ -71,6 +130,16 @@ class ForwarderService extends EventEmitter {
     };
 
     this.addFeedItem(item);
+
+    // If duplicate detected, block forwarding
+    if (duplicateFingerprint && prevSentRecord) {
+      const minutesAgo = Math.max(1, Math.round((Date.now() - prevSentRecord.sentAt) / 60000));
+      logger.warn('FORWARDER', `🚫 Oferta duplicada bloqueada: [${duplicateFingerprint}] já foi enviada há ${minutesAgo} min pelo canal "${prevSentRecord.channel}". Ignorando repasse.`);
+      item.status = 'failed';
+      item.error = `Oferta duplicada (enviada há ${minutesAgo} min por ${prevSentRecord.channel})`;
+      this.emit('message_updated', item);
+      return;
+    }
 
     if (!config.forwarder.active) {
       item.status = 'failed';
@@ -105,6 +174,21 @@ class ForwarderService extends EventEmitter {
 
       await whatsappService.sendMessage(destinationJid, processedText, finalMediaBuffer);
       
+      // Register fingerprints as successfully sent
+      for (const res of affResults) {
+        const fp = affiliateService.extractProductFingerprint(res.finalResolvedUrl) || affiliateService.extractProductFingerprint(res.originalUrl);
+        if (fp) {
+          this.sentOffers.set(fp, { fingerprint: fp, channel, sentAt: Date.now() });
+        }
+      }
+      if (data.text) {
+        const cleanText = data.text.replace(/https?:\/\/[^\s]+/g, '').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚãõÃÕâêîôûÂÊÎÔÛçÇ]/g, '').toLowerCase().trim();
+        if (cleanText.length > 25) {
+          const textFp = `text_${crypto.createHash('md5').update(cleanText).digest('hex')}`;
+          this.sentOffers.set(textFp, { fingerprint: textFp, channel, sentAt: Date.now() });
+        }
+      }
+
       item.status = 'success';
       this.emit('message_updated', item);
       logger.success('FORWARDER', `Mensagem #${data.id} repassada e entregue com sucesso no WhatsApp!`);

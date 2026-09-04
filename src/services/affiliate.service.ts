@@ -728,6 +728,62 @@ export class AffiliateService {
 
     return { text: updatedText, results };
   }
+
+  /**
+   * Extracts canonical unique product identifier for deduplication (Anti-Duplicate filter)
+   */
+  public extractProductFingerprint(url: string): string | null {
+    if (!url) return null;
+    const lower = url.toLowerCase();
+
+    // Mercado Livre (MLB12345678 or /p/MLBxxxx)
+    if (lower.includes('mercadolivre') || lower.includes('meli.la')) {
+      const mlbMatch = url.match(/(MLB-?\d+)/i) || url.match(/\/p\/([a-zA-Z0-9]+)/i);
+      if (mlbMatch) {
+        return `ml_${mlbMatch[1].replace('-', '').toUpperCase()}`;
+      }
+    }
+
+    // Amazon (ASIN B0xxxxxxxxx)
+    if (lower.includes('amazon') || lower.includes('amzn.to')) {
+      const asinMatch = url.match(/\/(?:dp|gp\/product|product|ASIN)\/([A-Z0-9]{10})/i) || url.match(/\/([A-Z0-9]{10})(?:[/?]|$)/i);
+      if (asinMatch) {
+        return `amz_${asinMatch[1].toUpperCase()}`;
+      }
+    }
+
+    // Magalu (/p/237981200/)
+    if (lower.includes('magazinevoce') || lower.includes('magazineluiza') || lower.includes('parceiromagalu')) {
+      const magaluMatch = url.match(/\/(?:p|produto)\/([a-zA-Z0-9]+)/i) || url.match(/sku=([a-zA-Z0-9]+)/i);
+      if (magaluMatch) {
+        return `magalu_${magaluMatch[1].toLowerCase()}`;
+      }
+    }
+
+    // Shopee (item id & shop id)
+    if (lower.includes('shopee') || lower.includes('shp.ee') || lower.includes('shope.ee')) {
+      const shopeeMatch = url.match(/-i\.(\d+)\.(\d+)/) || url.match(/\/product\/(\d+)\/(\d+)/);
+      if (shopeeMatch) {
+        return `shopee_${shopeeMatch[1]}_${shopeeMatch[2]}`;
+      }
+      try {
+        const parsed = new URL(url);
+        if (parsed.pathname.length > 3) {
+          return `shopee_${parsed.pathname.replace(/\/+$/, '')}`;
+        }
+      } catch {}
+    }
+
+    // AliExpress
+    if (lower.includes('aliexpress')) {
+      const aliMatch = url.match(/\/(?:item|i)\/(\d+)\.html/i) || url.match(/itemId=(\d+)/i);
+      if (aliMatch) {
+        return `ali_${aliMatch[1]}`;
+      }
+    }
+
+    return null;
+  }
 }
 
 export const affiliateService = new AffiliateService();
