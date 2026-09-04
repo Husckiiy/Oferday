@@ -489,32 +489,21 @@ export class AffiliateService {
     // 2. Tenta gerar meli.la oficial usando OAuth 2.0 ou Linkbuilder Cookie
     const rawCleanUrl = this.cleanAndTagMercadoLivreUrl(targetUrl, '');
     
-    // 2a. OAuth API (Auto-refresh)
-    const oauthMeliLa = await this.generateMeliLinkViaOAuth(rawCleanUrl, tag);
-    if (oauthMeliLa) {
-      logger.success('AFFILIATE', `Mercado Livre: Link curto oficial meli.la gerado via OAuth: ${oauthMeliLa}`);
-      return oauthMeliLa;
-    }
-
-    // 2b. Linkbuilder Cookie API
-    // 2b. Linkbuilder Cookie API (meli.la)
+    // 2a. Linkbuilder API / Cookie (meli.la)
     const officialMeliLa = await this.generateOfficialMeliShortLink(rawCleanUrl, tag);
     if (officialMeliLa) {
       logger.success('AFFILIATE', `Mercado Livre: Link curto oficial meli.la gerado via Linkbuilder: ${officialMeliLa}`);
       return officialMeliLa;
     }
 
-    const cleanedProductUrl = this.cleanAndTagMercadoLivreUrl(targetUrl, tag);
-    try {
-      const shortFallback = await urlShortenerService.shorten(cleanedProductUrl);
-      if (shortFallback && shortFallback !== cleanedProductUrl) {
-        logger.success('AFFILIATE', `Mercado Livre: Link curto gerado: ${shortFallback}`);
-        return shortFallback;
-      }
-    } catch {
-      // ignore
+    // 2b. OAuth API (Auto-refresh)
+    const oauthMeliLa = await this.generateMeliLinkViaOAuth(rawCleanUrl, tag);
+    if (oauthMeliLa) {
+      logger.success('AFFILIATE', `Mercado Livre: Link curto oficial meli.la gerado via OAuth: ${oauthMeliLa}`);
+      return oauthMeliLa;
     }
 
+    const cleanedProductUrl = this.cleanAndTagMercadoLivreUrl(targetUrl, tag);
     logger.success('AFFILIATE', `Mercado Livre: Link oficial de produto gerado: ${cleanedProductUrl}`);
     return cleanedProductUrl;
   }
