@@ -254,7 +254,7 @@
               <i data-lucide="link-2"></i>
             </div>
           </div>
-          <div class="metric-value" id="cardAffiliatesCount">6 / 5</div>
+          <div class="metric-value" id="cardAffiliatesCount">5 / 5</div>
           <div class="metric-sub text-muted">
             <span>Amazon, Shopee, ML, Magalu, Ali</span>
           </div>
@@ -294,7 +294,7 @@
               <div class="offer-title">Fritadeira Air Fryer Grand Family 5L – R$ 319,00</div>
               <div class="offer-snippet">🎁 PROMOÇÃO IMPERDÍVEL HOJE! 📻 Fritadeira Air Fryer Grand Family 5L ⚡ Por apenas R$ 319,00 Compre...</div>
               <div class="offer-footer-row">
-                <span class="offer-dest-tag">Destino: <strong id="feedDestTag1">Teste &lt;3</strong></span>
+                <span class="offer-dest-tag">Destino: <strong class="feed-dest-channel-tag">Teste &lt;3</strong></span>
               </div>
             </div>
 
@@ -309,7 +309,7 @@
               <div class="offer-title">Fritadeira Air Fryer Grand Family 5L – R$ 319,00</div>
               <div class="offer-snippet">🎁 PROMOÇÃO IMPERDÍVEL HOJE! 📻 Fritadeira Air Fryer Grand Family 5L ⚡ Por apenas R$ 319,00 Compre...</div>
               <div class="offer-footer-row">
-                <span class="offer-dest-tag">Destino: <strong id="feedDestTag2">Teste &lt;3</strong></span>
+                <span class="offer-dest-tag">Destino: <strong class="feed-dest-channel-tag">Teste &lt;3</strong></span>
               </div>
             </div>
 
@@ -324,7 +324,7 @@
               <div class="offer-title">Echo Dot 5ª Geração com Alexa Smart Speaker – R$ 299,00</div>
               <div class="offer-snippet">🔥 Menor preço histórico! 📦 Compre com Prime e Frete Grátis pelo link oficial...</div>
               <div class="offer-footer-row">
-                <span class="offer-dest-tag">Destino: <strong id="feedDestTag3">Teste &lt;3</strong></span>
+                <span class="offer-dest-tag">Destino: <strong class="feed-dest-channel-tag">Teste &lt;3</strong></span>
               </div>
             </div>
 
@@ -670,45 +670,81 @@
     </div>
   </div>
 
-  <!-- MODAL: CANAIS & DESTINOS -->
+  <!-- MODAL: CANAIS & DESTINOS (Layout Exato com Cards de Origem e Destino) -->
   <div class="modal-overlay" id="modal-channels">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
       <div class="modal-header">
         <div class="modal-title-wrap">
           <i data-lucide="radio" class="modal-title-icon"></i>
           <div>
-            <h3>Canais & Destinos</h3>
-            <p>Defina a origem das ofertas e o canal de envio no WhatsApp</p>
+            <h3>Canais de Origem (Fontes para Clonagem)</h3>
+            <p>Canais de onde o OferDay captura ofertas para converter com seu link de afiliado.</p>
           </div>
         </div>
-        <button class="btn-close-modal" data-close>&times;</button>
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <span class="badge badge-red-soft" id="sourcesCountBadge">4 Fontes Ativas</span>
+          <button class="btn-close-modal" data-close>&times;</button>
+        </div>
       </div>
 
       <div class="modal-body">
         
-        <div class="form-group">
-          <label>
-            Canais de Origem (Telegram / WhatsApp)
-            <span class="hint">Separados por vírgula</span>
-          </label>
-          <textarea id="cfgSourceChannel" rows="3" placeholder="https://t.me/PortalDOSsachadinhos, @economizandocomjp, @promos_tech1"></textarea>
-          <span class="field-help">💡 O bot monitora todas as mensagens, fotos e promoções postadas nesses canais.</span>
+        <!-- Grid of Channel Cards (Exactly as in uploaded reference image) -->
+        <div class="channels-cards-grid" id="sourceChannelsGrid">
+          <!-- Dynamically populated / pre-rendered cards -->
         </div>
 
-        <div class="form-group" style="margin-top: 1rem;">
-          <label>
-            Canal de Destino (WhatsApp)
-            <span class="hint">Link do canal ou JID @newsletter</span>
-          </label>
-          <input type="text" id="cfgDestJid" placeholder="https://whatsapp.com/channel/0029Vb... ou 120363...@newsletter">
+        <!-- Add Channel Row -->
+        <div class="add-channel-box">
+          <div class="add-channel-title">
+            <i data-lucide="plus-circle" class="sub-icon"></i>
+            <span>Adicionar Novo Canal de Origem</span>
+          </div>
+          <div class="form-row-3" style="margin-top: 0.5rem;">
+            <div class="form-group">
+              <label>Nome do Canal</label>
+              <input type="text" id="newChName" placeholder="Ex: Jp tech">
+            </div>
+            <div class="form-group">
+              <label>Link ou @handle</label>
+              <input type="text" id="newChUrl" placeholder="https://t.me/... ou @canal">
+            </div>
+            <div class="form-group">
+              <label>Membros (Opcional)</label>
+              <div style="display: flex; gap: 0.5rem;">
+                <input type="text" id="newChMembers" placeholder="~2500 membros">
+                <button class="btn btn-primary btn-sm" id="btnAddSourceChannel" type="button" style="white-space: nowrap;">+ Adicionar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Destination Channel Section -->
+        <div class="dest-channel-config-box">
+          <div class="dest-box-header">
+            <i data-lucide="message-square" class="dest-icon"></i>
+            <div>
+              <h4>Canal de Destino (WhatsApp)</h4>
+              <p class="text-muted">Defina o nome de exibição e o link ou JID do canal onde as ofertas convertidas serão postadas</p>
+            </div>
+          </div>
+
+          <div class="form-row-2" style="margin-top: 0.85rem;">
+            <div class="form-group">
+              <label>Nome de Exibição do Canal <span class="hint">Aparece nos cards e no topo</span></label>
+              <input type="text" id="cfgDestName" placeholder="Ex: Teste <3 ou Meu Canal de Ofertas">
+            </div>
+
+            <div class="form-group">
+              <label>Link ou JID do Canal WhatsApp <span class="hint">Ex: https://whatsapp.com/channel/...</span></label>
+              <input type="text" id="cfgDestJid" placeholder="https://whatsapp.com/channel/0029Vb... ou 120363...@newsletter">
+            </div>
+          </div>
+
           <div id="resolvedJidBadge" class="resolved-badge hidden"></div>
 
-          <div class="group-select-row" style="margin-top: 0.75rem; display: flex; gap: 0.5rem;">
-            <button class="btn btn-secondary btn-sm" id="btnLoadChats" type="button">📢 Listar Meus Canais</button>
-            <select id="chatSelectDropdown" class="chat-select hidden" style="flex: 1;">
-              <option value="">-- Selecione um Canal do WhatsApp --</option>
-            </select>
-          </div>
+          <!-- Hidden raw sourceChannel textarea for form compatibility -->
+          <textarea id="cfgSourceChannel" class="hidden"></textarea>
         </div>
 
       </div>

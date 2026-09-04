@@ -11,11 +11,18 @@ const DEFAULT_CONFIG: AppConfig = {
     apiId: process.env.TELEGRAM_API_ID ? Number(process.env.TELEGRAM_API_ID) : null,
     apiHash: process.env.TELEGRAM_API_HASH || '',
     phoneNumber: process.env.TELEGRAM_PHONE || '',
-    sourceChannel: process.env.TELEGRAM_SOURCE_CHANNEL || '@PortalDOSsachadinhos',
+    sourceChannel: process.env.TELEGRAM_SOURCE_CHANNEL || '@jptechofertasgerais, @EconomizandoComJP, @Promos_tech1, @PortalDOSsachadinhos',
+    sourceChannels: [
+      { id: '1', name: 'Jp tech', url: 'https://t.me/jptechofertasgerais', members: '~1682 membros', type: 'telegram' },
+      { id: '2', name: 'Economizando com JP', url: 'https://t.me/EconomizandoComJP', members: '~2889 membros', type: 'telegram' },
+      { id: '3', name: 'Promos Tech', url: 'https://t.me/Promos_tech1', members: '~3309 membros', type: 'telegram' },
+      { id: '4', name: 'Eu', url: 'https://t.me/PortalDOSsachadinhos', members: '~3597 membros', type: 'telegram' }
+    ],
     enabled: true
   },
   whatsapp: {
     destinationJid: process.env.WHATSAPP_DESTINATION_JID || '120363409015820792@newsletter',
+    destinationName: process.env.WHATSAPP_DESTINATION_NAME || 'Teste <3',
     enabled: true
   },
   forwarder: {

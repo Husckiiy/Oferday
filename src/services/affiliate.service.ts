@@ -497,6 +497,7 @@ export class AffiliateService {
     }
 
     // 2b. Linkbuilder Cookie API
+    // 2b. Linkbuilder Cookie API (meli.la)
     const officialMeliLa = await this.generateOfficialMeliShortLink(rawCleanUrl, tag);
     if (officialMeliLa) {
       logger.success('AFFILIATE', `Mercado Livre: Link curto oficial meli.la gerado via Linkbuilder: ${officialMeliLa}`);
@@ -504,6 +505,16 @@ export class AffiliateService {
     }
 
     const cleanedProductUrl = this.cleanAndTagMercadoLivreUrl(targetUrl, tag);
+    try {
+      const shortFallback = await urlShortenerService.shorten(cleanedProductUrl);
+      if (shortFallback && shortFallback !== cleanedProductUrl) {
+        logger.success('AFFILIATE', `Mercado Livre: Link curto gerado: ${shortFallback}`);
+        return shortFallback;
+      }
+    } catch {
+      // ignore
+    }
+
     logger.success('AFFILIATE', `Mercado Livre: Link oficial de produto gerado: ${cleanedProductUrl}`);
     return cleanedProductUrl;
   }

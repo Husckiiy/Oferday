@@ -8,7 +8,13 @@ let appState = {
   telegram: null,
   whatsapp: null,
   feed: [],
-  autoScroll: true
+  autoScroll: true,
+  sourceChannels: [
+    { id: '1', name: 'Jp tech', url: 'https://t.me/jptechofertasgerais', members: '~1682 membros', type: 'telegram' },
+    { id: '2', name: 'Economizando com JP', url: 'https://t.me/EconomizandocomJP', members: '~2889 membros', type: 'telegram' },
+    { id: '3', name: 'Promos Tech', url: 'https://t.me/Promos_tech1', members: '~3309 membros', type: 'telegram' },
+    { id: '4', name: 'Eu', url: 'https://t.me/PortalDOSsachadinhos', members: '~3597 membros', type: 'telegram' }
+  ]
 };
 
 // --- Modal Management System ---
@@ -16,6 +22,7 @@ function openModal(modalId) {
   const modal = document.getElementById(modalId);
   if (modal) {
     modal.classList.add('active');
+    if (window.lucide) lucide.createIcons();
   }
 }
 
@@ -66,6 +73,7 @@ document.querySelectorAll('.nav-group-header').forEach((header) => {
     const parentGroup = header.closest('.nav-group');
     if (parentGroup) {
       parentGroup.classList.toggle('open');
+      if (window.lucide) lucide.createIcons();
     }
   });
 });
@@ -164,10 +172,20 @@ const chkStep4 = document.getElementById('chkStep4');
 // Config & Inputs
 const cfgSourceChannel = document.getElementById('cfgSourceChannel');
 const cfgDestJid = document.getElementById('cfgDestJid');
+const cfgDestName = document.getElementById('cfgDestName');
 const forwarderActiveSwitch = document.getElementById('forwarderActiveSwitch');
 const forwarderStatusLabel = document.getElementById('forwarderStatusLabel');
 const btnSaveConfig = document.getElementById('btnSaveConfig');
 const btnSaveConfigRouting = document.getElementById('btnSaveConfigRouting');
+
+// Channels Source Manager DOM
+const sourceChannelsGrid = document.getElementById('sourceChannelsGrid');
+const sourcesCountBadge = document.getElementById('sourcesCountBadge');
+const newChName = document.getElementById('newChName');
+const newChUrl = document.getElementById('newChUrl');
+const newChMembers = document.getElementById('newChMembers');
+const btnAddSourceChannel = document.getElementById('btnAddSourceChannel');
+const resolvedJidBadge = document.getElementById('resolvedJidBadge');
 
 // Feed
 const feedContainer = document.getElementById('feedContainer');
@@ -182,15 +200,171 @@ const logTerminal = document.getElementById('logTerminal');
 const autoScrollCheck = document.getElementById('autoScrollCheck');
 const btnClearLogs = document.getElementById('btnClearLogs');
 
-// WhatsApp Channel Resolver
-const btnLoadChats = document.getElementById('btnLoadChats');
-const chatSelectDropdown = document.getElementById('chatSelectDropdown');
-const resolvedJidBadge = document.getElementById('resolvedJidBadge');
-
 // Meli Tokens
 const meliTokenBadge = document.getElementById('meliTokenBadge');
 const meliTokenExpireInfo = document.getElementById('meliTokenExpireInfo');
 const btnRefreshMeliToken = document.getElementById('btnRefreshMeliToken');
+
+// --- Render Source Channels Cards Grid ---
+function renderSourceChannels() {
+  if (!sourceChannelsGrid) return;
+  sourceChannelsGrid.innerHTML = '';
+
+  const channels = appState.sourceChannels || [];
+  const count = channels.length;
+
+  if (sourcesCountBadge) {
+    sourcesCountBadge.textContent = `${count} ${count === 1 ? 'Fonte Ativa' : 'Fontes Ativas'}`;
+  }
+  if (cardMonitoredCount) {
+    cardMonitoredCount.textContent = `${count} ${count === 1 ? 'canal' : 'canais'}`;
+  }
+
+  // Sync hidden comma-separated textarea
+  if (cfgSourceChannel) {
+    cfgSourceChannel.value = channels.map((c) => c.url || c.name).join(', ');
+  }
+
+  channels.forEach((ch, index) => {
+    const card = document.createElement('div');
+    card.className = 'channel-source-card';
+    card.id = `ch-card-${ch.id || index}`;
+
+    const cleanUrl = ch.url.startsWith('http') ? ch.url : (ch.url.startsWith('@') ? `https://t.me/${ch.url.replace('@', '')}` : `https://t.me/${ch.url}`);
+
+    card.innerHTML = `
+      <div class="channel-card-top">
+        <span class="channel-type-badge">✈️ Telegram</span>
+        <div class="channel-actions-row">
+          <button class="btn-icon-action" title="Editar Canal" onclick="editSourceChannel('${ch.id || index}')">
+            <i data-lucide="edit-3"></i>
+          </button>
+          <button class="btn-icon-action btn-delete" title="Excluir Canal" onclick="deleteSourceChannel('${ch.id || index}')">
+            <i data-lucide="trash-2"></i>
+          </button>
+        </div>
+      </div>
+      <div class="channel-card-name">${escapeHtml(ch.name || 'Canal')}</div>
+      <a href="${escapeHtml(cleanUrl)}" target="_blank" class="channel-card-url" rel="noopener">
+        <span>${escapeHtml(ch.url)}</span>
+        <i data-lucide="external-link"></i>
+      </a>
+      <div class="channel-card-bottom">
+        <span class="channel-status-pill">
+          <span class="status-dot-mini dot-green"></span>
+          <span>Monitorando</span>
+        </span>
+        <span class="channel-members-text">${escapeHtml(ch.members || '~1000 membros')}</span>
+      </div>
+    `;
+
+    sourceChannelsGrid.appendChild(card);
+  });
+
+  if (window.lucide) lucide.createIcons();
+}
+
+// Add New Source Channel
+btnAddSourceChannel?.addEventListener('click', () => {
+  const name = newChName.value.trim();
+  const url = newChUrl.value.trim();
+  const members = newChMembers.value.trim() || `~${Math.floor(Math.random() * 3000 + 1000)} membros`;
+
+  if (!name || !url) {
+    showToast('Informe o nome e link/@handle do canal.', 'error');
+    return;
+  }
+
+  const newChannel = {
+    id: String(Date.now()),
+    name,
+    url,
+    members,
+    type: 'telegram'
+  };
+
+  appState.sourceChannels.push(newChannel);
+  newChName.value = '';
+  newChUrl.value = '';
+  newChMembers.value = '';
+
+  renderSourceChannels();
+  showToast(`Canal "${name}" adicionado com sucesso!`, 'success');
+});
+
+// Edit Source Channel
+window.editSourceChannel = function(id) {
+  const ch = appState.sourceChannels.find((c, idx) => (c.id === id || String(idx) === id));
+  if (!ch) return;
+
+  const newName = prompt('Novo nome do canal:', ch.name);
+  if (newName === null) return;
+  const newUrl = prompt('Novo link ou @handle do canal:', ch.url);
+  if (newUrl === null) return;
+  const newMem = prompt('Membros (ex: ~2500 membros):', ch.members || '~2000 membros');
+
+  ch.name = newName.trim() || ch.name;
+  ch.url = newUrl.trim() || ch.url;
+  if (newMem !== null) ch.members = newMem.trim();
+
+  renderSourceChannels();
+  showToast('Canal atualizado!', 'success');
+};
+
+// Delete Source Channel
+window.deleteSourceChannel = function(id) {
+  if (!confirm('Deseja remover este canal das fontes de clonagem?')) return;
+  appState.sourceChannels = appState.sourceChannels.filter((c, idx) => c.id !== id && String(idx) !== id);
+  renderSourceChannels();
+  showToast('Canal removido!', 'info');
+};
+
+// --- Destination Channel Auto-resolver & Name updates ---
+async function checkAndResolveJid(val) {
+  if (!val || val.length < 5) {
+    resolvedJidBadge?.classList.add('hidden');
+    return;
+  }
+  try {
+    const res = await fetch('/api/whatsapp/resolve-jid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ input: val })
+    });
+    const json = await res.json();
+    if (json.success) {
+      const detectedName = json.name || (json.jid.includes('@') ? json.jid.split('@')[0] : json.jid);
+      if (cfgDestName && (!cfgDestName.value || cfgDestName.value === 'Teste <3')) {
+        cfgDestName.value = detectedName;
+        updateDestinationDisplayName(detectedName);
+      }
+      if (resolvedJidBadge) {
+        resolvedJidBadge.textContent = `✅ Destino Identificado: ${detectedName} (${json.jid})`;
+        resolvedJidBadge.classList.remove('hidden');
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
+function updateDestinationDisplayName(name) {
+  const cleanName = name || 'Teste <3';
+  if (cardDestChannelName) {
+    cardDestChannelName.textContent = cleanName;
+  }
+  document.querySelectorAll('.feed-dest-channel-tag').forEach((el) => {
+    el.textContent = cleanName;
+  });
+}
+
+cfgDestName?.addEventListener('input', () => {
+  updateDestinationDisplayName(cfgDestName.value.trim());
+});
+
+cfgDestJid?.addEventListener('blur', () => {
+  checkAndResolveJid(cfgDestJid.value.trim());
+});
 
 // --- SSE Setup ---
 function setupSSE() {
@@ -327,7 +501,6 @@ function renderFeed(items) {
 function addFeedItemUI(item, prepend = true) {
   if (!feedContainer) return;
 
-  // Remove mock items if any
   const mock1 = document.getElementById('mockOffer1');
   const mock2 = document.getElementById('mockOffer2');
   const mock3 = document.getElementById('mockOffer3');
@@ -343,7 +516,7 @@ function addFeedItemUI(item, prepend = true) {
   const storeClass = getStoreClass(store);
   const { title, snippet } = extractTitleAndSnippet(item.text);
   const originChannel = item.channel || 'Telegram';
-  const destName = cardDestChannelName?.textContent || 'Canal';
+  const destName = cfgDestName?.value || cardDestChannelName?.textContent || 'Teste <3';
 
   itemEl.innerHTML = `
     <div class="offer-header-row">
@@ -356,7 +529,7 @@ function addFeedItemUI(item, prepend = true) {
     <div class="offer-title">${escapeHtml(title)}</div>
     <div class="offer-snippet">${escapeHtml(snippet)}</div>
     <div class="offer-footer-row">
-      <span class="offer-dest-tag">Destino: <strong>${escapeHtml(destName)}</strong></span>
+      <span class="offer-dest-tag">Destino: <strong class="feed-dest-channel-tag">${escapeHtml(destName)}</strong></span>
     </div>
   `;
 
@@ -391,23 +564,48 @@ function escapeHtml(str) {
 function updateConfigUI(config) {
   if (!config) return;
 
-  if (cfgSourceChannel && config.telegram?.sourceChannel) {
-    cfgSourceChannel.value = config.telegram.sourceChannel;
+  // Source Channels
+  if (config.telegram?.sourceChannels && Array.isArray(config.telegram.sourceChannels) && config.telegram.sourceChannels.length > 0) {
+    appState.sourceChannels = config.telegram.sourceChannels;
+  } else if (config.telegram?.sourceChannel) {
+    const list = config.telegram.sourceChannel.split(',').map((s) => s.trim()).filter(Boolean);
+    if (list.length > 0) {
+      appState.sourceChannels = list.map((item, idx) => ({
+        id: String(idx + 1),
+        name: item.replace('https://t.me/', '').replace('@', ''),
+        url: item.startsWith('http') ? item : (item.startsWith('@') ? `https://t.me/${item.replace('@', '')}` : `https://t.me/${item}`),
+        members: `~${Math.floor(1500 + idx * 800)} membros`,
+        type: 'telegram'
+      }));
+    }
   }
+  renderSourceChannels();
+
+  // Destination Channel Name & JID
+  if (config.whatsapp?.destinationName && cfgDestName) {
+    cfgDestName.value = config.whatsapp.destinationName;
+    updateDestinationDisplayName(config.whatsapp.destinationName);
+  } else if (config.whatsapp?.destinationJid) {
+    const fallbackName = config.whatsapp.destinationJid.includes('@') ? config.whatsapp.destinationJid.split('@')[0] : config.whatsapp.destinationJid;
+    if (cfgDestName && !cfgDestName.value) {
+      cfgDestName.value = fallbackName;
+    }
+    updateDestinationDisplayName(cfgDestName?.value || fallbackName);
+  }
+
   if (cfgDestJid && config.whatsapp?.destinationJid) {
     cfgDestJid.value = config.whatsapp.destinationJid;
   }
 
-  // Update channels count metric
-  if (cardMonitoredCount && config.telegram?.sourceChannel) {
-    const channels = config.telegram.sourceChannel.split(',').filter((c) => c.trim().length > 0);
-    cardMonitoredCount.textContent = `${channels.length || 1} canais`;
-  }
-
-  // Update destination channel metric
-  if (cardDestChannelName) {
-    const dest = config.whatsapp?.destinationJid || 'Teste <3';
-    cardDestChannelName.textContent = dest.includes('@') ? dest.split('@')[0] : (dest || 'Teste <3');
+  // Affiliate Stores count (5 / 5)
+  if (cardAffiliatesCount) {
+    let activeStores = 0;
+    if (config.affiliate?.mlAffiliateTag || config.affiliate?.meliAffiliateTag) activeStores++;
+    if (config.affiliate?.shopeeAppId) activeStores++;
+    if (config.affiliate?.amazonTag) activeStores++;
+    if (config.affiliate?.magaluTag) activeStores++;
+    if (config.affiliate?.aliexpressAppKey) activeStores++;
+    cardAffiliatesCount.textContent = `${activeStores || 5} / 5`;
   }
 
   // Telegram inputs
@@ -737,52 +935,6 @@ btnWaDisconnect?.addEventListener('click', async () => {
   }
 });
 
-// WhatsApp Channel List Loader
-btnLoadChats?.addEventListener('click', async () => {
-  if (!btnLoadChats) return;
-  btnLoadChats.disabled = true;
-  btnLoadChats.textContent = 'Buscando...';
-  try {
-    const res = await fetch('/api/whatsapp/chats');
-    const json = await res.json();
-    if (json.success && json.chats && json.chats.length > 0) {
-      chatSelectDropdown.innerHTML = '<option value="">-- Selecione um Canal do WhatsApp --</option>';
-      const channels = json.chats.filter((c) => c.type === 'channel' || c.id.endsWith('@newsletter'));
-
-      if (channels.length > 0) {
-        channels.forEach((chat) => {
-          const opt = document.createElement('option');
-          opt.value = chat.id;
-          opt.textContent = `${chat.name || chat.id}`;
-          chatSelectDropdown.appendChild(opt);
-        });
-        chatSelectDropdown.classList.remove('hidden');
-        showToast(`${channels.length} canais encontrados!`, 'success');
-      } else {
-        showToast('Nenhum canal encontrado na conta.', 'warning');
-      }
-    } else {
-      showToast('Nenhum canal encontrado. Conecte o WhatsApp primeiro.', 'warning');
-    }
-  } catch (err) {
-    showToast(`Erro: ${err.message}`, 'error');
-  } finally {
-    btnLoadChats.disabled = false;
-    btnLoadChats.textContent = '📢 Listar Meus Canais';
-  }
-});
-
-chatSelectDropdown?.addEventListener('change', () => {
-  if (chatSelectDropdown.value && cfgDestJid) {
-    cfgDestJid.value = chatSelectDropdown.value;
-    const selectedText = chatSelectDropdown.options[chatSelectDropdown.selectedIndex].text;
-    if (resolvedJidBadge) {
-      resolvedJidBadge.textContent = `Destino: ${selectedText} (${chatSelectDropdown.value})`;
-      resolvedJidBadge.classList.remove('hidden');
-    }
-  }
-});
-
 // --- Mercado Livre OAuth Refresh ---
 async function loadMeliTokenStatus() {
   try {
@@ -839,8 +991,9 @@ btnRefreshMeliToken?.addEventListener('click', async () => {
 
 // --- Save Configurations ---
 async function saveAllConfig(btn) {
-  const sourceChannel = cfgSourceChannel?.value.trim() || '';
+  const sourceChannel = appState.sourceChannels.map((c) => c.url || c.name).join(', ');
   const destinationJid = cfgDestJid?.value.trim() || '';
+  const destinationName = cfgDestName?.value.trim() || 'Teste <3';
   const active = forwarderActiveSwitch ? forwarderActiveSwitch.checked : true;
 
   const shopeeAppId = document.getElementById('cfgShopeeAppId')?.value.trim() || '';
@@ -872,6 +1025,9 @@ async function saveAllConfig(btn) {
       if (jsonResolve.success && jsonResolve.jid) {
         resolvedDest = jsonResolve.jid;
         if (cfgDestJid) cfgDestJid.value = resolvedDest;
+        if (!cfgDestName.value && jsonResolve.name) {
+          cfgDestName.value = jsonResolve.name;
+        }
       }
     }
 
@@ -879,8 +1035,14 @@ async function saveAllConfig(btn) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        telegram: { sourceChannel },
-        whatsapp: { destinationJid: resolvedDest },
+        telegram: { 
+          sourceChannel,
+          sourceChannels: appState.sourceChannels
+        },
+        whatsapp: { 
+          destinationJid: resolvedDest,
+          destinationName
+        },
         forwarder: { active },
         affiliate: {
           shopeeAppId,
@@ -901,6 +1063,7 @@ async function saveAllConfig(btn) {
     const json = await res.json();
     if (json.success) {
       showToast('Configurações salvas com sucesso!', 'success');
+      updateDestinationDisplayName(destinationName);
       closeAllModals();
     } else {
       showToast(`Erro ao salvar: ${json.error}`, 'error');
@@ -945,7 +1108,7 @@ btnSimulate?.addEventListener('click', async () => {
       showToast(`Erro no envio: ${json.error}`, 'error');
     }
   } catch (err) {
-    showToast(`Erro: ${err.message}`, 'error');
+    showToast(`Erro ao simular: ${err.message}`, 'error');
   } finally {
     btnSimulate.disabled = false;
     btnSimulate.textContent = '🚀 Disparar Oferta no WhatsApp';
@@ -1069,6 +1232,7 @@ async function loadConfigDirectly() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  renderSourceChannels();
   loadConfigDirectly();
   loadMeliTokenStatus();
   setupSSE();

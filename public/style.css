@@ -32,8 +32,8 @@
   --accent-green-text: #15803d;
   
   --accent-blue: #3b82f6;
-  --accent-blue-light: #dbeafe;
-  --accent-blue-text: #1d4ed8;
+  --accent-blue-light: #e0f2fe;
+  --accent-blue-text: #0284c7;
 
   --accent-orange: #f97316;
   --accent-orange-light: #ffedd5;
@@ -348,6 +348,15 @@ body {
 .badge-red {
   background: var(--brand-red-light);
   color: var(--brand-red-text);
+}
+
+.badge-red-soft {
+  background: var(--brand-red-light);
+  color: var(--brand-burgundy);
+  font-weight: 700;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
 }
 
 /* Sidebar Footer */
@@ -1074,7 +1083,7 @@ input:checked + .toggle-slider:before {
 }
 
 .modal-dialog.modal-lg {
-  max-width: 780px;
+  max-width: 860px;
 }
 
 .modal-header {
@@ -1133,6 +1142,197 @@ input:checked + .toggle-slider:before {
   justify-content: flex-end;
   gap: 0.75rem;
   background: var(--bg-page);
+}
+
+/* ==========================================================================
+   CHANNELS SOURCE CARDS (Grid as in reference image)
+   ========================================================================== */
+.channels-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .channels-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.channel-source-card {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.1rem 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.channel-source-card:hover {
+  box-shadow: var(--shadow-hover);
+  border-color: #cbd5e1;
+}
+
+.channel-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.channel-type-badge {
+  background: var(--accent-blue-light);
+  color: var(--accent-blue-text);
+  font-weight: 700;
+  font-size: 0.72rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-pill);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  text-transform: uppercase;
+}
+
+.channel-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.btn-icon-action {
+  background: transparent;
+  border: none;
+  color: var(--text-sub);
+  cursor: pointer;
+  padding: 0.2rem;
+  border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.btn-icon-action:hover {
+  color: var(--text-heading);
+  background: var(--border-light);
+}
+
+.btn-icon-action.btn-delete:hover {
+  color: var(--brand-red);
+  background: var(--brand-red-light);
+}
+
+.btn-icon-action i {
+  width: 14px;
+  height: 14px;
+}
+
+.channel-card-name {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-heading);
+  line-height: 1.2;
+}
+
+.channel-card-url {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.channel-card-url:hover {
+  color: var(--accent-blue-text);
+  text-decoration: underline;
+}
+
+.channel-card-url i {
+  width: 12px;
+  height: 12px;
+}
+
+.channel-card-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.35rem;
+}
+
+.channel-status-pill {
+  background: var(--accent-green-light);
+  color: var(--accent-green-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-pill);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.channel-members-text {
+  font-size: 0.75rem;
+  color: var(--text-sub);
+}
+
+.add-channel-box {
+  background: var(--bg-page);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.15rem;
+  margin-bottom: 1.5rem;
+}
+
+.add-channel-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.dest-channel-config-box {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+}
+
+.dest-box-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dest-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--accent-blue-text);
+}
+
+.dest-box-header h4 {
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: var(--text-heading);
+}
+
+.resolved-badge {
+  background: var(--accent-blue-light);
+  color: var(--accent-blue-text);
+  padding: 0.45rem 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
 }
 
 /* Store Box Items inside Store Modal */

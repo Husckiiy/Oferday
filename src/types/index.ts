@@ -4,10 +4,12 @@ export interface AppConfig {
     apiHash: string;
     phoneNumber: string;
     sourceChannel: string; // e.g. "@promocoes" or "promocoes"
+    sourceChannels?: Array<{ id: string; name: string; url: string; members?: string; type?: string }>;
     enabled: boolean;
   };
   whatsapp: {
     destinationJid: string; // e.g. "12036302XXXXXXXXXX@g.us" or "5511999999999@s.whatsapp.net" or "xxx@newsletter"
+    destinationName?: string; // Custom display name for the channel
     enabled: boolean;
   };
   forwarder: {
