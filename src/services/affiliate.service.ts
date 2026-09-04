@@ -184,15 +184,12 @@ export class AffiliateService {
     try {
       const parsed = new URL(url);
 
-      // 1. Shorten product URLs by removing long title slugs and keeping only /p/MLB... or /MLB...
-      const pMatch = parsed.pathname.match(/\/p\/(MLB\d+)/i);
-      if (pMatch) {
-        parsed.pathname = `/p/${pMatch[1]}`;
-      } else {
-        const mlbMatch = parsed.pathname.match(/\/(MLB-?\d+)/i);
-        if (mlbMatch && parsed.hostname.includes('produto.mercadolivre.com.br')) {
-          parsed.pathname = `/${mlbMatch[1]}`;
-        }
+      // 1. Ensure pathname is valid and not malformed
+      // If it's a bare /MLB1234567 or /MLB-1234567 without slug or _JM, format it as /MLB-1234567-_JM
+      const mlbBareMatch = parsed.pathname.match(/^\/?(MLB-?\d+)$/i);
+      if (mlbBareMatch) {
+        const digits = mlbBareMatch[1].replace(/\D/g, '');
+        parsed.pathname = `/MLB-${digits}-_JM`;
       }
 
       // 2. List of junk / tracking / competitor parameters to strip completely
@@ -353,14 +350,7 @@ export class AffiliateService {
       if (!res.ok) return null;
       const html = await res.text();
 
-      // 1. Check for item_id in pdp_filters
-      const pdpMatch = html.match(/item_id%3A(MLB-?\d+)/i) || html.match(/item_id=(MLB-?\d+)/i);
-      if (pdpMatch) {
-        const mlb = pdpMatch[1].replace('-', '');
-        return `https://produto.mercadolivre.com.br/${mlb}`;
-      }
-
-      // 2. Check for featured product link in recommendations / card-featured
+      // 1. Check for featured product link in recommendations / card-featured (Priority 1: gets full valid URL)
       const featuredMatch = html.match(/href=["'](https?:\/\/www\.mercadolivre\.com\.br\/[^"']+\/up\/MLBU[^"']+)["']/i) ||
                             html.match(/href=["'](https?:\/\/produto\.mercadolivre\.com\.br\/MLB[^"']+)["']/i) ||
                             html.match(/href=["'](https?:\/\/www\.mercadolivre\.com\.br\/p\/MLB[^"']+)["']/i);
@@ -368,10 +358,18 @@ export class AffiliateService {
         return featuredMatch[1].replace(/&amp;/g, '&').split('?')[0];
       }
 
+      // 2. Check for item_id in pdp_filters
+      const pdpMatch = html.match(/item_id%3A(MLB-?\d+)/i) || html.match(/item_id=(MLB-?\d+)/i);
+      if (pdpMatch) {
+        const digits = pdpMatch[1].replace(/\D/g, '');
+        return `https://produto.mercadolivre.com.br/MLB-${digits}-_JM`;
+      }
+
       // 3. Check for wid=MLB...
       const widMatch = html.match(/wid=(MLB\d+)/i);
       if (widMatch) {
-        return `https://produto.mercadolivre.com.br/${widMatch[1]}`;
+        const digits = widMatch[1].replace(/\D/g, '');
+        return `https://produto.mercadolivre.com.br/MLB-${digits}-_JM`;
       }
     } catch (err: any) {
       logger.warn('AFFILIATE', `Aviso ao extrair produto da página social: ${err.message}`);
