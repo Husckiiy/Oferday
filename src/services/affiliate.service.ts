@@ -348,6 +348,64 @@ export class AffiliateService {
   }
 
   /**
+   * Generates official https://meli.la/xxxx link using Mercado Livre's OAuth createLink API with auto-refreshing token.
+   */
+  public async generateMeliLinkViaOAuth(productUrl: string, tag: string): Promise<string | null> {
+    try {
+      const token = await meliAuthService.getValidAccessToken();
+      if (!token) return null;
+
+      let apiTag = tag;
+      if (apiTag.includes('matt_word=')) {
+        const match = apiTag.match(/matt_word=([^&]+)/);
+        if (match) apiTag = match[1];
+      }
+      if (!apiTag || apiTag === '6282693331910478') {
+        apiTag = 'G20260107233651';
+      }
+
+      const callApi = async (accessToken: string) => {
+        return await fetch('https://api.mercadolibre.com/affiliate-program/api/v2/affiliates/createLink', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            urls: [productUrl],
+            tag: apiTag
+          }),
+          signal: AbortSignal.timeout(8000)
+        });
+      };
+
+      let resp = await callApi(token);
+      if (resp.status === 401) {
+        logger.warn('AFFILIATE', 'Mercado Livre OAuth: Token expirado (401). Renovando token...');
+        const newToken = await meliAuthService.refreshAccessToken();
+        if (newToken) {
+          resp = await callApi(newToken);
+        }
+      }
+
+      if (resp.ok) {
+        const data: any = await resp.json();
+        if (Array.isArray(data?.urls) && data.urls.length > 0) {
+          const shortUrl = data.urls[0]?.short_url || data.urls[0]?.url;
+          if (shortUrl && (shortUrl.includes('meli.la') || shortUrl.includes('mercadolivre.com/sec'))) {
+            return shortUrl;
+          }
+        }
+      }
+    } catch (err: any) {
+      logger.warn('AFFILIATE', `Aviso ao chamar createLink OAuth: ${err.message}`);
+    }
+
+    return null;
+  }
+
+  /**
    * Extracts the underlying featured product from a Mercado Livre social recommendation page
    */
   public async extractProductFromSocialPage(socialUrl: string): Promise<string | null> {
@@ -414,11 +472,20 @@ export class AffiliateService {
       }
     }
 
-    // 2. Tenta gerar meli.la oficial usando a URL canônica limpa do produto
+    // 2. Tenta gerar meli.la oficial usando OAuth 2.0 ou Linkbuilder Cookie
     const rawCleanUrl = this.cleanAndTagMercadoLivreUrl(targetUrl, '');
+    
+    // 2a. OAuth API (Auto-refresh)
+    const oauthMeliLa = await this.generateMeliLinkViaOAuth(rawCleanUrl, tag);
+    if (oauthMeliLa) {
+      logger.success('AFFILIATE', `Mercado Livre: Link curto oficial meli.la gerado via OAuth: ${oauthMeliLa}`);
+      return oauthMeliLa;
+    }
+
+    // 2b. Linkbuilder Cookie API
     const officialMeliLa = await this.generateOfficialMeliShortLink(rawCleanUrl, tag);
     if (officialMeliLa) {
-      logger.success('AFFILIATE', `Mercado Livre: Link curto oficial meli.la gerado com sucesso: ${officialMeliLa}`);
+      logger.success('AFFILIATE', `Mercado Livre: Link curto oficial meli.la gerado via Linkbuilder: ${officialMeliLa}`);
       return officialMeliLa;
     }
 
