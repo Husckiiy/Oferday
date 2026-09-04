@@ -315,6 +315,32 @@ apiRouter.post('/meli/refresh', async (req: Request, res: Response) => {
   }
 });
 
+apiRouter.get('/meli/auth-code', async (req: Request, res: Response) => {
+  try {
+    const code = (req.query.code as string) || '';
+    if (!code) {
+      return res.status(400).send('<h1>Erro: Nenhum código de autorização recebido.</h1>');
+    }
+    const rUri = `https://${req.get('host')}/api/meli/auth-code`;
+    const tokens = await meliAuthService.exchangeAuthorizationCode(code, rUri);
+    res.send(`
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 30px; border-radius: 12px; background: #e6ffed; border: 2px solid #28a745; text-align: center;">
+        <h1 style="color: #28a745;">✅ Mercado Livre Conectado com Sucesso!</h1>
+        <p style="font-size: 16px; color: #333;">O bot Oferday agora está conectado à API Oficial do Mercado Livre via OAuth 2.0.</p>
+        <p style="font-size: 14px; color: #555;">Os links <b>meli.la</b> agora serão gerados automaticamente para todas as ofertas, e o token será renovado 24h por dia sozinho!</p>
+        <p style="color: #888; font-size: 12px; margin-top: 20px;">Você já pode fechar esta aba.</p>
+      </div>
+    `);
+  } catch (err: any) {
+    res.status(500).send(`
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 30px; border-radius: 12px; background: #ffeef0; border: 2px solid #dc3545; text-align: center;">
+        <h1 style="color: #dc3545;">❌ Erro ao Conectar Mercado Livre</h1>
+        <p style="font-size: 14px; color: #333;">${err.message}</p>
+      </div>
+    `);
+  }
+});
+
 apiRouter.post('/meli/auth-code', async (req: Request, res: Response) => {
   try {
     const { code, redirectUri } = req.body;
