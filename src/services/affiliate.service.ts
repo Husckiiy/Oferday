@@ -770,7 +770,80 @@ export class AffiliateService {
       }
     }
 
+    // Sanitize competitor bot links, coin bots, and Telegram self-promotions
+    updatedText = this.sanitizeCompetitorText(updatedText);
+
     return { text: updatedText, results };
+  }
+
+  /**
+   * Sanitizes competitor promotions, telegram channels, coin bots and self-promotions
+   */
+  public sanitizeCompetitorText(text: string): string {
+    if (!text) return '';
+
+    const lines = text.split('\n');
+    const cleanedLines: string[] = [];
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      const lower = trimmed.toLowerCase();
+
+      // Drop lines promoting competitor bots (coin bots, coupon bots, etc.)
+      if (
+        lower.includes('bot de moedas') ||
+        lower.includes('bot de cupom') ||
+        lower.includes('bot de cupons') ||
+        lower.includes('bot de desconto') ||
+        lower.includes('economizandobot')
+      ) {
+        continue;
+      }
+
+      // Drop lines promoting competitor Telegram channels, groups, or direct t.me links
+      if (
+        lower.includes('t.me/') ||
+        lower.includes('telegram.me/') ||
+        lower.includes('canal do telegram') ||
+        lower.includes('grupo vip') ||
+        lower.includes('siga nosso canal') ||
+        lower.includes('canal de ofertas') ||
+        lower.includes('canal de cupons')
+      ) {
+        if (
+          lower.startsWith('link do') ||
+          lower.startsWith('canal:') ||
+          lower.startsWith('grupo:') ||
+          lower.startsWith('t.me/') ||
+          lower.startsWith('https://t.me/') ||
+          lower.includes('economizandobot')
+        ) {
+          continue;
+        }
+        const cleanLine = line.replace(/https?:\/\/(?:www\.)?(?:t\.me|telegram\.me)\/[^\s]+/gi, '').trim();
+        if (cleanLine.length > 0) {
+          cleanedLines.push(cleanLine);
+        }
+        continue;
+      }
+
+      // Remove competitor handles
+      const cleanedHandleLine = line
+        .replace(/@economizandocomjp\b/gi, '')
+        .replace(/@economizandobot\b/gi, '')
+        .replace(/@promos_tech1\b/gi, '')
+        .replace(/@jptechofertasgerais\b/gi, '')
+        .replace(/@portaldossachadinhos\b/gi, '')
+        .trim();
+
+      if (/^[-\s:•*~#_]+$/.test(cleanedHandleLine)) {
+        continue;
+      }
+
+      cleanedLines.push(line);
+    }
+
+    return cleanedLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
   }
 
   /**
