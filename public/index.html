@@ -3,542 +3,535 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Oferday Bot - Painel de Controle</title>
+  <title>OferDay PRO EDITION - Painel de Controle</title>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body>
-  <div class="dashboard-layout">
+<body class="theme-light">
+  
+  <div class="app-container">
     
-    <!-- Top Modern Navbar -->
-    <header class="top-navbar">
-      <div class="brand-group">
-        <div class="brand-badge">⚡</div>
-        <div>
-          <div class="brand-title">OFERDAY <span class="version-tag">PRO v2.0</span></div>
-          <div class="brand-desc">Clonador & Repassador Automático de Ofertas</div>
-        </div>
-      </div>
-
-      <!-- Quick Status Indicators -->
-      <div class="navbar-status-group">
-        <div class="status-pill" id="pillTelegram">
-          <span class="dot dot-gray"></span>
-          <span>Telegram:</span>
-          <strong id="pillTgText">Desconectado</strong>
-        </div>
-        <div class="status-pill" id="pillWhatsApp">
-          <span class="dot dot-gray"></span>
-          <span>WhatsApp:</span>
-          <strong id="pillWaText">Desconectado</strong>
-        </div>
-        <div class="status-pill" id="pillMeli">
-          <span class="dot dot-green"></span>
-          <span>Meli OAuth:</span>
-          <strong id="pillMeliText">Ativo (24h)</strong>
-        </div>
-      </div>
-
-      <!-- Main Action: Forwarder Switch -->
-      <div class="navbar-actions">
-        <div class="master-switch-card">
-          <span class="switch-title" id="forwarderStatusLabel">Repasse: Ativo</span>
-          <label class="switch">
-            <input type="checkbox" id="forwarderActiveSwitch" checked>
-            <span class="slider round"></span>
-          </label>
-        </div>
-      </div>
-    </header>
-
-    <!-- Navigation Tabs -->
-    <nav class="nav-tabs-bar">
-      <button class="nav-tab active" data-tab="tab-overview">
-        <span class="tab-icon">📊</span>
-        <span>Visão Geral</span>
-      </button>
-      <button class="nav-tab" data-tab="tab-connections">
-        <span class="tab-icon">🔌</span>
-        <span>Conexões (TG & WA)</span>
-      </button>
-      <button class="nav-tab" data-tab="tab-routing">
-        <span class="tab-icon">🎯</span>
-        <span>Canais & Destino</span>
-      </button>
-      <button class="nav-tab" data-tab="tab-affiliates">
-        <span class="tab-icon">🏷️</span>
-        <span>Lojas & Afiliados</span>
-      </button>
-      <button class="nav-tab" data-tab="tab-tester">
-        <span class="tab-icon">🔗</span>
-        <span>Testador de Links</span>
-      </button>
-      <button class="nav-tab" data-tab="tab-simulator">
-        <span class="tab-icon">🧪</span>
-        <span>Simulador</span>
-      </button>
-      <button class="nav-tab" data-tab="tab-logs">
-        <span class="tab-icon">📜</span>
-        <span>Terminal & Logs</span>
-      </button>
-    </nav>
-
-    <!-- TAB 1: VISÃO GERAL -->
-    <section class="tab-content active" id="tab-overview">
+    <!-- ==================== SIDEBAR ==================== -->
+    <aside class="sidebar">
       
-      <!-- Visual Pipeline Flow -->
-      <div class="card pipeline-card">
-        <div class="card-head">
-          <div class="card-title-group">
-            <span class="card-emoji">⚡</span>
-            <div>
-              <h3>Fluxo de Repasse em Tempo Real</h3>
-              <p class="card-subtitle">Como as mensagens trafegam da origem ao canal do WhatsApp</p>
-            </div>
-          </div>
-        </div>
-        
-        <div class="pipeline-track">
-          <!-- Step 1: Telegram -->
-          <div class="pipeline-box" id="nodeTelegram">
-            <div class="box-icon icon-tg">✈️</div>
-            <div class="box-content">
-              <div class="box-label">1. Origem Telegram</div>
-              <div class="box-value" id="pipeTgChannel">@carregando...</div>
-            </div>
-            <span class="box-badge badge-gray" id="pipeTgBadge">Desconectado</span>
-          </div>
-
-          <div class="pipeline-arrow">
-            <div class="arrow-line"><span class="arrow-pulse"></span></div>
-            <span class="arrow-tag">MTProto / GramJS</span>
-          </div>
-
-          <!-- Step 2: Processor -->
-          <div class="pipeline-box highlight-box" id="nodeProcessor">
-            <div class="box-icon icon-core">⚙️</div>
-            <div class="box-content">
-              <div class="box-label">2. Bot & Filtros de Afiliado</div>
-              <div class="box-value" id="pipeProcessorStatus">Monitorando 24h</div>
-            </div>
-            <span class="box-badge badge-green" id="pipeProcessorBadge">Ativo</span>
-          </div>
-
-          <div class="pipeline-arrow">
-            <div class="arrow-line"><span class="arrow-pulse"></span></div>
-            <span class="arrow-tag">Baileys Socket</span>
-          </div>
-
-          <!-- Step 3: WhatsApp -->
-          <div class="pipeline-box" id="nodeWhatsApp">
-            <div class="box-icon icon-wa">💬</div>
-            <div class="box-content">
-              <div class="box-label">3. Destino WhatsApp</div>
-              <div class="box-value" id="pipeWaDest">JID não configurado</div>
-            </div>
-            <span class="box-badge badge-gray" id="pipeWaBadge">Desconectado</span>
-          </div>
+      <!-- Brand / Logo Header -->
+      <div class="sidebar-header">
+        <div class="brand-logo-badge">OD</div>
+        <div class="brand-info">
+          <div class="brand-name">OferDay</div>
+          <div class="brand-edition">PRO EDITION</div>
         </div>
       </div>
 
-      <!-- Quick Metrics & Recent Feed Preview -->
-      <div class="grid-2-cols">
+      <!-- Navigation Menu -->
+      <nav class="sidebar-nav">
         
-        <!-- Quick Stats Card -->
-        <div class="card">
-          <div class="card-head">
-            <div class="card-title-group">
-              <span class="card-emoji">📈</span>
-              <div>
-                <h3>Status das Integrações</h3>
-                <p class="card-subtitle">Plataformas e APIs configuradas no sistema</p>
-              </div>
+        <a href="#" class="nav-item active" data-view="dashboard">
+          <i data-lucide="layout-grid" class="nav-icon"></i>
+          <span class="nav-label">Dashboard</span>
+        </a>
+
+        <a href="#" class="nav-item" data-modal="modal-tutorials">
+          <i data-lucide="book-open" class="nav-icon"></i>
+          <span class="nav-label">Tutoriais</span>
+        </a>
+
+        <a href="#" class="nav-item" data-modal="modal-stores">
+          <i data-lucide="store" class="nav-icon"></i>
+          <span class="nav-label">Configurar Lojas</span>
+        </a>
+
+        <!-- Connections Dropdown -->
+        <div class="nav-group open" id="navGroupConnections">
+          <button type="button" class="nav-group-header">
+            <div class="nav-group-left">
+              <i data-lucide="smartphone" class="nav-icon"></i>
+              <span class="nav-label">Conexões</span>
             </div>
-          </div>
-          <div class="card-body">
-            <div class="integration-list">
-              <div class="integration-item">
-                <div class="integration-icon bg-meli">🟡</div>
-                <div class="integration-info">
-                  <strong>Mercado Livre</strong>
-                  <span>OAuth 2.0 Oficial (meli.la)</span>
-                </div>
-                <span class="badge badge-green" id="dashMeliBadge">Conectado (24h)</span>
-              </div>
-              <div class="integration-item">
-                <div class="integration-icon bg-shopee">🟠</div>
-                <div class="integration-info">
-                  <strong>Shopee Brasil</strong>
-                  <span>GraphQL API Oficial (s.shopee.com.br)</span>
-                </div>
-                <span class="badge badge-green">API Ativa</span>
-              </div>
-              <div class="integration-item">
-                <div class="integration-icon bg-amazon">📦</div>
-                <div class="integration-info">
-                  <strong>Amazon Brasil</strong>
-                  <span>SiteStripe API Oficial (link.amazon)</span>
-                </div>
-                <span class="badge badge-green">SiteStripe Ativo</span>
-              </div>
-              <div class="integration-item">
-                <div class="integration-icon bg-magalu">🔵</div>
-                <div class="integration-info">
-                  <strong>Magazine Luiza</strong>
-                  <span>Parceiro Magalu (magazinevoce)</span>
-                </div>
-                <span class="badge badge-green">Loja Ativa</span>
-              </div>
-            </div>
+            <i data-lucide="chevron-down" class="chevron-icon"></i>
+          </button>
+          <div class="nav-sub-items">
+            <a href="#" class="nav-sub-item" data-modal="modal-whatsapp" id="sidebarWaItem">
+              <span class="status-dot dot-gray" id="sidebarWaDot"></span>
+              <span class="sub-label">WhatsApp (Baileys)</span>
+              <span class="status-pill-badge badge-gray" id="sidebarWaBadge">Offline</span>
+            </a>
+            <a href="#" class="nav-sub-item" data-modal="modal-telegram" id="sidebarTgItem">
+              <span class="status-dot dot-gray" id="sidebarTgDot"></span>
+              <span class="sub-label">Telegram (GramJS)</span>
+              <span class="status-pill-badge badge-gray" id="sidebarTgBadge">Offline</span>
+            </a>
           </div>
         </div>
 
-        <!-- Recent Cloned Feed Preview Card -->
-        <div class="card">
-          <div class="card-head">
-            <div class="card-title-group">
-              <span class="card-emoji">📦</span>
-              <div>
-                <h3>Últimas Ofertas Repassadas</h3>
-                <p class="card-subtitle">Feed em tempo real do canal de destino</p>
-              </div>
+        <!-- Shipping / Routing Dropdown -->
+        <div class="nav-group open" id="navGroupForwarding">
+          <button type="button" class="nav-group-header">
+            <div class="nav-group-left">
+              <i data-lucide="zap" class="nav-icon"></i>
+              <span class="nav-label">Configurar Envios</span>
             </div>
-            <span class="badge badge-blue" id="feedCountBadge">0 itens</span>
-          </div>
-          <div class="card-body feed-scroll-wrapper">
-            <div class="feed-container" id="feedContainer">
-              <div class="empty-feed" id="emptyFeedMsg">
-                <div class="empty-icon">📭</div>
-                <p>Nenhuma mensagem clonada ainda.</p>
-                <span>As mensagens enviadas aparecerão aqui automaticamente.</span>
-              </div>
-            </div>
+            <i data-lucide="chevron-down" class="chevron-icon"></i>
+          </button>
+          <div class="nav-sub-items">
+            <a href="#" class="nav-sub-item" data-modal="modal-channels">
+              <span class="sub-label">Canais & Destinos</span>
+            </a>
+            <a href="#" class="nav-sub-item" data-modal="modal-watermark">
+              <i data-lucide="shield-check" class="sub-icon"></i>
+              <span class="sub-label">Anti-Marca d'Água</span>
+            </a>
           </div>
         </div>
 
-      </div>
-    </section>
+        <a href="#" class="nav-item" data-modal="modal-promoter">
+          <i data-lucide="megaphone" class="nav-icon"></i>
+          <span class="nav-label">Divulgador & Ofertas</span>
+        </a>
 
-    <!-- TAB 2: CONEXÕES (TELEGRAM & WHATSAPP) -->
-    <section class="tab-content" id="tab-connections">
-      <div class="grid-2-cols">
+        <a href="#" class="nav-item" data-modal="modal-shopee-finder">
+          <i data-lucide="shopping-bag" class="nav-icon"></i>
+          <span class="nav-label">Achadinhos Shopee</span>
+        </a>
+
+        <a href="#" class="nav-item" data-modal="modal-monitoring">
+          <i data-lucide="activity" class="nav-icon"></i>
+          <span class="nav-label">Monitoramento</span>
+        </a>
+
+        <a href="#" class="nav-item" data-modal="modal-simulation">
+          <i data-lucide="send" class="nav-icon"></i>
+          <span class="nav-label">Disparo Manual</span>
+        </a>
+
+        <a href="#" class="nav-item" data-modal="modal-queue">
+          <i data-lucide="list-ordered" class="nav-icon"></i>
+          <span class="nav-label">Filas de Disparo</span>
+        </a>
+
+        <a href="#" class="nav-item nav-item-has-arrow" data-modal="modal-products">
+          <div class="nav-group-left">
+            <i data-lucide="package" class="nav-icon"></i>
+            <span class="nav-label">Meus Produtos</span>
+          </div>
+          <i data-lucide="chevron-right" class="chevron-right-icon"></i>
+        </a>
+
+        <a href="#" class="nav-item" data-modal="modal-link-generator">
+          <i data-lucide="link" class="nav-icon"></i>
+          <span class="nav-label">Gerador de link</span>
+        </a>
+
+      </nav>
+
+      <!-- Sidebar Footer (Theme Toggle + User Profile) -->
+      <div class="sidebar-footer">
         
-        <!-- Telegram Connection Card -->
-        <div class="card" id="telegramCard">
-          <div class="card-head">
-            <div class="card-title-group">
-              <span class="card-emoji">✈️</span>
-              <div>
-                <h3>Origem: Telegram (GramJS)</h3>
-                <p class="card-subtitle">Sessão MTProto para escuta de canais de ofertas</p>
-              </div>
-            </div>
-            <span class="badge badge-gray" id="tgBadge">Desconectado</span>
-          </div>
-          
-          <div class="card-body">
-            <!-- Form Step: Auth -->
-            <div id="tgAuthForm" class="auth-section">
-              <div class="form-group">
-                <label for="tgApiId">API ID <a href="https://my.telegram.org" target="_blank" class="link-hint">(my.telegram.org)</a></label>
-                <input type="number" id="tgApiId" placeholder="Ex: 35512013">
-              </div>
-              <div class="form-group">
-                <label for="tgApiHash">API Hash</label>
-                <input type="text" id="tgApiHash" placeholder="Ex: cff50e9f4c36f15d799a5768799016ff">
-              </div>
-              <div class="form-group">
-                <label for="tgPhone">Telefone com DDI + DDD</label>
-                <input type="text" id="tgPhone" placeholder="+5511999999999">
-              </div>
-              <button class="btn btn-primary btn-block" id="btnTgSendCode">
-                <span>Enviar Código de Login</span>
-              </button>
-            </div>
-
-            <!-- Form Step: Code Verification -->
-            <div id="tgCodeStep" class="auth-section hidden">
-              <div class="alert alert-info">
-                Código de verificação enviado para o seu app Telegram.
-              </div>
-              <div class="form-group">
-                <label for="tgCode">Código de 5 dígitos</label>
-                <input type="text" id="tgCode" placeholder="Ex: 12345" maxlength="10">
-              </div>
-              <div class="btn-group">
-                <button class="btn btn-success" id="btnTgVerifyCode">Confirmar Código</button>
-                <button class="btn btn-secondary" id="btnTgCancelCode">Voltar</button>
-              </div>
-            </div>
-
-            <!-- Form Step: 2FA Password -->
-            <div id="tg2FaStep" class="auth-section hidden">
-              <div class="alert alert-warning">
-                Sua conta possui Senha de Nuvem (2FA ativado).
-              </div>
-              <div class="form-group">
-                <label for="tg2FaPass">Senha de Nuvem (2FA)</label>
-                <input type="password" id="tg2FaPass" placeholder="Sua senha do Telegram">
-              </div>
-              <button class="btn btn-success btn-block" id="btnTgSubmit2Fa">Autenticar 2FA</button>
-            </div>
-
-            <!-- Form Step: Connected -->
-            <div id="tgConnectedStep" class="auth-section hidden">
-              <div class="success-banner">
-                <div class="banner-title">✅ Telegram Conectado e Operando</div>
-                <div class="banner-meta">Sessão MTProto ativa & monitorando canais configurados.</div>
-              </div>
-              <button class="btn btn-danger btn-sm" id="btnTgLogout" style="margin-top: 1rem;">Desconectar Sessão</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- WhatsApp Connection Card -->
-        <div class="card" id="whatsappCard">
-          <div class="card-head">
-            <div class="card-title-group">
-              <span class="card-emoji">💬</span>
-              <div>
-                <h3>Destino: WhatsApp (Baileys)</h3>
-                <p class="card-subtitle">Conexão oficial com envio direto em canais</p>
-              </div>
-            </div>
-            <span class="badge badge-gray" id="waBadge">Desconectado</span>
-          </div>
-
-          <div class="card-body">
-            <!-- QR Section -->
-            <div id="waQrSection" class="qr-section">
-              <div class="qr-box-wrapper">
-                <div class="qr-placeholder" id="waQrPlaceholder">
-                  <div class="spinner"></div>
-                  <p>Gerando QR Code de Conexão...</p>
-                </div>
-                <img id="waQrImg" alt="QR Code WhatsApp" class="qr-img hidden">
-              </div>
-              <p class="qr-helper-text">Abra o WhatsApp ➔ <strong>Aparelhos conectados</strong> ➔ <strong>Conectar um aparelho</strong> e aponte a câmera para o QR Code acima.</p>
-              <button class="btn btn-secondary btn-sm" id="btnWaReconnect">🔄 Gerar Novo QR Code</button>
-            </div>
-
-            <!-- Connected Section -->
-            <div id="waConnectedSection" class="connected-section hidden">
-              <div class="success-banner">
-                <div class="banner-title">✅ WhatsApp Conectado com Sucesso</div>
-                <div class="banner-meta">Bot autenticado como <strong>OferdayBot</strong>. Notificações do seu celular preservadas.</div>
-              </div>
-              <button class="btn btn-danger btn-sm" id="btnWaDisconnect" style="margin-top: 1rem;">Desconectar WhatsApp</button>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- TAB 3: CANAIS & ROTEAMENTO -->
-    <section class="tab-content" id="tab-routing">
-      <div class="card">
-        <div class="card-head">
-          <div class="card-title-group">
-            <span class="card-emoji">🎯</span>
-            <div>
-              <h3>Roteamento de Mensagens & Canais</h3>
-              <p class="card-subtitle">Defina de onde as ofertas são capturadas e para qual canal são enviadas</p>
-            </div>
-          </div>
-          <button class="btn btn-success" id="btnSaveConfigRouting">
-            <span>💾 Salvar Roteamento</span>
+        <!-- Theme Toggle -->
+        <div class="theme-toggle-box">
+          <button type="button" class="theme-btn active" id="btnThemeLight" title="Modo Claro">
+            <i data-lucide="sun" class="theme-icon"></i>
+          </button>
+          <button type="button" class="theme-btn" id="btnThemeDark" title="Modo Escuro">
+            <i data-lucide="moon" class="theme-icon"></i>
           </button>
         </div>
 
-        <div class="card-body">
-          <div class="form-grid-2">
-            
-            <div class="form-group">
-              <label for="cfgSourceChannel">
-                Canais de Origem (Telegram)
-                <span class="hint">Aceita múltiplos canais separados por vírgula</span>
-              </label>
-              <textarea id="cfgSourceChannel" rows="3" placeholder="https://t.me/PortalDOSsachadinhos, @economizandocomjp, @promos_tech1"></textarea>
-              <span class="field-help">💡 O bot escuta todas as mensagens e fotos em tempo real nesses canais.</span>
-            </div>
-
-            <div class="form-group">
-              <label for="cfgDestJid">
-                Canal de Destino (WhatsApp)
-                <span class="hint">Link do canal ou JID @newsletter</span>
-              </label>
-              <input type="text" id="cfgDestJid" placeholder="https://whatsapp.com/channel/0029Vb... ou 120363...@newsletter">
-              <div id="resolvedJidBadge" class="resolved-badge hidden"></div>
-
-              <div class="group-select-row" style="margin-top: 0.75rem;">
-                <button class="btn btn-secondary btn-sm" id="btnLoadChats" type="button">📢 Listar Meus Canais</button>
-                <select id="chatSelectDropdown" class="chat-select hidden">
-                  <option value="">-- Selecione um Canal do WhatsApp --</option>
-                </select>
-              </div>
-            </div>
-
+        <!-- User Profile Card -->
+        <div class="user-profile-card">
+          <div class="user-avatar-text">CA</div>
+          <div class="user-info">
+            <div class="user-name">Carlos Afiliado Pro</div>
+            <div class="user-email">carlos@oferday.com</div>
           </div>
+          <button class="btn-logout" title="Sair do painel" id="btnAppLogout">
+            <i data-lucide="log-out" class="logout-icon"></i>
+          </button>
         </div>
-      </div>
-    </section>
 
-    <!-- TAB 4: LOJAS & AFILIADOS -->
-    <section class="tab-content" id="tab-affiliates">
+      </div>
+
+    </aside>
+
+    <!-- ==================== MAIN CONTENT ==================== -->
+    <main class="main-content">
       
-      <!-- Top Actions Bar for Affiliates -->
-      <div class="section-actions-bar">
-        <div>
-          <h3>Credenciais e Plataformas de Afiliados</h3>
-          <p class="text-muted">Configure suas tags, chaves de API e tokens para substituição automática de links.</p>
+      <!-- Top Responsive Bar (Mobile only) -->
+      <div class="mobile-topbar">
+        <div class="mobile-brand">
+          <div class="brand-logo-badge small">OD</div>
+          <span class="brand-name">OferDay PRO</span>
         </div>
-        <button class="btn btn-success" id="btnSaveConfig">
-          <span>💾 Salvar Todas as Configurações</span>
+        <button class="mobile-menu-btn" id="btnToggleMobileMenu">
+          <i data-lucide="menu"></i>
         </button>
       </div>
 
-      <div class="grid-stores">
+      <!-- HERO BANNER -->
+      <section class="hero-banner">
+        <div class="hero-badge">
+          <i data-lucide="zap" class="hero-badge-icon"></i>
+          <span>Sistema Ativo em Tempo Real</span>
+        </div>
+        
+        <h1 class="hero-title">Bem-vindo ao <span class="highlight-brand">OferDay</span> 🚀</h1>
+        
+        <p class="hero-description">
+          Automatize a clonagem de ofertas dos seus canais favoritos no WhatsApp e Telegram, substituindo automaticamente pelos seus links de afiliado (Amazon, Shopee, Mercado Livre, Magalu e AliExpress) em tempo real.
+        </p>
 
-        <!-- 1. Mercado Livre (OAuth & Tags) -->
-        <div class="store-card store-meli">
-          <div class="store-header">
-            <div class="store-title-wrap">
-              <span class="store-badge-icon">🟡</span>
-              <div>
-                <h4>Mercado Livre (meli.la)</h4>
-                <span class="store-type">OAuth 2.0 Oficial & Linkbuilder</span>
+        <div class="hero-actions">
+          <button class="btn-hero-light" data-modal="modal-channels">
+            <span>Gerenciar Canais e Grupos</span>
+            <i data-lucide="arrow-right" class="btn-icon-right"></i>
+          </button>
+
+          <button class="btn-hero-primary" data-modal="modal-simulation">
+            <i data-lucide="zap" class="btn-icon-left"></i>
+            <span>Simular Nova Oferta Agora</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- 4 TOP METRIC CARDS ROW -->
+      <section class="metrics-row">
+        
+        <!-- Metric 1: WhatsApp -->
+        <div class="metric-card" data-modal="modal-whatsapp">
+          <div class="metric-card-top">
+            <span class="metric-title">WHATSAPP CONECTADO</span>
+            <div class="metric-icon-circle red-tint">
+              <i data-lucide="smartphone"></i>
+            </div>
+          </div>
+          <div class="metric-value" id="cardWaStatusText">Desconectado</div>
+          <div class="metric-sub">
+            <a href="#" class="metric-link alert-link" id="cardWaSubLink">
+              <i data-lucide="alert-triangle" class="sub-alert-icon"></i>
+              <span id="cardWaActionText">Conectar agora</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Metric 2: Canais Monitorados -->
+        <div class="metric-card" data-modal="modal-channels">
+          <div class="metric-card-top">
+            <span class="metric-title">CANAIS MONITORADOS</span>
+            <div class="metric-icon-circle red-tint">
+              <i data-lucide="radio"></i>
+            </div>
+          </div>
+          <div class="metric-value" id="cardMonitoredCount">4 canais</div>
+          <div class="metric-sub text-green">
+            <span class="status-dot-mini dot-green"></span>
+            <span>Clonagem automática ativa</span>
+          </div>
+        </div>
+
+        <!-- Metric 3: Canal de Destino -->
+        <div class="metric-card" data-modal="modal-channels">
+          <div class="metric-card-top">
+            <span class="metric-title">CANAL DE DESTINO</span>
+            <div class="metric-icon-circle blue-tint">
+              <i data-lucide="message-square"></i>
+            </div>
+          </div>
+          <div class="metric-value" id="cardDestChannelName">Teste &lt;3</div>
+          <div class="metric-sub text-muted">
+            <span>Destino dos disparos automáticos</span>
+          </div>
+        </div>
+
+        <!-- Metric 4: Redes Afiliadas -->
+        <div class="metric-card" data-modal="modal-stores">
+          <div class="metric-card-top">
+            <span class="metric-title">REDES AFILIADAS</span>
+            <div class="metric-icon-circle red-tint">
+              <i data-lucide="link-2"></i>
+            </div>
+          </div>
+          <div class="metric-value" id="cardAffiliatesCount">6 / 5</div>
+          <div class="metric-sub text-muted">
+            <span>Amazon, Shopee, ML, Magalu, Ali</span>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- 2-COLUMN SPLIT: FEED & CHECKLIST -->
+      <div class="dashboard-grid-split">
+        
+        <!-- Left: Cloned & Converted Offers Feed -->
+        <section class="feed-section">
+          
+          <div class="section-header">
+            <div>
+              <h2 class="section-heading">Últimas Ofertas Clonadas e Convertidas</h2>
+              <p class="section-subheading">Substituição de links em tempo real enviada para seu canal</p>
+            </div>
+            <a href="#" class="link-see-all" id="btnSeeAllOffers" data-modal="modal-monitoring">
+              <span>Ver todas</span>
+              <i data-lucide="arrow-right"></i>
+            </a>
+          </div>
+
+          <!-- Feed Items Container -->
+          <div class="feed-list" id="feedContainer">
+            
+            <!-- Default mock items for initial render if feed is empty -->
+            <div class="offer-item-card" id="mockOffer1">
+              <div class="offer-header-row">
+                <div class="offer-store-and-origin">
+                  <span class="store-pill store-meli">MERCADO LIVRE</span>
+                  <span class="offer-origin">de Eu • Agora mesmo</span>
+                </div>
+                <span class="badge-status-sent">Disparado ✅</span>
               </div>
+              <div class="offer-title">Fritadeira Air Fryer Grand Family 5L – R$ 319,00</div>
+              <div class="offer-snippet">🎁 PROMOÇÃO IMPERDÍVEL HOJE! 📻 Fritadeira Air Fryer Grand Family 5L ⚡ Por apenas R$ 319,00 Compre...</div>
+              <div class="offer-footer-row">
+                <span class="offer-dest-tag">Destino: <strong id="feedDestTag1">Teste &lt;3</strong></span>
+              </div>
+            </div>
+
+            <div class="offer-item-card" id="mockOffer2">
+              <div class="offer-header-row">
+                <div class="offer-store-and-origin">
+                  <span class="store-pill store-meli">MERCADO LIVRE</span>
+                  <span class="offer-origin">de Economizando com jp • Agora mesmo</span>
+                </div>
+                <span class="badge-status-sent">Disparado ✅</span>
+              </div>
+              <div class="offer-title">Fritadeira Air Fryer Grand Family 5L – R$ 319,00</div>
+              <div class="offer-snippet">🎁 PROMOÇÃO IMPERDÍVEL HOJE! 📻 Fritadeira Air Fryer Grand Family 5L ⚡ Por apenas R$ 319,00 Compre...</div>
+              <div class="offer-footer-row">
+                <span class="offer-dest-tag">Destino: <strong id="feedDestTag2">Teste &lt;3</strong></span>
+              </div>
+            </div>
+
+            <div class="offer-item-card" id="mockOffer3">
+              <div class="offer-header-row">
+                <div class="offer-store-and-origin">
+                  <span class="store-pill store-amazon">AMAZON</span>
+                  <span class="offer-origin">de jp • Agora mesmo</span>
+                </div>
+                <span class="badge-status-sent">Disparado ✅</span>
+              </div>
+              <div class="offer-title">Echo Dot 5ª Geração com Alexa Smart Speaker – R$ 299,00</div>
+              <div class="offer-snippet">🔥 Menor preço histórico! 📦 Compre com Prime e Frete Grátis pelo link oficial...</div>
+              <div class="offer-footer-row">
+                <span class="offer-dest-tag">Destino: <strong id="feedDestTag3">Teste &lt;3</strong></span>
+              </div>
+            </div>
+
+          </div>
+
+        </section>
+
+        <!-- Right: Configuration Checklist -->
+        <aside class="checklist-section">
+          <div class="checklist-card">
+            
+            <h3 class="checklist-title">Checklist de Configuração</h3>
+            <p class="checklist-sub">Siga estes passos para começar a lucrar com seus grupos de ofertas</p>
+
+            <div class="checklist-items">
+              
+              <!-- Step 1 -->
+              <div class="checklist-step" data-modal="modal-whatsapp">
+                <div class="step-num-circle" id="chkStep1">1</div>
+                <div class="step-details">
+                  <div class="step-title">Conectar WhatsApp</div>
+                  <div class="step-desc">Escaneie o QR Code na aba WhatsApp.</div>
+                </div>
+              </div>
+
+              <!-- Step 2 -->
+              <div class="checklist-step completed" data-modal="modal-channels">
+                <div class="step-num-circle check-completed" id="chkStep2">2</div>
+                <div class="step-details">
+                  <div class="step-title">Adicionar Canais de Origem</div>
+                  <div class="step-desc">Escolha quais canais deseja clonar ofertas.</div>
+                </div>
+              </div>
+
+              <!-- Step 3 -->
+              <div class="checklist-step completed" data-modal="modal-channels">
+                <div class="step-num-circle check-completed" id="chkStep3">3</div>
+                <div class="step-details">
+                  <div class="step-title">Definir Canal de Destino</div>
+                  <div class="step-desc">Onde suas ofertas convertidas serão enviadas.</div>
+                </div>
+              </div>
+
+              <!-- Step 4 -->
+              <div class="checklist-step completed" data-modal="modal-stores">
+                <div class="step-num-circle check-completed" id="chkStep4">4</div>
+                <div class="step-details">
+                  <div class="step-title">Cadastrar Links de Afiliado</div>
+                  <div class="step-desc">Insira suas tags de Amazon, Shopee e ML.</div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Master Switch Quick Box inside checklist -->
+            <div class="checklist-footer-switch">
+              <div class="switch-meta">
+                <span class="switch-heading" id="forwarderStatusLabel">Repasse: Ativo</span>
+                <span class="switch-sub">Monitorando 24h sem parar</span>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="forwarderActiveSwitch" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+          </div>
+        </aside>
+
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ==================== MODALS / SYSTEM DRAWERS ==================== -->
+  
+  <!-- MODAL: CONFIGURAR LOJAS (Mercado Livre OAuth, Shopee, Amazon, Magalu, Ali) -->
+  <div class="modal-overlay" id="modal-stores">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <i data-lucide="store" class="modal-title-icon"></i>
+          <div>
+            <h3>Configurar Lojas & Afiliados</h3>
+            <p>Gerencie suas credenciais e tokens de API para conversão de links</p>
+          </div>
+        </div>
+        <button class="btn-close-modal" data-close>&times;</button>
+      </div>
+
+      <div class="modal-body">
+        
+        <!-- Mercado Livre -->
+        <div class="store-box-item">
+          <div class="store-box-header">
+            <div class="store-box-title">
+              <span class="store-tag-badge bg-meli">🟡 Mercado Livre (meli.la)</span>
+              <span class="store-tech-label">OAuth 2.0 Oficial & Linkbuilder</span>
             </div>
             <span class="badge badge-green" id="meliTokenBadge">OAuth Ativo (24h)</span>
           </div>
-
-          <div class="store-body">
-            <div class="form-grid-2">
+          <div class="store-box-content">
+            <div class="form-row-2">
               <div class="form-group">
-                <label for="cfgMlTag">Tag de Afiliado (matt_word)</label>
+                <label>Tag de Afiliado (matt_word)</label>
                 <input type="text" id="cfgMlTag" value="G20260107233651" placeholder="Ex: G20260107233651">
               </div>
               <div class="form-group">
-                <label for="cfgMlListUrl">Link da sua Vitrine Oficial</label>
+                <label>Link da sua Vitrine Oficial</label>
                 <input type="text" id="cfgMlListUrl" value="https://meli.la/2H1hvz6" placeholder="https://meli.la/2H1hvz6">
               </div>
             </div>
-
-            <div class="form-grid-2">
+            <div class="form-row-2">
               <div class="form-group">
-                <label for="cfgMlAppId">App ID (Client ID)</label>
-                <input type="text" id="cfgMlAppId" value="6282693331910478" placeholder="App ID do DevCenter">
+                <label>App ID (Client ID)</label>
+                <input type="text" id="cfgMlAppId" value="6282693331910478" placeholder="Client ID">
               </div>
               <div class="form-group">
-                <label for="cfgMlSecretKey">Client Secret Key</label>
+                <label>Client Secret Key</label>
                 <input type="password" id="cfgMlSecretKey" value="gV7EDEKygMX4uEP8J9lh0gLIj6wx42Ya" placeholder="Secret Key">
               </div>
             </div>
-
-            <div class="token-status-box">
-              <div class="token-status-text" id="meliTokenExpireInfo">Renovação contínua automática ativa no servidor.</div>
+            <div class="token-banner">
+              <span id="meliTokenExpireInfo">Renovação contínua automática 24h ativa no servidor.</span>
               <button class="btn btn-secondary btn-sm" id="btnRefreshMeliToken">🔄 Renovar Token Agora</button>
             </div>
           </div>
         </div>
 
-        <!-- 2. Shopee -->
-        <div class="store-card store-shopee">
-          <div class="store-header">
-            <div class="store-title-wrap">
-              <span class="store-badge-icon">🟠</span>
-              <div>
-                <h4>Shopee Brasil</h4>
-                <span class="store-type">GraphQL API Oficial (s.shopee.com.br)</span>
-              </div>
+        <!-- Shopee -->
+        <div class="store-box-item">
+          <div class="store-box-header">
+            <div class="store-box-title">
+              <span class="store-tag-badge bg-shopee">🟠 Shopee Brasil</span>
+              <span class="store-tech-label">GraphQL API Oficial (s.shopee.com.br)</span>
             </div>
             <span class="badge badge-green">API Ativa</span>
           </div>
-
-          <div class="store-body">
-            <div class="form-grid-2">
+          <div class="store-box-content">
+            <div class="form-row-2">
               <div class="form-group">
-                <label for="cfgShopeeAppId">Shopee App ID</label>
-                <input type="text" id="cfgShopeeAppId" value="18378190901" placeholder="18378190901">
+                <label>Shopee App ID</label>
+                <input type="text" id="cfgShopeeAppId" value="18378190901">
               </div>
               <div class="form-group">
-                <label for="cfgShopeeAppSecret">Shopee App Secret</label>
-                <input type="password" id="cfgShopeeAppSecret" value="ITHJMNNGTV4JOSEZLT27UZ3TY7ICCC6L" placeholder="Secret Key">
+                <label>Shopee App Secret</label>
+                <input type="password" id="cfgShopeeAppSecret" value="ITHJMNNGTV4JOSEZLT27UZ3TY7ICCC6L">
               </div>
             </div>
           </div>
         </div>
 
-        <!-- 3. Amazon -->
-        <div class="store-card store-amazon">
-          <div class="store-header">
-            <div class="store-title-wrap">
-              <span class="store-badge-icon">📦</span>
-              <div>
-                <h4>Amazon Brasil</h4>
-                <span class="store-type">SiteStripe API Oficial (link.amazon)</span>
-              </div>
+        <!-- Amazon -->
+        <div class="store-box-item">
+          <div class="store-box-header">
+            <div class="store-box-title">
+              <span class="store-tag-badge bg-amazon">📦 Amazon Brasil</span>
+              <span class="store-tech-label">SiteStripe API Oficial (link.amazon)</span>
             </div>
             <span class="badge badge-green">SiteStripe Ativo</span>
           </div>
-
-          <div class="store-body">
+          <div class="store-box-content">
             <div class="form-group">
-              <label for="cfgAmazonTag">Tag de Associado Amazon</label>
-              <input type="text" id="cfgAmazonTag" value="ibanez08-20" placeholder="ibanez08-20">
+              <label>Tag de Associado Amazon</label>
+              <input type="text" id="cfgAmazonTag" value="ibanez08-20">
             </div>
           </div>
         </div>
 
-        <!-- 4. Magazine Luiza -->
-        <div class="store-card store-magalu">
-          <div class="store-header">
-            <div class="store-title-wrap">
-              <span class="store-badge-icon">🔵</span>
-              <div>
-                <h4>Magazine Luiza</h4>
-                <span class="store-type">Parceiro Magalu / Magazine Você</span>
-              </div>
+        <!-- Magazine Luiza -->
+        <div class="store-box-item">
+          <div class="store-box-header">
+            <div class="store-box-title">
+              <span class="store-tag-badge bg-magalu">🔵 Magazine Luiza</span>
+              <span class="store-tech-label">Parceiro Magalu / Magazine Você</span>
             </div>
             <span class="badge badge-green">Loja Ativa</span>
           </div>
-
-          <div class="store-body">
+          <div class="store-box-content">
             <div class="form-group">
-              <label for="cfgMagaluTag">Nome da Loja Magazine Você</label>
-              <input type="text" id="cfgMagaluTag" value="magazineibanez01" placeholder="magazineibanez01">
+              <label>Nome da Loja Magazine Você</label>
+              <input type="text" id="cfgMagaluTag" value="magazineibanez01">
             </div>
           </div>
         </div>
 
-        <!-- 5. AliExpress -->
-        <div class="store-card store-ali">
-          <div class="store-header">
-            <div class="store-title-wrap">
-              <span class="store-badge-icon">🔴</span>
-              <div>
-                <h4>AliExpress</h4>
-                <span class="store-type">Open Platform API (s.click.aliexpress.com)</span>
-              </div>
+        <!-- AliExpress -->
+        <div class="store-box-item">
+          <div class="store-box-header">
+            <div class="store-box-title">
+              <span class="store-tag-badge bg-ali">🔴 AliExpress</span>
+              <span class="store-tech-label">Open Platform API (s.click.aliexpress.com)</span>
             </div>
             <span class="badge badge-green">API Ativa</span>
           </div>
-
-          <div class="store-body">
-            <div class="form-grid-3">
+          <div class="store-box-content">
+            <div class="form-row-3">
               <div class="form-group">
-                <label for="cfgAliAppKey">App Key</label>
+                <label>App Key</label>
                 <input type="text" id="cfgAliAppKey" value="544386">
               </div>
               <div class="form-group">
-                <label for="cfgAliTrackingId">Tracking ID</label>
+                <label>Tracking ID</label>
                 <input type="text" id="cfgAliTrackingId" value="ibanez">
               </div>
               <div class="form-group">
-                <label for="cfgAliAppSecret">App Secret</label>
+                <label>App Secret</label>
                 <input type="password" id="cfgAliAppSecret" value="g7NPfxfXQIYYvCHFfTd7VTgRDKgBbYDz">
               </div>
             </div>
@@ -546,105 +539,408 @@
         </div>
 
       </div>
-    </section>
 
-    <!-- TAB 5: TESTADOR DE LINKS -->
-    <section class="tab-content" id="tab-tester">
-      <div class="card">
-        <div class="card-head">
-          <div class="card-title-group">
-            <span class="card-emoji">🔗</span>
-            <div>
-              <h3>Testador Instantâneo de Afiliados</h3>
-              <p class="card-subtitle">Cole qualquer link ou texto com oferta para verificar a conversão e geração do link oficial</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="card-body">
-          <div class="form-group">
-            <label for="testAffInput">Link ou Mensagem de Teste</label>
-            <textarea id="testAffInput" rows="3" placeholder="Cole uma mensagem ou URL (ex: https://produto.mercadolivre.com.br/MLB-6233177660...)"></textarea>
-          </div>
-
-          <button class="btn btn-primary" id="btnTestAffiliate">
-            <span>⚡ Testar Conversão de Link</span>
-          </button>
-
-          <div id="affTestResultBox" class="aff-result-box hidden">
-            <!-- Dynamically populated -->
-          </div>
-        </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close>Cancelar</button>
+        <button class="btn btn-primary" id="btnSaveConfig">💾 Salvar Configurações</button>
       </div>
-    </section>
+    </div>
+  </div>
 
-    <!-- TAB 6: SIMULADOR -->
-    <section class="tab-content" id="tab-simulator">
-      <div class="card">
-        <div class="card-head">
-          <div class="card-title-group">
-            <span class="card-emoji">🧪</span>
-            <div>
-              <h3>Simulador de Envio para o WhatsApp</h3>
-              <p class="card-subtitle">Dispare uma oferta de teste completa para o seu canal para verificar formatação e imagem</p>
+  <!-- MODAL: WHATSAPP CONNECTION (Baileys) -->
+  <div class="modal-overlay" id="modal-whatsapp">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <i data-lucide="smartphone" class="modal-title-icon"></i>
+          <div>
+            <h3>Conexão WhatsApp (Baileys)</h3>
+            <p>Conecte o bot ao seu WhatsApp para envio nos canais</p>
+          </div>
+        </div>
+        <button class="btn-close-modal" data-close>&times;</button>
+      </div>
+
+      <div class="modal-body text-center">
+        
+        <div id="waBadge" class="badge badge-gray" style="margin-bottom: 1rem; display: inline-block;">Desconectado</div>
+
+        <!-- QR Section -->
+        <div id="waQrSection" class="qr-container">
+          <div class="qr-card-box">
+            <div class="qr-placeholder" id="waQrPlaceholder">
+              <div class="spinner"></div>
+              <p>Gerando QR Code...</p>
             </div>
+            <img id="waQrImg" alt="QR Code WhatsApp" class="qr-img hidden">
+          </div>
+          <p class="qr-info-text">
+            Abra o WhatsApp no celular ➔ <strong>Aparelhos conectados</strong> ➔ <strong>Conectar um aparelho</strong> e aponte a câmera para o QR Code acima.
+          </p>
+          <button class="btn btn-secondary btn-sm" id="btnWaReconnect">🔄 Gerar Novo QR Code</button>
+        </div>
+
+        <!-- Connected Section -->
+        <div id="waConnectedSection" class="connected-banner hidden">
+          <div class="connected-icon">✅</div>
+          <h4>WhatsApp Conectado com Sucesso!</h4>
+          <p>Bot autenticado. Notificações no celular preservadas sem aparecer online 24h.</p>
+          <button class="btn btn-danger btn-sm" id="btnWaDisconnect" style="margin-top: 1rem;">Desconectar WhatsApp</button>
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-primary" data-close>OK, Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: TELEGRAM CONNECTION (GramJS) -->
+  <div class="modal-overlay" id="modal-telegram">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <i data-lucide="send" class="modal-title-icon"></i>
+          <div>
+            <h3>Origem Telegram (GramJS)</h3>
+            <p>Sessão MTProto para escuta de canais de ofertas em tempo real</p>
+          </div>
+        </div>
+        <button class="btn-close-modal" data-close>&times;</button>
+      </div>
+
+      <div class="modal-body">
+        
+        <div id="tgBadge" class="badge badge-gray" style="margin-bottom: 1rem; display: inline-block;">Desconectado</div>
+
+        <!-- Auth Form -->
+        <div id="tgAuthForm">
+          <div class="form-group">
+            <label>API ID <a href="https://my.telegram.org" target="_blank" class="link-hint">(my.telegram.org)</a></label>
+            <input type="number" id="tgApiId" placeholder="Ex: 35512013">
+          </div>
+          <div class="form-group">
+            <label>API Hash</label>
+            <input type="text" id="tgApiHash" placeholder="Ex: cff50e9f4c36f15d799a5768799016ff">
+          </div>
+          <div class="form-group">
+            <label>Telefone com DDI + DDD</label>
+            <input type="text" id="tgPhone" placeholder="+5511999999999">
+          </div>
+          <button class="btn btn-primary btn-block" id="btnTgSendCode">Enviar Código de Login</button>
+        </div>
+
+        <!-- Code Form -->
+        <div id="tgCodeStep" class="hidden">
+          <div class="info-box">Código enviado para o seu aplicativo Telegram.</div>
+          <div class="form-group">
+            <label>Código de Verificação</label>
+            <input type="text" id="tgCode" placeholder="Ex: 12345">
+          </div>
+          <div class="btn-group">
+            <button class="btn btn-success" id="btnTgVerifyCode">Confirmar Código</button>
+            <button class="btn btn-secondary" id="btnTgCancelCode">Voltar</button>
           </div>
         </div>
 
-        <div class="card-body">
+        <!-- 2FA Form -->
+        <div id="tg2FaStep" class="hidden">
+          <div class="warning-box">Conta protegida por Senha de Nuvem (2FA).</div>
           <div class="form-group">
-            <label for="simText">Texto da Oferta de Teste</label>
-            <textarea id="simText" rows="4">🔥 [OFERTA TESTE] Fone de Ouvido Bluetooth TWS Pro
+            <label>Senha 2FA</label>
+            <input type="password" id="tg2FaPass" placeholder="Sua senha de nuvem">
+          </div>
+          <button class="btn btn-success btn-block" id="btnTgSubmit2Fa">Autenticar 2FA</button>
+        </div>
+
+        <!-- Connected Step -->
+        <div id="tgConnectedStep" class="connected-banner hidden">
+          <div class="connected-icon">✅</div>
+          <h4>Telegram Conectado e Operando!</h4>
+          <p>Monitorando mensagens e mídias dos canais cadastrados.</p>
+          <button class="btn btn-danger btn-sm" id="btnTgLogout" style="margin-top: 1rem;">Desconectar Sessão</button>
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close>Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CANAIS & DESTINOS -->
+  <div class="modal-overlay" id="modal-channels">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <i data-lucide="radio" class="modal-title-icon"></i>
+          <div>
+            <h3>Canais & Destinos</h3>
+            <p>Defina a origem das ofertas e o canal de envio no WhatsApp</p>
+          </div>
+        </div>
+        <button class="btn-close-modal" data-close>&times;</button>
+      </div>
+
+      <div class="modal-body">
+        
+        <div class="form-group">
+          <label>
+            Canais de Origem (Telegram / WhatsApp)
+            <span class="hint">Separados por vírgula</span>
+          </label>
+          <textarea id="cfgSourceChannel" rows="3" placeholder="https://t.me/PortalDOSsachadinhos, @economizandocomjp, @promos_tech1"></textarea>
+          <span class="field-help">💡 O bot monitora todas as mensagens, fotos e promoções postadas nesses canais.</span>
+        </div>
+
+        <div class="form-group" style="margin-top: 1rem;">
+          <label>
+            Canal de Destino (WhatsApp)
+            <span class="hint">Link do canal ou JID @newsletter</span>
+          </label>
+          <input type="text" id="cfgDestJid" placeholder="https://whatsapp.com/channel/0029Vb... ou 120363...@newsletter">
+          <div id="resolvedJidBadge" class="resolved-badge hidden"></div>
+
+          <div class="group-select-row" style="margin-top: 0.75rem; display: flex; gap: 0.5rem;">
+            <button class="btn btn-secondary btn-sm" id="btnLoadChats" type="button">📢 Listar Meus Canais</button>
+            <select id="chatSelectDropdown" class="chat-select hidden" style="flex: 1;">
+              <option value="">-- Selecione um Canal do WhatsApp --</option>
+            </select>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close>Cancelar</button>
+        <button class="btn btn-primary" id="btnSaveConfigRouting">💾 Salvar Roteamento</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: DISPARO MANUAL / SIMULADOR -->
+  <div class="modal-overlay" id="modal-simulation">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <i data-lucide="send" class="modal-title-icon"></i>
+          <div>
+            <h3>Disparo Manual & Simulador</h3>
+            <p>Teste o envio de uma oferta diretamente para seu canal do WhatsApp</p>
+          </div>
+        </div>
+        <button class="btn-close-modal" data-close>&times;</button>
+      </div>
+
+      <div class="modal-body">
+        
+        <div class="form-group">
+          <label>Texto da Oferta</label>
+          <textarea id="simText" rows="4">🔥 [OFERTA TESTE] Fone de Ouvido Bluetooth TWS Pro
 💰 Por apenas R$ 79,90 com Frete Grátis!
 👉 Compre aqui: https://produto.mercadolivre.com.br/MLB-6233177660-_JM</textarea>
-          </div>
+        </div>
 
-          <div class="form-group">
-            <label for="simImage">URL da Imagem (Opcional)</label>
-            <input type="text" id="simImage" value="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500">
-          </div>
+        <div class="form-group">
+          <label>URL da Imagem (Opcional)</label>
+          <input type="text" id="simImage" value="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500">
+        </div>
 
-          <button class="btn btn-primary" id="btnSimulate">
-            <span>🚀 Disparar Oferta de Teste no WhatsApp</span>
-          </button>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close>Fechar</button>
+        <button class="btn btn-primary" id="btnSimulate">🚀 Disparar Oferta no WhatsApp</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: MONITORAMENTO & TERMINAL DE LOGS -->
+  <div class="modal-overlay" id="modal-monitoring">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <i data-lucide="activity" class="modal-title-icon"></i>
+          <div>
+            <h3>Monitoramento & Logs em Tempo Real</h3>
+            <p>Console de eventos e atividades do bot</p>
+          </div>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <label style="font-size: 0.8rem; display: flex; align-items: center; gap: 0.25rem;">
+            <input type="checkbox" id="autoScrollCheck" checked> Auto-rolar
+          </label>
+          <button class="btn btn-secondary btn-sm" id="btnClearLogs">🗑️ Limpar</button>
+          <button class="btn-close-modal" data-close>&times;</button>
         </div>
       </div>
-    </section>
 
-    <!-- TAB 7: TERMINAL & LOGS -->
-    <section class="tab-content" id="tab-logs">
-      <div class="card logs-card">
-        <div class="card-head">
-          <div class="card-title-group">
-            <span class="card-emoji">📜</span>
-            <div>
-              <h3>Terminal de Logs do Sistema em Tempo Real</h3>
-              <p class="card-subtitle">Monitoramento contínuo das ações, resoluções de links e repasses</p>
-            </div>
-          </div>
-          <div class="log-controls">
-            <label class="autoscroll-label">
-              <input type="checkbox" id="autoScrollCheck" checked> Auto-rolar
-            </label>
-            <button class="btn btn-secondary btn-sm" id="btnClearLogs" title="Limpar Logs">🗑️ Limpar</button>
-          </div>
-        </div>
-
-        <div class="terminal-body" id="logTerminal">
+      <div class="modal-body" style="padding: 0;">
+        <div class="terminal-container" id="logTerminal">
           <div class="log-entry system info">
             <span class="log-time">[--:--:--]</span>
             <span class="log-tag">[SYSTEM]</span>
-            <span class="log-msg">Iniciando console de monitoramento...</span>
+            <span class="log-msg">Console de monitoramento iniciado.</span>
           </div>
         </div>
       </div>
-    </section>
 
+      <div class="modal-footer">
+        <button class="btn btn-primary" data-close>Fechar Terminal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: GERADOR DE LINK / TESTADOR -->
+  <div class="modal-overlay" id="modal-link-generator">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <i data-lucide="link" class="modal-title-icon"></i>
+          <div>
+            <h3>Gerador & Testador de Links de Afiliado</h3>
+            <p>Cole qualquer URL para converter instantaneamente com sua tag</p>
+          </div>
+        </div>
+        <button class="btn-close-modal" data-close>&times;</button>
+      </div>
+
+      <div class="modal-body">
+        
+        <div class="form-group">
+          <label>Link ou Texto com Promoção</label>
+          <textarea id="testAffInput" rows="3" placeholder="Cole o link de Mercado Livre, Shopee, Amazon, Magalu ou AliExpress..."></textarea>
+        </div>
+
+        <button class="btn btn-primary btn-block" id="btnTestAffiliate">⚡ Testar Conversão de Link</button>
+
+        <div id="affTestResultBox" class="aff-result-box hidden" style="margin-top: 1rem;">
+          <!-- Dynamically filled -->
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close>Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: TUTORIAIS -->
+  <div class="modal-overlay" id="modal-tutorials">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <i data-lucide="book-open" class="modal-title-icon"></i>
+          <div>
+            <h3>Tutoriais & Guia Rápido</h3>
+            <p>Como tirar o máximo proveito do OferDay PRO</p>
+          </div>
+        </div>
+        <button class="btn-close-modal" data-close>&times;</button>
+      </div>
+
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 1rem;">
+        <div class="tutorial-card">
+          <h4>📱 1. Conexão do WhatsApp</h4>
+          <p>Acesse o menu Conexões ➔ WhatsApp (Baileys) e escaneie o QR Code. O bot mantém sua sessão conectada sem roubar as notificações no celular.</p>
+        </div>
+        <div class="tutorial-card">
+          <h4>📡 2. Adicionando Canais de Origem</h4>
+          <p>Em Configurar Envios ➔ Canais & Destinos, coloque os links ou @nomes dos canais de promoções que você deseja copiar automaticamente.</p>
+        </div>
+        <div class="tutorial-card">
+          <h4>🛒 3. Configurando suas Lojas</h4>
+          <p>Em Configurar Lojas, coloque sua tag da Amazon, Magazine Luiza, Shopee e Mercado Livre. O bot substitui os links nos posts em milissegundos.</p>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-primary" data-close>Entendido</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ANTI-MARCA D'ÁGUA -->
+  <div class="modal-overlay" id="modal-watermark">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <i data-lucide="shield-check" class="modal-title-icon"></i>
+          <div>
+            <h3>Anti-Marca d'Água & Limpeza de Concorrência</h3>
+            <p>Remove links de canais concorrentes, bots e arrobas automaticamente</p>
+          </div>
+        </div>
+        <button class="btn-close-modal" data-close>&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="toggle-option-row">
+          <div>
+            <strong>Remover @arrobas de canais concorrentes</strong>
+            <p class="text-muted">Limpa menções no texto da mensagem clonada</p>
+          </div>
+          <span class="badge badge-green">Ativado</span>
+        </div>
+        <div class="toggle-option-row" style="margin-top: 1rem;">
+          <div>
+            <strong>Filtro Anti-Duplicados (4 Horas)</strong>
+            <p class="text-muted">Evita postar a mesma oferta repetida no seu canal</p>
+          </div>
+          <span class="badge badge-green">Ativado</span>
+        </div>
+        <div class="toggle-option-row" style="margin-top: 1rem;">
+          <div>
+            <strong>Limpeza de Links t.me / Moeda Bot</strong>
+            <p class="text-muted">Remove links de bots externos de moedas ou canais</p>
+          </div>
+          <span class="badge badge-green">Ativado</span>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-primary" data-close>Salvar Configurações</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: DIVULGADOR / ACHADINHOS / FILAS / PRODUTOS -->
+  <div class="modal-overlay" id="modal-generic-info">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <i data-lucide="sparkles" class="modal-title-icon"></i>
+          <div>
+            <h3 id="genericModalTitle">Módulo OferDay</h3>
+            <p id="genericModalSub">Gerenciamento automático</p>
+          </div>
+        </div>
+        <button class="btn-close-modal" data-close>&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <p id="genericModalBody">Recurso pronto para uso com automação em tempo real.</p>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-primary" data-close>Fechar</button>
+      </div>
+    </div>
   </div>
 
   <!-- Toast Notification System -->
   <div id="toast" class="toast hidden"></div>
 
+  <!-- Scripts -->
   <script src="app.js"></script>
+  <script>
+    // Initialize Lucide icons
+    if (window.lucide) {
+      lucide.createIcons();
+    }
+  </script>
 </body>
 </html>

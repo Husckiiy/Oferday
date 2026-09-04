@@ -1,4 +1,8 @@
-// State
+// ==========================================================================
+// OferDay PRO EDITION - Client-side Dashboard Application Controller
+// ==========================================================================
+
+// Global App State
 let appState = {
   config: null,
   telegram: null,
@@ -7,22 +11,111 @@ let appState = {
   autoScroll: true
 };
 
-// --- Tab Switching Navigation ---
-document.querySelectorAll('.nav-tab').forEach((tabBtn) => {
-  tabBtn.addEventListener('click', () => {
-    document.querySelectorAll('.nav-tab').forEach((t) => t.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach((c) => c.classList.remove('active'));
+// --- Modal Management System ---
+function openModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    modal.classList.add('active');
+  }
+}
 
-    tabBtn.classList.add('active');
-    const targetId = tabBtn.getAttribute('data-tab');
-    const targetEl = document.getElementById(targetId);
-    if (targetEl) {
-      targetEl.classList.add('active');
+function closeModal(modalEl) {
+  if (modalEl) {
+    modalEl.classList.remove('active');
+  }
+}
+
+function closeAllModals() {
+  document.querySelectorAll('.modal-overlay').forEach((m) => m.classList.remove('active'));
+}
+
+// Bind modal trigger buttons
+document.addEventListener('click', (e) => {
+  const targetBtn = e.target.closest('[data-modal]');
+  if (targetBtn) {
+    e.preventDefault();
+    const modalId = targetBtn.getAttribute('data-modal');
+    if (modalId) openModal(modalId);
+    return;
+  }
+
+  const closeBtn = e.target.closest('[data-close]');
+  if (closeBtn) {
+    e.preventDefault();
+    const modal = closeBtn.closest('.modal-overlay');
+    closeModal(modal);
+    return;
+  }
+
+  // Backdrop click
+  if (e.target.classList.contains('modal-overlay')) {
+    closeModal(e.target);
+  }
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeAllModals();
+  }
+});
+
+// --- Collapsible Sidebar Groups ---
+document.querySelectorAll('.nav-group-header').forEach((header) => {
+  header.addEventListener('click', () => {
+    const parentGroup = header.closest('.nav-group');
+    if (parentGroup) {
+      parentGroup.classList.toggle('open');
     }
   });
 });
 
-// DOM Elements
+// --- Theme Switcher (Light / Dark) ---
+const btnThemeLight = document.getElementById('btnThemeLight');
+const btnThemeDark = document.getElementById('btnThemeDark');
+
+btnThemeLight?.addEventListener('click', () => {
+  document.body.classList.remove('theme-dark');
+  document.body.classList.add('theme-light');
+  btnThemeLight.classList.add('active');
+  btnThemeDark.classList.remove('active');
+  localStorage.setItem('oferday_theme', 'light');
+});
+
+btnThemeDark?.addEventListener('click', () => {
+  document.body.classList.remove('theme-light');
+  document.body.classList.add('theme-dark');
+  btnThemeDark.classList.add('active');
+  btnThemeLight.classList.remove('active');
+  localStorage.setItem('oferday_theme', 'dark');
+});
+
+// Restore saved theme
+const savedTheme = localStorage.getItem('oferday_theme');
+if (savedTheme === 'dark') {
+  btnThemeDark?.click();
+}
+
+// --- Mobile Sidebar Toggle ---
+const btnToggleMobileMenu = document.getElementById('btnToggleMobileMenu');
+btnToggleMobileMenu?.addEventListener('click', () => {
+  document.querySelector('.sidebar')?.classList.toggle('mobile-open');
+});
+
+// --- Toast Notification ---
+const toastEl = document.getElementById('toast');
+function showToast(message, type = 'info') {
+  if (!toastEl) return;
+  toastEl.textContent = message;
+  toastEl.className = `toast ${type}`;
+  toastEl.classList.remove('hidden');
+  setTimeout(() => {
+    toastEl.classList.add('hidden');
+  }, 4000);
+}
+
+// --- DOM References ---
+// Telegram
 const tgBadge = document.getElementById('tgBadge');
 const tgAuthForm = document.getElementById('tgAuthForm');
 const tgCodeStep = document.getElementById('tgCodeStep');
@@ -33,13 +126,13 @@ const tgApiHash = document.getElementById('tgApiHash');
 const tgPhone = document.getElementById('tgPhone');
 const tgCode = document.getElementById('tgCode');
 const tg2FaPass = document.getElementById('tg2FaPass');
-
 const btnTgSendCode = document.getElementById('btnTgSendCode');
 const btnTgVerifyCode = document.getElementById('btnTgVerifyCode');
 const btnTgCancelCode = document.getElementById('btnTgCancelCode');
 const btnTgSubmit2Fa = document.getElementById('btnTgSubmit2Fa');
 const btnTgLogout = document.getElementById('btnTgLogout');
 
+// WhatsApp
 const waBadge = document.getElementById('waBadge');
 const waQrSection = document.getElementById('waQrSection');
 const waConnectedSection = document.getElementById('waConnectedSection');
@@ -48,56 +141,56 @@ const waQrPlaceholder = document.getElementById('waQrPlaceholder');
 const btnWaReconnect = document.getElementById('btnWaReconnect');
 const btnWaDisconnect = document.getElementById('btnWaDisconnect');
 
-const forwarderActiveSwitch = document.getElementById('forwarderActiveSwitch');
-const forwarderStatusLabel = document.getElementById('forwarderStatusLabel');
+// Sidebar Status Indicators
+const sidebarWaDot = document.getElementById('sidebarWaDot');
+const sidebarWaBadge = document.getElementById('sidebarWaBadge');
+const sidebarTgDot = document.getElementById('sidebarTgDot');
+const sidebarTgBadge = document.getElementById('sidebarTgBadge');
+
+// Top Metric Cards
+const cardWaStatusText = document.getElementById('cardWaStatusText');
+const cardWaSubLink = document.getElementById('cardWaSubLink');
+const cardWaActionText = document.getElementById('cardWaActionText');
+const cardMonitoredCount = document.getElementById('cardMonitoredCount');
+const cardDestChannelName = document.getElementById('cardDestChannelName');
+const cardAffiliatesCount = document.getElementById('cardAffiliatesCount');
+
+// Checklist Steps
+const chkStep1 = document.getElementById('chkStep1');
+const chkStep2 = document.getElementById('chkStep2');
+const chkStep3 = document.getElementById('chkStep3');
+const chkStep4 = document.getElementById('chkStep4');
+
+// Config & Inputs
 const cfgSourceChannel = document.getElementById('cfgSourceChannel');
 const cfgDestJid = document.getElementById('cfgDestJid');
+const forwarderActiveSwitch = document.getElementById('forwarderActiveSwitch');
+const forwarderStatusLabel = document.getElementById('forwarderStatusLabel');
 const btnSaveConfig = document.getElementById('btnSaveConfig');
 const btnSaveConfigRouting = document.getElementById('btnSaveConfigRouting');
 
-// Navbar Status Pills DOM
-const pillTgText = document.getElementById('pillTgText');
-const pillWaText = document.getElementById('pillWaText');
-const pillMeliText = document.getElementById('pillMeliText');
-const pillTelegram = document.getElementById('pillTelegram');
-const pillWhatsApp = document.getElementById('pillWhatsApp');
-
-// Pipeline DOM
-const nodeTelegram = document.getElementById('nodeTelegram');
-const nodeProcessor = document.getElementById('nodeProcessor');
-const nodeWhatsApp = document.getElementById('nodeWhatsApp');
-const pipeTgChannel = document.getElementById('pipeTgChannel');
-const pipeTgBadge = document.getElementById('pipeTgBadge');
-const pipeProcessorStatus = document.getElementById('pipeProcessorStatus');
-const pipeProcessorBadge = document.getElementById('pipeProcessorBadge');
-const pipeWaDest = document.getElementById('pipeWaDest');
-const pipeWaBadge = document.getElementById('pipeWaBadge');
-
-// Feed DOM
+// Feed
 const feedContainer = document.getElementById('feedContainer');
-const emptyFeedMsg = document.getElementById('emptyFeedMsg');
-const feedCountBadge = document.getElementById('feedCountBadge');
 
-// Simulator DOM
+// Simulator
 const simText = document.getElementById('simText');
 const simImage = document.getElementById('simImage');
 const btnSimulate = document.getElementById('btnSimulate');
 
-// Terminal DOM
+// Terminal & Logs
 const logTerminal = document.getElementById('logTerminal');
 const autoScrollCheck = document.getElementById('autoScrollCheck');
 const btnClearLogs = document.getElementById('btnClearLogs');
-const toastEl = document.getElementById('toast');
 
-// --- Toast Notification ---
-function showToast(message, type = 'info') {
-  toastEl.textContent = message;
-  toastEl.className = `toast ${type}`;
-  toastEl.classList.remove('hidden');
-  setTimeout(() => {
-    toastEl.classList.add('hidden');
-  }, 4000);
-}
+// WhatsApp Channel Resolver
+const btnLoadChats = document.getElementById('btnLoadChats');
+const chatSelectDropdown = document.getElementById('chatSelectDropdown');
+const resolvedJidBadge = document.getElementById('resolvedJidBadge');
+
+// Meli Tokens
+const meliTokenBadge = document.getElementById('meliTokenBadge');
+const meliTokenExpireInfo = document.getElementById('meliTokenExpireInfo');
+const btnRefreshMeliToken = document.getElementById('btnRefreshMeliToken');
 
 // --- SSE Setup ---
 function setupSSE() {
@@ -110,12 +203,12 @@ function setupSSE() {
     updateTelegramUI(data.telegram);
     updateWhatsAppUI(data.whatsapp);
     
-    if (data.logs) {
+    if (data.logs && logTerminal) {
       logTerminal.innerHTML = '';
       data.logs.forEach(appendLog);
     }
 
-    if (data.feed) {
+    if (data.feed && data.feed.length > 0) {
       appState.feed = data.feed;
       renderFeed(data.feed);
     }
@@ -127,7 +220,7 @@ function setupSSE() {
   });
 
   eventSource.addEventListener('logs_cleared', () => {
-    logTerminal.innerHTML = '';
+    if (logTerminal) logTerminal.innerHTML = '';
   });
 
   eventSource.addEventListener('whatsapp_qr', (e) => {
@@ -156,7 +249,6 @@ function setupSSE() {
   eventSource.addEventListener('new_forwarded_message', (e) => {
     const item = JSON.parse(e.data);
     addFeedItemUI(item, true);
-    triggerPulseAnimation();
   });
 
   eventSource.addEventListener('message_updated', (e) => {
@@ -169,32 +261,23 @@ function setupSSE() {
   };
 }
 
-// --- Trigger Visual Pulse when Message arrives ---
-function triggerPulseAnimation() {
-  nodeProcessor.classList.add('active');
-  pipeProcessorStatus.textContent = '⚡ Repassando mensagem...';
-  setTimeout(() => {
-    nodeProcessor.classList.remove('active');
-    pipeProcessorStatus.textContent = 'Monitorando 24h';
-  }, 2500);
-}
-
-// --- Log Rendering ---
+// --- Terminal Log Rendering ---
 function appendLog(entry) {
+  if (!logTerminal) return;
   const logDiv = document.createElement('div');
-  logDiv.className = `log-entry ${entry.module.toLowerCase()} ${entry.level}`;
+  logDiv.className = `log-entry ${entry.module?.toLowerCase() || 'system'} ${entry.level || 'info'}`;
   
   const timeSpan = document.createElement('span');
   timeSpan.className = 'log-time';
-  timeSpan.textContent = `[${entry.timestamp}]`;
+  timeSpan.textContent = `[${entry.timestamp || '--:--:--'}]`;
 
   const tagSpan = document.createElement('span');
   tagSpan.className = 'log-tag';
-  tagSpan.textContent = `[${entry.module}]`;
+  tagSpan.textContent = `[${entry.module || 'SYS'}]`;
 
   const msgSpan = document.createElement('span');
   msgSpan.className = 'log-msg';
-  msgSpan.textContent = entry.message;
+  msgSpan.textContent = entry.message || '';
 
   logDiv.appendChild(timeSpan);
   logDiv.appendChild(tagSpan);
@@ -208,51 +291,72 @@ function appendLog(entry) {
 }
 
 // --- Feed UI Rendering ---
+function detectStore(text) {
+  if (!text) return 'OFERTA';
+  const t = text.toLowerCase();
+  if (t.includes('mercadolivre') || t.includes('meli.la') || t.includes('mercado livre')) return 'MERCADO LIVRE';
+  if (t.includes('amazon.com') || t.includes('amzn.to')) return 'AMAZON';
+  if (t.includes('shopee.com') || t.includes('s.shopee')) return 'SHOPEE';
+  if (t.includes('magazineluiza') || t.includes('magazinevoce') || t.includes('magalu')) return 'MAGAZINE LUIZA';
+  if (t.includes('aliexpress') || t.includes('s.click.aliexpress')) return 'ALIEXPRESS';
+  return 'OFERTA PROMO';
+}
+
+function getStoreClass(store) {
+  if (store.includes('MERCADO')) return 'store-meli';
+  if (store.includes('AMAZON')) return 'store-amazon';
+  if (store.includes('SHOPEE')) return 'store-shopee';
+  return 'store-meli';
+}
+
+function extractTitleAndSnippet(text) {
+  if (!text) return { title: 'Nova Oferta Repassada', snippet: '' };
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  const title = lines[0] || 'Oferta Repassada';
+  const snippet = lines.slice(1).join(' ') || text;
+  return { title, snippet };
+}
+
 function renderFeed(items) {
+  if (!feedContainer) return;
   feedContainer.innerHTML = '';
-  if (!items || items.length === 0) {
-    feedContainer.appendChild(emptyFeedMsg);
-    feedCountBadge.textContent = '0 itens';
-    return;
-  }
-  feedCountBadge.textContent = `${items.length} itens`;
-  items.forEach((item) => addFeedItemUI(item, false));
+  if (!items || items.length === 0) return;
+  items.slice(0, 15).forEach((item) => addFeedItemUI(item, false));
 }
 
 function addFeedItemUI(item, prepend = true) {
-  emptyFeedMsg.remove();
+  if (!feedContainer) return;
+
+  // Remove mock items if any
+  const mock1 = document.getElementById('mockOffer1');
+  const mock2 = document.getElementById('mockOffer2');
+  const mock3 = document.getElementById('mockOffer3');
+  if (mock1) mock1.remove();
+  if (mock2) mock2.remove();
+  if (mock3) mock3.remove();
 
   const itemEl = document.createElement('div');
-  itemEl.className = 'feed-item';
+  itemEl.className = 'offer-item-card';
   itemEl.id = `feed-${item.id}`;
 
-  let mediaHtml = '';
-  if (item.mediaBase64) {
-    mediaHtml = `<img src="${item.mediaBase64}" class="feed-thumb" alt="Thumbnail">`;
-  } else {
-    mediaHtml = `<div class="feed-no-thumb">📝</div>`;
-  }
-
-  const statusLabel = {
-    success: 'Entregue no WhatsApp',
-    failed: `Falhou: ${item.error || 'Erro'}`,
-    pending: 'Enviando...'
-  }[item.status] || item.status;
-
-  const statusClass = item.status;
+  const store = detectStore(item.text);
+  const storeClass = getStoreClass(store);
+  const { title, snippet } = extractTitleAndSnippet(item.text);
+  const originChannel = item.channel || 'Telegram';
+  const destName = cardDestChannelName?.textContent || 'Canal';
 
   itemEl.innerHTML = `
-    ${mediaHtml}
-    <div class="feed-content">
-      <div class="feed-header">
-        <span class="feed-origin">${item.channel || 'Telegram'} #${item.telegramMessageId}</span>
-        <span class="feed-time">${item.timestamp}</span>
+    <div class="offer-header-row">
+      <div class="offer-store-and-origin">
+        <span class="store-pill ${storeClass}">${escapeHtml(store)}</span>
+        <span class="offer-origin">de ${escapeHtml(originChannel)} • ${escapeHtml(item.timestamp || 'Agora mesmo')}</span>
       </div>
-      <div class="feed-text">${escapeHtml(item.text || '[Apenas mídia]')}</div>
-      <div class="feed-footer">
-        <span class="feed-dest">Destino: ${escapeHtml(item.destinationJid)}</span>
-        <span class="feed-status ${statusClass}">${statusLabel}</span>
-      </div>
+      <span class="badge-status-sent" id="status-${item.id}">Disparado ✅</span>
+    </div>
+    <div class="offer-title">${escapeHtml(title)}</div>
+    <div class="offer-snippet">${escapeHtml(snippet)}</div>
+    <div class="offer-footer-row">
+      <span class="offer-dest-tag">Destino: <strong>${escapeHtml(destName)}</strong></span>
     </div>
   `;
 
@@ -261,23 +365,20 @@ function addFeedItemUI(item, prepend = true) {
   } else {
     feedContainer.appendChild(itemEl);
   }
-
-  const count = feedContainer.querySelectorAll('.feed-item').length;
-  feedCountBadge.textContent = `${count} itens`;
 }
 
 function updateFeedItemStatus(item) {
-  const itemEl = document.getElementById(`feed-${item.id}`);
-  if (!itemEl) return;
-
-  const statusEl = itemEl.querySelector('.feed-status');
+  const statusEl = document.getElementById(`status-${item.id}`);
   if (statusEl) {
-    statusEl.className = `feed-status ${item.status}`;
-    statusEl.textContent = {
-      success: 'Entregue no WhatsApp',
-      failed: `Falhou: ${item.error || 'Erro'}`,
-      pending: 'Enviando...'
-    }[item.status] || item.status;
+    if (item.status === 'success') {
+      statusEl.textContent = 'Disparado ✅';
+      statusEl.className = 'badge-status-sent';
+    } else if (item.status === 'failed') {
+      statusEl.textContent = 'Falha ⚠️';
+      statusEl.className = 'status-pill-badge badge-red';
+    } else {
+      statusEl.textContent = 'Enviando...';
+    }
   }
 }
 
@@ -286,15 +387,33 @@ function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// --- Config UI ---
+// --- Config Synchronization & UI Updates ---
 function updateConfigUI(config) {
   if (!config) return;
-  cfgSourceChannel.value = config.telegram.sourceChannel || '';
-  cfgDestJid.value = config.whatsapp.destinationJid || '';
-  
-  if (config.telegram.apiId) tgApiId.value = config.telegram.apiId;
-  if (config.telegram.apiHash) tgApiHash.value = config.telegram.apiHash;
-  if (config.telegram.phoneNumber) tgPhone.value = config.telegram.phoneNumber;
+
+  if (cfgSourceChannel && config.telegram?.sourceChannel) {
+    cfgSourceChannel.value = config.telegram.sourceChannel;
+  }
+  if (cfgDestJid && config.whatsapp?.destinationJid) {
+    cfgDestJid.value = config.whatsapp.destinationJid;
+  }
+
+  // Update channels count metric
+  if (cardMonitoredCount && config.telegram?.sourceChannel) {
+    const channels = config.telegram.sourceChannel.split(',').filter((c) => c.trim().length > 0);
+    cardMonitoredCount.textContent = `${channels.length || 1} canais`;
+  }
+
+  // Update destination channel metric
+  if (cardDestChannelName) {
+    const dest = config.whatsapp?.destinationJid || 'Teste <3';
+    cardDestChannelName.textContent = dest.includes('@') ? dest.split('@')[0] : (dest || 'Teste <3');
+  }
+
+  // Telegram inputs
+  if (config.telegram?.apiId && tgApiId) tgApiId.value = config.telegram.apiId;
+  if (config.telegram?.apiHash && tgApiHash) tgApiHash.value = config.telegram.apiHash;
+  if (config.telegram?.phoneNumber && tgPhone) tgPhone.value = config.telegram.phoneNumber;
 
   // Shopee
   const cfgShopeeAppId = document.getElementById('cfgShopeeAppId');
@@ -330,132 +449,164 @@ function updateConfigUI(config) {
   if (cfgAliAppSecret && config.affiliate?.aliexpressAppSecret) cfgAliAppSecret.value = config.affiliate.aliexpressAppSecret;
   if (cfgAliTrackingId && config.affiliate?.aliexpressTrackingId) cfgAliTrackingId.value = config.affiliate.aliexpressTrackingId;
 
-  forwarderActiveSwitch.checked = !!config.forwarder.active;
-  forwarderStatusLabel.textContent = config.forwarder.active ? 'Repasse: Ativo' : 'Repasse: Pausado';
-
-  pipeTgChannel.textContent = config.telegram.sourceChannel || '@não_configurado';
-  pipeWaDest.textContent = config.whatsapp.destinationJid || 'JID não configurado';
-
-  if (!config.forwarder.active) {
-    pipeProcessorBadge.textContent = 'Pausado';
-    pipeProcessorBadge.className = 'box-badge badge-gray';
-  } else {
-    pipeProcessorBadge.textContent = 'Ativo';
-    pipeProcessorBadge.className = 'box-badge badge-green';
+  // Master Forwarder Switch
+  if (forwarderActiveSwitch) {
+    forwarderActiveSwitch.checked = !!config.forwarder?.active;
+  }
+  if (forwarderStatusLabel) {
+    forwarderStatusLabel.textContent = config.forwarder?.active ? 'Repasse: Ativo' : 'Repasse: Pausado';
   }
 }
 
-// --- Telegram UI ---
+// --- Telegram Status UI ---
 function updateTelegramUI(statusObj) {
   if (!statusObj) return;
   const status = statusObj.status;
 
-  tgAuthForm.classList.add('hidden');
-  tgCodeStep.classList.add('hidden');
-  tg2FaStep.classList.add('hidden');
-  tgConnectedStep.classList.add('hidden');
+  tgAuthForm?.classList.add('hidden');
+  tgCodeStep?.classList.add('hidden');
+  tg2FaStep?.classList.add('hidden');
+  tgConnectedStep?.classList.add('hidden');
 
   if (status === 'connected') {
-    tgBadge.textContent = 'Conectado';
-    tgBadge.className = 'badge badge-green';
-    tgConnectedStep.classList.remove('hidden');
+    if (tgBadge) {
+      tgBadge.textContent = 'Conectado';
+      tgBadge.className = 'badge badge-green';
+    }
+    tgConnectedStep?.classList.remove('hidden');
 
-    pillTgText.textContent = 'Conectado';
-    pillTelegram.querySelector('.dot').className = 'dot dot-green';
-
-    nodeTelegram.classList.add('active');
-    pipeTgBadge.textContent = 'Conectado';
-    pipeTgBadge.className = 'box-badge badge-green';
+    if (sidebarTgDot) sidebarTgDot.className = 'status-dot dot-green';
+    if (sidebarTgBadge) {
+      sidebarTgBadge.textContent = 'Online';
+      sidebarTgBadge.className = 'status-pill-badge badge-green';
+    }
   } else if (status === 'waiting_code') {
-    tgBadge.textContent = 'Aguardando Código';
-    tgBadge.className = 'badge badge-connecting';
-    tgCodeStep.classList.remove('hidden');
+    if (tgBadge) {
+      tgBadge.textContent = 'Aguardando Código';
+      tgBadge.className = 'badge badge-yellow';
+    }
+    tgCodeStep?.classList.remove('hidden');
 
-    pillTgText.textContent = 'Código';
-    pillTelegram.querySelector('.dot').className = 'dot dot-yellow';
-
-    pipeTgBadge.textContent = 'Aguardando Código';
-    pipeTgBadge.className = 'box-badge badge-connecting';
+    if (sidebarTgDot) sidebarTgDot.className = 'status-dot dot-yellow';
+    if (sidebarTgBadge) {
+      sidebarTgBadge.textContent = 'Código';
+      sidebarTgBadge.className = 'status-pill-badge badge-gray';
+    }
   } else if (status === 'waiting_2fa') {
-    tgBadge.textContent = 'Aguardando 2FA';
-    tgBadge.className = 'badge badge-connecting';
-    tg2FaStep.classList.remove('hidden');
+    if (tgBadge) {
+      tgBadge.textContent = 'Aguardando 2FA';
+      tgBadge.className = 'badge badge-yellow';
+    }
+    tg2FaStep?.classList.remove('hidden');
 
-    pillTgText.textContent = '2FA';
-    pillTelegram.querySelector('.dot').className = 'dot dot-yellow';
-
-    pipeTgBadge.textContent = 'Aguardando 2FA';
-    pipeTgBadge.className = 'box-badge badge-connecting';
+    if (sidebarTgDot) sidebarTgDot.className = 'status-dot dot-yellow';
+    if (sidebarTgBadge) {
+      sidebarTgBadge.textContent = '2FA';
+      sidebarTgBadge.className = 'status-pill-badge badge-gray';
+    }
   } else {
-    tgBadge.textContent = 'Desconectado';
-    tgBadge.className = 'badge badge-gray';
-    tgAuthForm.classList.remove('hidden');
+    if (tgBadge) {
+      tgBadge.textContent = 'Desconectado';
+      tgBadge.className = 'badge badge-gray';
+    }
+    tgAuthForm?.classList.remove('hidden');
 
-    pillTgText.textContent = 'Desconectado';
-    pillTelegram.querySelector('.dot').className = 'dot dot-gray';
-
-    nodeTelegram.classList.remove('active');
-    pipeTgBadge.textContent = 'Desconectado';
-    pipeTgBadge.className = 'box-badge badge-gray';
+    if (sidebarTgDot) sidebarTgDot.className = 'status-dot dot-gray';
+    if (sidebarTgBadge) {
+      sidebarTgBadge.textContent = 'Offline';
+      sidebarTgBadge.className = 'status-pill-badge badge-gray';
+    }
   }
 }
 
-// --- WhatsApp UI ---
+// --- WhatsApp Status UI ---
 function updateWhatsAppUI(statusObj) {
   if (!statusObj) return;
   const status = statusObj.status;
 
   if (status === 'connected') {
-    waBadge.textContent = 'Conectado';
-    waBadge.className = 'badge badge-green';
-    waQrSection.classList.add('hidden');
-    waConnectedSection.classList.remove('hidden');
+    if (waBadge) {
+      waBadge.textContent = 'Conectado';
+      waBadge.className = 'badge badge-green';
+    }
+    waQrSection?.classList.add('hidden');
+    waConnectedSection?.classList.remove('hidden');
 
-    pillWaText.textContent = 'Conectado';
-    pillWhatsApp.querySelector('.dot').className = 'dot dot-green';
+    // Sidebar
+    if (sidebarWaDot) sidebarWaDot.className = 'status-dot dot-green';
+    if (sidebarWaBadge) {
+      sidebarWaBadge.textContent = 'Online';
+      sidebarWaBadge.className = 'status-pill-badge badge-green';
+    }
 
-    nodeWhatsApp.classList.add('active');
-    pipeWaBadge.textContent = 'Conectado';
-    pipeWaBadge.className = 'box-badge badge-green';
+    // Metric card
+    if (cardWaStatusText) cardWaStatusText.textContent = 'Conectado';
+    if (cardWaActionText) cardWaActionText.textContent = 'Sessão Ativa';
+    if (cardWaSubLink) {
+      cardWaSubLink.className = 'metric-link text-green';
+      cardWaSubLink.innerHTML = '<span class="status-dot-mini dot-green"></span> <span>Sessão 24h Ativa</span>';
+    }
+
+    // Checklist step 1 completed
+    if (chkStep1) {
+      chkStep1.className = 'step-num-circle check-completed';
+      chkStep1.innerHTML = '✓';
+    }
   } else if (status === 'connecting') {
-    waBadge.textContent = 'Aguardando QR';
-    waBadge.className = 'badge badge-connecting';
-    waQrSection.classList.remove('hidden');
-    waConnectedSection.classList.add('hidden');
+    if (waBadge) {
+      waBadge.textContent = 'Aguardando QR Code';
+      waBadge.className = 'badge badge-yellow';
+    }
+    waQrSection?.classList.remove('hidden');
+    waConnectedSection?.classList.add('hidden');
     if (statusObj.qrCode) {
       renderQr(statusObj.qrCode);
     }
-    pillWaText.textContent = 'QR Code';
-    pillWhatsApp.querySelector('.dot').className = 'dot dot-yellow';
 
-    pipeWaBadge.textContent = 'Aguardando QR';
-    pipeWaBadge.className = 'box-badge badge-connecting';
+    // Sidebar
+    if (sidebarWaDot) sidebarWaDot.className = 'status-dot dot-yellow';
+    if (sidebarWaBadge) {
+      sidebarWaBadge.textContent = 'QR Code';
+      sidebarWaBadge.className = 'status-pill-badge badge-gray';
+    }
+
+    // Metric card
+    if (cardWaStatusText) cardWaStatusText.textContent = 'Aguardando QR';
+    if (cardWaActionText) cardWaActionText.textContent = 'Escanear QR agora';
+    if (cardWaSubLink) cardWaSubLink.className = 'metric-link alert-link';
   } else {
-    waBadge.textContent = 'Desconectado';
-    waBadge.className = 'badge badge-gray';
-    waQrSection.classList.remove('hidden');
-    waConnectedSection.classList.add('hidden');
-    waQrImg.classList.add('hidden');
-    waQrPlaceholder.classList.remove('hidden');
+    if (waBadge) {
+      waBadge.textContent = 'Desconectado';
+      waBadge.className = 'badge badge-gray';
+    }
+    waQrSection?.classList.remove('hidden');
+    waConnectedSection?.classList.add('hidden');
+    waQrImg?.classList.add('hidden');
+    waQrPlaceholder?.classList.remove('hidden');
 
-    pillWaText.textContent = 'Desconectado';
-    pillWhatsApp.querySelector('.dot').className = 'dot dot-gray';
+    // Sidebar
+    if (sidebarWaDot) sidebarWaDot.className = 'status-dot dot-gray';
+    if (sidebarWaBadge) {
+      sidebarWaBadge.textContent = 'Offline';
+      sidebarWaBadge.className = 'status-pill-badge badge-gray';
+    }
 
-    nodeWhatsApp.classList.remove('active');
-    pipeWaBadge.textContent = 'Desconectado';
-    pipeWaBadge.className = 'box-badge badge-gray';
+    // Metric card
+    if (cardWaStatusText) cardWaStatusText.textContent = 'Desconectado';
+    if (cardWaActionText) cardWaActionText.textContent = 'Conectar agora';
+    if (cardWaSubLink) cardWaSubLink.className = 'metric-link alert-link';
   }
 }
 
 function renderQr(dataUrl) {
-  waQrPlaceholder.classList.add('hidden');
-  waQrImg.src = dataUrl;
-  waQrImg.classList.remove('hidden');
+  if (waQrPlaceholder) waQrPlaceholder.classList.add('hidden');
+  if (waQrImg) {
+    waQrImg.src = dataUrl;
+    waQrImg.classList.remove('hidden');
+  }
 }
 
-// --- Event Handlers ---
-
-// Telegram: Send Login Code
+// --- Telegram Action Handlers ---
 btnTgSendCode?.addEventListener('click', async () => {
   const apiId = tgApiId.value.trim();
   const apiHash = tgApiHash.value.trim();
@@ -467,7 +618,7 @@ btnTgSendCode?.addEventListener('click', async () => {
   }
 
   btnTgSendCode.disabled = true;
-  btnTgSendCode.textContent = 'Enviando código...';
+  btnTgSendCode.textContent = 'Enviando...';
 
   try {
     const res = await fetch('/api/telegram/auth/send-code', {
@@ -482,18 +633,17 @@ btnTgSendCode?.addEventListener('click', async () => {
       showToast(`Erro: ${json.error}`, 'error');
     }
   } catch (err) {
-    showToast(`Erro ao enviar código: ${err.message}`, 'error');
+    showToast(`Erro: ${err.message}`, 'error');
   } finally {
     btnTgSendCode.disabled = false;
     btnTgSendCode.textContent = 'Enviar Código de Login';
   }
 });
 
-// Telegram: Verify Code
 btnTgVerifyCode?.addEventListener('click', async () => {
   const code = tgCode.value.trim();
   if (!code) {
-    showToast('Digite o código de verificação recebido.', 'error');
+    showToast('Digite o código recebido.', 'error');
     return;
   }
 
@@ -508,33 +658,27 @@ btnTgVerifyCode?.addEventListener('click', async () => {
     });
     const json = await res.json();
     if (json.success) {
-      if (json.connected) {
-        showToast('Login no Telegram realizado com sucesso!', 'success');
-      }
+      showToast('Telegram conectado com sucesso!', 'success');
     } else {
       showToast(`Erro: ${json.error}`, 'error');
     }
   } catch (err) {
-    showToast(`Erro na validação: ${err.message}`, 'error');
+    showToast(`Erro: ${err.message}`, 'error');
   } finally {
     btnTgVerifyCode.disabled = false;
     btnTgVerifyCode.textContent = 'Confirmar Código';
   }
 });
 
-// Telegram: Cancel Code input
 btnTgCancelCode?.addEventListener('click', () => {
-  tgCodeStep.classList.add('hidden');
-  tgAuthForm.classList.remove('hidden');
-  tgBadge.textContent = 'Desconectado';
-  tgBadge.className = 'badge badge-gray';
+  tgCodeStep?.classList.add('hidden');
+  tgAuthForm?.classList.remove('hidden');
 });
 
-// Telegram: Submit 2FA Password
 btnTgSubmit2Fa?.addEventListener('click', async () => {
   const password = tg2FaPass.value.trim();
   if (!password) {
-    showToast('Digite sua senha de 2 etapas (2FA).', 'error');
+    showToast('Digite sua senha 2FA.', 'error');
     return;
   }
 
@@ -549,7 +693,7 @@ btnTgSubmit2Fa?.addEventListener('click', async () => {
     });
     const json = await res.json();
     if (json.success) {
-      showToast('Autenticação 2FA concluída com sucesso!', 'success');
+      showToast('Autenticação 2FA concluída!', 'success');
     } else {
       showToast(`Erro 2FA: ${json.error}`, 'error');
     }
@@ -561,9 +705,8 @@ btnTgSubmit2Fa?.addEventListener('click', async () => {
   }
 });
 
-// Telegram: Logout
 btnTgLogout?.addEventListener('click', async () => {
-  if (!confirm('Deseja realmente desconectar o Telegram?')) return;
+  if (!confirm('Deseja desconectar o Telegram?')) return;
   try {
     await fetch('/api/telegram/logout', { method: 'POST' });
     showToast('Telegram desconectado.', 'info');
@@ -572,21 +715,20 @@ btnTgLogout?.addEventListener('click', async () => {
   }
 });
 
-// WhatsApp: Reconnect / Regenerate QR
+// --- WhatsApp Action Handlers ---
 btnWaReconnect?.addEventListener('click', async () => {
-  waQrPlaceholder.classList.remove('hidden');
-  waQrImg.classList.add('hidden');
+  waQrPlaceholder?.classList.remove('hidden');
+  waQrImg?.classList.add('hidden');
   try {
     await fetch('/api/whatsapp/connect', { method: 'POST' });
-    showToast('Solicitando novo QR Code...', 'info');
+    showToast('Gerando novo QR Code...', 'info');
   } catch (err) {
     showToast(`Erro: ${err.message}`, 'error');
   }
 });
 
-// WhatsApp: Disconnect
 btnWaDisconnect?.addEventListener('click', async () => {
-  if (!confirm('Deseja realmente desconectar o WhatsApp?')) return;
+  if (!confirm('Deseja desconectar o WhatsApp?')) return;
   try {
     await fetch('/api/whatsapp/disconnect', { method: 'POST' });
     showToast('WhatsApp desconectado.', 'info');
@@ -595,22 +737,16 @@ btnWaDisconnect?.addEventListener('click', async () => {
   }
 });
 
-// WhatsApp Group Picker & Resolver DOM
-const btnLoadChats = document.getElementById('btnLoadChats');
-const chatSelectDropdown = document.getElementById('chatSelectDropdown');
-const resolvedJidBadge = document.getElementById('resolvedJidBadge');
-
-// Load User's WhatsApp Channels (Exclusively Channels)
+// WhatsApp Channel List Loader
 btnLoadChats?.addEventListener('click', async () => {
+  if (!btnLoadChats) return;
   btnLoadChats.disabled = true;
-  btnLoadChats.textContent = 'Buscando canais...';
+  btnLoadChats.textContent = 'Buscando...';
   try {
     const res = await fetch('/api/whatsapp/chats');
     const json = await res.json();
     if (json.success && json.chats && json.chats.length > 0) {
       chatSelectDropdown.innerHTML = '<option value="">-- Selecione um Canal do WhatsApp --</option>';
-
-      // Filter exclusively channels (@newsletter)
       const channels = json.chats.filter((c) => c.type === 'channel' || c.id.endsWith('@newsletter'));
 
       if (channels.length > 0) {
@@ -621,15 +757,15 @@ btnLoadChats?.addEventListener('click', async () => {
           chatSelectDropdown.appendChild(opt);
         });
         chatSelectDropdown.classList.remove('hidden');
-        showToast(`${channels.length} canais do WhatsApp encontrados!`, 'success');
+        showToast(`${channels.length} canais encontrados!`, 'success');
       } else {
-        showToast('Nenhum canal do WhatsApp encontrado na sua conta.', 'warning');
+        showToast('Nenhum canal encontrado na conta.', 'warning');
       }
     } else {
-      showToast('Nenhum canal encontrado. Verifique se o WhatsApp está conectado.', 'warning');
+      showToast('Nenhum canal encontrado. Conecte o WhatsApp primeiro.', 'warning');
     }
   } catch (err) {
-    showToast(`Erro ao carregar lista de canais: ${err.message}`, 'error');
+    showToast(`Erro: ${err.message}`, 'error');
   } finally {
     btnLoadChats.disabled = false;
     btnLoadChats.textContent = '📢 Listar Meus Canais';
@@ -637,46 +773,17 @@ btnLoadChats?.addEventListener('click', async () => {
 });
 
 chatSelectDropdown?.addEventListener('change', () => {
-  if (chatSelectDropdown.value) {
+  if (chatSelectDropdown.value && cfgDestJid) {
     cfgDestJid.value = chatSelectDropdown.value;
     const selectedText = chatSelectDropdown.options[chatSelectDropdown.selectedIndex].text;
-    resolvedJidBadge.textContent = `Destino selecionado: ${selectedText} ➔ JID: ${chatSelectDropdown.value}`;
-    resolvedJidBadge.classList.remove('hidden');
-  }
-});
-
-// Auto-resolve JID on input blur / change
-async function checkAndResolveJid(val) {
-  if (!val || val.length < 5) {
-    resolvedJidBadge.classList.add('hidden');
-    return;
-  }
-  try {
-    const res = await fetch('/api/whatsapp/resolve-jid', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ input: val })
-    });
-    const json = await res.json();
-    if (json.success) {
-      const typeLabel = json.type === 'channel' ? 'Canal Detectado' : json.type === 'group' ? 'Grupo Detectado' : 'Contato';
-      resolvedJidBadge.textContent = `✅ ${typeLabel}: ${json.name || ''} ➔ JID: ${json.jid}`;
+    if (resolvedJidBadge) {
+      resolvedJidBadge.textContent = `Destino: ${selectedText} (${chatSelectDropdown.value})`;
       resolvedJidBadge.classList.remove('hidden');
     }
-  } catch {
-    // ignore
   }
-}
-
-cfgDestJid?.addEventListener('blur', () => {
-  checkAndResolveJid(cfgDestJid.value.trim());
 });
 
-// ML OAuth Tokens DOM
-const meliTokenBadge = document.getElementById('meliTokenBadge');
-const meliTokenExpireInfo = document.getElementById('meliTokenExpireInfo');
-const btnRefreshMeliToken = document.getElementById('btnRefreshMeliToken');
-
+// --- Mercado Livre OAuth Refresh ---
 async function loadMeliTokenStatus() {
   try {
     const res = await fetch('/api/meli/tokens');
@@ -688,20 +795,14 @@ async function loadMeliTokenStatus() {
           meliTokenBadge.textContent = `OAuth Ativo (${Math.floor(st.expiresInMinutes / 60)}h ${st.expiresInMinutes % 60}m)`;
           meliTokenBadge.className = 'badge badge-green';
         }
-        if (meliTokenExpireInfo) meliTokenExpireInfo.textContent = `Expira em: ${st.expiresAtDate} (Renovando 24h automaticamente)`;
-        if (pillMeliText) pillMeliText.textContent = 'Ativo (24h)';
+        if (meliTokenExpireInfo) {
+          meliTokenExpireInfo.textContent = `Expira em: ${st.expiresAtDate} (Renovação automática 24h ativa)`;
+        }
       } else if (st.hasAccessToken && st.isExpired) {
         if (meliTokenBadge) {
           meliTokenBadge.textContent = 'Token Expirado (Renovável)';
-          meliTokenBadge.className = 'badge badge-connecting';
+          meliTokenBadge.className = 'badge badge-yellow';
         }
-        if (meliTokenExpireInfo) meliTokenExpireInfo.textContent = 'Clique em "Renovar Token" para atualizar';
-      } else {
-        if (meliTokenBadge) {
-          meliTokenBadge.textContent = 'Token Ausente';
-          meliTokenBadge.className = 'badge badge-gray';
-        }
-        if (meliTokenExpireInfo) meliTokenExpireInfo.textContent = 'Autorize seu aplicativo para ativar a API';
       }
     }
   } catch {
@@ -719,31 +820,28 @@ btnRefreshMeliToken?.addEventListener('click', async () => {
     const res = await fetch('/api/meli/refresh', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: clientId,
-        client_secret: clientSecret
-      })
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret })
     });
     const json = await res.json();
     if (json.success) {
-      showToast('Token renovado com sucesso via OAuth 2.0!', 'success');
+      showToast('Token renovado com sucesso!', 'success');
       loadMeliTokenStatus();
     } else {
       showToast(`Erro na renovação: ${json.error}`, 'error');
     }
   } catch (err) {
-    showToast(`Erro ao renovar token: ${err.message}`, 'error');
+    showToast(`Erro ao renovar: ${err.message}`, 'error');
   } finally {
     btnRefreshMeliToken.disabled = false;
     btnRefreshMeliToken.textContent = '🔄 Renovar Token Agora';
   }
 });
 
-// Save Config Helper
-async function saveAllConfig(sourceBtn) {
-  const sourceChannel = cfgSourceChannel.value.trim();
-  const destinationJid = cfgDestJid.value.trim();
-  const active = forwarderActiveSwitch.checked;
+// --- Save Configurations ---
+async function saveAllConfig(btn) {
+  const sourceChannel = cfgSourceChannel?.value.trim() || '';
+  const destinationJid = cfgDestJid?.value.trim() || '';
+  const active = forwarderActiveSwitch ? forwarderActiveSwitch.checked : true;
 
   const shopeeAppId = document.getElementById('cfgShopeeAppId')?.value.trim() || '';
   const shopeeAppSecret = document.getElementById('cfgShopeeAppSecret')?.value.trim() || '';
@@ -757,9 +855,9 @@ async function saveAllConfig(sourceBtn) {
   const aliexpressAppSecret = document.getElementById('cfgAliAppSecret')?.value.trim() || '';
   const aliexpressTrackingId = document.getElementById('cfgAliTrackingId')?.value.trim() || '';
 
-  if (sourceBtn) {
-    sourceBtn.disabled = true;
-    sourceBtn.textContent = 'Salvando...';
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Salvando...';
   }
 
   try {
@@ -773,8 +871,7 @@ async function saveAllConfig(sourceBtn) {
       const jsonResolve = await resResolve.json();
       if (jsonResolve.success && jsonResolve.jid) {
         resolvedDest = jsonResolve.jid;
-        cfgDestJid.value = resolvedDest;
-        showToast(`Canal resolvido para: ${jsonResolve.jid}`, 'success');
+        if (cfgDestJid) cfgDestJid.value = resolvedDest;
       }
     }
 
@@ -803,16 +900,17 @@ async function saveAllConfig(sourceBtn) {
     });
     const json = await res.json();
     if (json.success) {
-      showToast('Configurações e tokens salvos com sucesso!', 'success');
+      showToast('Configurações salvas com sucesso!', 'success');
+      closeAllModals();
     } else {
       showToast(`Erro ao salvar: ${json.error}`, 'error');
     }
   } catch (err) {
     showToast(`Erro: ${err.message}`, 'error');
   } finally {
-    if (sourceBtn) {
-      sourceBtn.disabled = false;
-      sourceBtn.innerHTML = '<span>💾 Salvar Configurações</span>';
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '💾 Salvar Configurações';
     }
   }
 }
@@ -820,20 +918,54 @@ async function saveAllConfig(sourceBtn) {
 btnSaveConfig?.addEventListener('click', () => saveAllConfig(btnSaveConfig));
 btnSaveConfigRouting?.addEventListener('click', () => saveAllConfig(btnSaveConfigRouting));
 
-// Affiliate Link Tester
+// --- Simulator / Manual Send ---
+btnSimulate?.addEventListener('click', async () => {
+  const text = simText?.value.trim() || '';
+  const imageUrl = simImage?.value.trim() || '';
+
+  if (!cfgDestJid?.value.trim()) {
+    showToast('Informe o canal de destino antes de simular.', 'error');
+    return;
+  }
+
+  btnSimulate.disabled = true;
+  btnSimulate.textContent = 'Enviando oferta...';
+
+  try {
+    const res = await fetch('/api/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, imageUrl })
+    });
+    const json = await res.json();
+    if (json.success) {
+      showToast('Oferta disparada com sucesso no WhatsApp!', 'success');
+      closeAllModals();
+    } else {
+      showToast(`Erro no envio: ${json.error}`, 'error');
+    }
+  } catch (err) {
+    showToast(`Erro: ${err.message}`, 'error');
+  } finally {
+    btnSimulate.disabled = false;
+    btnSimulate.textContent = '🚀 Disparar Oferta no WhatsApp';
+  }
+});
+
+// --- Affiliate Link Tester ---
 const btnTestAffiliate = document.getElementById('btnTestAffiliate');
 const testAffInput = document.getElementById('testAffInput');
 const affTestResultBox = document.getElementById('affTestResultBox');
 
 btnTestAffiliate?.addEventListener('click', async () => {
-  const input = testAffInput.value.trim();
+  const input = testAffInput?.value.trim() || '';
   if (!input) {
-    showToast('Insira um link ou texto para testar a conversão.', 'error');
+    showToast('Insira um link ou texto para testar.', 'error');
     return;
   }
 
   btnTestAffiliate.disabled = true;
-  btnTestAffiliate.textContent = 'Processando...';
+  btnTestAffiliate.textContent = 'Processando conversão...';
 
   try {
     const res = await fetch('/api/affiliate/test', {
@@ -848,7 +980,7 @@ btnTestAffiliate?.addEventListener('click', async () => {
         affTestResultBox.innerHTML = `
           <div class="aff-res-row">
             <span class="aff-res-label">Resultado:</span>
-            <span class="aff-res-val">Nenhum link de loja monitorada (ML, Shopee, Magalu, Ali) encontrado no texto.</span>
+            <span class="aff-res-val">Nenhum link monitorado identificado.</span>
           </div>
         `;
       } else {
@@ -856,27 +988,23 @@ btnTestAffiliate?.addEventListener('click', async () => {
         json.results.forEach((r, idx) => {
           html += `
             <div class="aff-res-row">
-              <span class="aff-res-label">#${idx + 1} Loja Identificada:</span>
-              <span class="aff-res-val highlight">${r.store}</span>
+              <span class="aff-res-label">#${idx + 1} Loja:</span>
+              <span class="aff-res-val highlight">${escapeHtml(r.store)}</span>
             </div>
             <div class="aff-res-row">
               <span class="aff-res-label">Link Original:</span>
               <span class="aff-res-val">${escapeHtml(r.originalUrl)}</span>
             </div>
             <div class="aff-res-row">
-              <span class="aff-res-label">Link Final Resolvido:</span>
-              <span class="aff-res-val">${escapeHtml(r.finalResolvedUrl)}</span>
-            </div>
-            <div class="aff-res-row">
               <span class="aff-res-label">Link de Afiliado Gerado:</span>
               <span class="aff-res-val highlight">${escapeHtml(r.affiliateUrl)}</span>
             </div>
-            <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 0.3rem 0;">
+            <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 0.4rem 0;">
           `;
         });
         html += `
           <div class="aff-res-row">
-            <span class="aff-res-label">Texto Final Formatado:</span>
+            <span class="aff-res-label">Texto Formatado Final:</span>
             <span class="aff-res-val" style="white-space: pre-wrap;">${escapeHtml(json.text)}</span>
           </div>
         `;
@@ -888,57 +1016,24 @@ btnTestAffiliate?.addEventListener('click', async () => {
       showToast(`Erro: ${json.error}`, 'error');
     }
   } catch (err) {
-    showToast(`Erro no teste: ${err.message}`, 'error');
+    showToast(`Erro: ${err.message}`, 'error');
   } finally {
     btnTestAffiliate.disabled = false;
     btnTestAffiliate.textContent = '⚡ Testar Conversão de Link';
   }
 });
 
-// Simulator / Quick Test
-btnSimulate?.addEventListener('click', async () => {
-  const text = simText.value.trim();
-  const imageUrl = simImage.value.trim();
-
-  if (!cfgDestJid.value.trim()) {
-    showToast('Informe o Canal de Destino antes de disparar o teste.', 'error');
-    return;
-  }
-
-  btnSimulate.disabled = true;
-  btnSimulate.textContent = 'Enviando...';
-
-  try {
-    const res = await fetch('/api/simulate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, imageUrl })
-    });
-    const json = await res.json();
-    if (json.success) {
-      showToast('Oferta de teste disparada com sucesso no WhatsApp!', 'success');
-    } else {
-      showToast(`Erro no envio: ${json.error}`, 'error');
-    }
-  } catch (err) {
-    showToast(`Erro ao simular: ${err.message}`, 'error');
-  } finally {
-    btnSimulate.disabled = false;
-    btnSimulate.textContent = '🚀 Disparar Oferta de Teste no WhatsApp';
-  }
-});
-
-// Forwarder Switch
+// --- Forwarder Master Switch ---
 forwarderActiveSwitch?.addEventListener('change', async () => {
   const active = forwarderActiveSwitch.checked;
-  forwarderStatusLabel.textContent = active ? 'Repasse: Ativo' : 'Repasse: Pausado';
+  if (forwarderStatusLabel) {
+    forwarderStatusLabel.textContent = active ? 'Repasse: Ativo' : 'Repasse: Pausado';
+  }
   try {
     await fetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        forwarder: { active }
-      })
+      body: JSON.stringify({ forwarder: { active } })
     });
     showToast(active ? 'Repasse automático ativado!' : 'Repasse pausado.', 'info');
   } catch (err) {
@@ -946,12 +1041,11 @@ forwarderActiveSwitch?.addEventListener('change', async () => {
   }
 });
 
-// Auto-scroll checkbox
+// --- Logs & Terminal Controls ---
 autoScrollCheck?.addEventListener('change', () => {
   appState.autoScroll = autoScrollCheck.checked;
 });
 
-// Clear Logs
 btnClearLogs?.addEventListener('click', async () => {
   try {
     await fetch('/api/logs/clear', { method: 'POST' });
@@ -960,6 +1054,7 @@ btnClearLogs?.addEventListener('click', async () => {
   }
 });
 
+// --- Initial Load ---
 async function loadConfigDirectly() {
   try {
     const res = await fetch('/api/config');
@@ -973,7 +1068,6 @@ async function loadConfigDirectly() {
   }
 }
 
-// Initialize on load
 window.addEventListener('DOMContentLoaded', () => {
   loadConfigDirectly();
   loadMeliTokenStatus();
