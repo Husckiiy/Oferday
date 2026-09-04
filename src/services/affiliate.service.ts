@@ -185,11 +185,23 @@ export class AffiliateService {
       const parsed = new URL(url);
 
       // 1. Ensure pathname is valid and not malformed
-      // If it's a bare /MLB1234567 or /MLB-1234567 without slug or _JM, format it as /MLB-1234567-_JM
-      const mlbBareMatch = parsed.pathname.match(/^\/?(MLB-?\d+)$/i);
-      if (mlbBareMatch) {
-        const digits = mlbBareMatch[1].replace(/\D/g, '');
-        parsed.pathname = `/MLB-${digits}-_JM`;
+      // If it's a /p/MLB... catalog link, we can keep /p/MLBxxxx
+      const pMatch = parsed.pathname.match(/\/p\/(MLB\d+)/i);
+      if (pMatch) {
+        parsed.pathname = `/p/${pMatch[1]}`;
+      } else {
+        // If it's an /up/MLBU... link, shorten to /up/MLBUxxxx
+        const mlbuMatch = parsed.pathname.match(/\/up\/(MLBU\d+)/i);
+        if (mlbuMatch) {
+          parsed.pathname = `/up/${mlbuMatch[1]}`;
+        } else {
+          // If it's a bare /MLB1234567 or /MLB-1234567 without slug or _JM, format it as /MLB-1234567-_JM
+          const mlbBareMatch = parsed.pathname.match(/^\/?(MLB-?\d+)$/i);
+          if (mlbBareMatch) {
+            const digits = mlbBareMatch[1].replace(/\D/g, '');
+            parsed.pathname = `/MLB-${digits}-_JM`;
+          }
+        }
       }
 
       // 2. List of junk / tracking / competitor parameters to strip completely
