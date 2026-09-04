@@ -49,21 +49,44 @@ class ImageService {
    */
   public async detectColorTheme(buffer: Buffer): Promise<'YELLOW_ML' | 'BLUE_MAGALU' | 'UNKNOWN'> {
     try {
-      const { data } = await sharp(buffer)
+      const { data, info } = await sharp(buffer)
         .resize(50, 50, { fit: 'fill' })
         .raw()
         .toBuffer({ resolveWithObject: true });
 
-      const r = data[0];
-      const g = data[1];
-      const b = data[2];
+      const channels = info.channels || 3;
+      let yellowVotes = 0;
+      let blueVotes = 0;
 
-      // Yellow: High Red & Green, Low Blue
-      if (r > 150 && g > 150 && b < 100) {
+      // Sample 16 key background points (corners, top/bottom borders, inner margins)
+      const samplePoints = [
+        [5, 5], [25, 5], [45, 5],
+        [5, 25], [45, 25],
+        [5, 45], [25, 45], [45, 45],
+        [2, 2], [48, 2], [2, 48], [48, 48],
+        [10, 10], [40, 10], [10, 40], [40, 40]
+      ];
+
+      for (const [x, y] of samplePoints) {
+        const idx = (y * 50 + x) * channels;
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+
+        // Yellow (Mercado Livre): High Red + Green, Low Blue
+        if (r > 140 && g > 130 && b < 120) {
+          yellowVotes++;
+        }
+        // Blue (Magalu): High Blue, Low Red
+        if (b > 130 && r < 140) {
+          blueVotes++;
+        }
+      }
+
+      if (yellowVotes >= 4) {
         return 'YELLOW_ML';
       }
-      // Blue: High Blue, Low Red
-      if (b > 140 && r < 120) {
+      if (blueVotes >= 4) {
         return 'BLUE_MAGALU';
       }
 
@@ -190,9 +213,15 @@ class ImageService {
           'ativou',
           'resgatou',
           'resgate',
+          'resgate seu cupom',
+          'resgate o cupom',
+          'resgatou na conta',
+          'para quem resgatou',
           'produtos full',
+          'valido em produtos',
           'cupom ativo',
-          'cupons ativos'
+          'cupons ativos',
+          'cupons full'
         ],
         cleanImagePath: mlClean,
         referenceImages: [mlComp, mlClean]
@@ -213,7 +242,9 @@ class ImageService {
           'cupom de desconto no magalu',
           'novo cupom de desconto no magalu',
           'salve seu cupom magalu',
-          'economizandocomjp'
+          'economizandocomjp',
+          'resgate seu cupom magalu',
+          'cupom ativo magalu'
         ],
         cleanImagePath: magaluClean,
         referenceImages: [magaluComp, magaluClean]
