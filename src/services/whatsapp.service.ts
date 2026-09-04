@@ -366,6 +366,13 @@ class WhatsAppService extends EventEmitter {
         });
       }
 
+      // Immediately return to unavailable/offline presence after sending to prevent online status
+      try {
+        await this.sock.sendPresenceUpdate('unavailable');
+      } catch {
+        // ignore
+      }
+
       logger.success('WHATSAPP', `Mensagem entregue com sucesso no destino (${typeDesc})!`);
       return result;
     } catch (sendErr: any) {
