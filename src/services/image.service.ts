@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { logger } from './logger.service.js';
 
 const BANNERS_DIR = path.resolve(process.cwd(), 'data', 'banners');
+const ASSETS_BANNERS_DIR = path.resolve(process.cwd(), 'assets', 'banners');
 
 export interface CachedImageReference {
   path: string;
@@ -38,9 +39,60 @@ class ImageService {
     await this.initDefaultRules();
   }
 
+  public async reload(): Promise<void> {
+    this.initialized = false;
+    await this.initDefaultRules();
+  }
+
+  public getBannerStatus(): { ml: boolean; magalu: boolean; mlPreview?: string; magaluPreview?: string } {
+    const mlPath = path.join(BANNERS_DIR, 'alerta_cupons_ml_limpo.jpg');
+    const magaluPath = path.join(BANNERS_DIR, 'alerta_cupons_magalu_limpo.jpg');
+    const mlFallback = path.join(ASSETS_BANNERS_DIR, 'alerta_cupons_ml_limpo.jpg');
+    const magaluFallback = path.join(ASSETS_BANNERS_DIR, 'alerta_cupons_magalu_limpo.jpg');
+
+    let mlPreview: string | undefined;
+    let magaluPreview: string | undefined;
+
+    const actualMl = fs.existsSync(mlPath) ? mlPath : (fs.existsSync(mlFallback) ? mlFallback : null);
+    const actualMagalu = fs.existsSync(magaluPath) ? magaluPath : (fs.existsSync(magaluFallback) ? magaluFallback : null);
+
+    if (actualMl) {
+      try {
+        mlPreview = `data:image/jpeg;base64,${fs.readFileSync(actualMl).toString('base64')}`;
+      } catch {}
+    }
+    if (actualMagalu) {
+      try {
+        magaluPreview = `data:image/jpeg;base64,${fs.readFileSync(actualMagalu).toString('base64')}`;
+      } catch {}
+    }
+
+    return {
+      ml: !!actualMl,
+      magalu: !!actualMagalu,
+      mlPreview,
+      magaluPreview
+    };
+  }
+
   private ensureBannersDir(): void {
     if (!fs.existsSync(BANNERS_DIR)) {
       fs.mkdirSync(BANNERS_DIR, { recursive: true });
+    }
+    // Sincroniza banners padrão da pasta assets para data/banners (evita perda no volume do Railway)
+    if (fs.existsSync(ASSETS_BANNERS_DIR)) {
+      try {
+        const files = fs.readdirSync(ASSETS_BANNERS_DIR);
+        for (const file of files) {
+          const target = path.join(BANNERS_DIR, file);
+          if (!fs.existsSync(target)) {
+            fs.copyFileSync(path.join(ASSETS_BANNERS_DIR, file), target);
+            logger.info('IMAGE', `Banner padrão copiado para data/banners: ${file}`);
+          }
+        }
+      } catch (err: any) {
+        logger.warn('IMAGE', `Aviso ao sincronizar banners padrão: ${err.message}`);
+      }
     }
   }
 
@@ -162,9 +214,17 @@ class ImageService {
   }
 
   private async processReferenceImage(filePath: string): Promise<CachedImageReference | null> {
-    if (!fs.existsSync(filePath)) return null;
+    let resolvedPath = filePath;
+    if (!fs.existsSync(resolvedPath)) {
+      const fallback = path.join(ASSETS_BANNERS_DIR, path.basename(filePath));
+      if (fs.existsSync(fallback)) {
+        resolvedPath = fallback;
+      } else {
+        return null;
+      }
+    }
     try {
-      const buf = fs.readFileSync(filePath);
+      const buf = fs.readFileSync(resolvedPath);
       const sha256 = crypto.createHash('sha256').update(buf).digest('hex');
       const md5 = crypto.createHash('md5').update(buf).digest('hex');
       const dHash = await this.computeDHash(buf);
@@ -173,7 +233,7 @@ class ImageService {
       if (!dHash) return null;
 
       return {
-        path: filePath,
+        path: resolvedPath,
         sha256,
         md5,
         dHashBinary: dHash.binary,
@@ -181,7 +241,7 @@ class ImageService {
         pixelBuffer
       };
     } catch (err: any) {
-      logger.error('IMAGE', `Erro ao indexar imagem de referência (${filePath}): ${err.message}`);
+      logger.error('IMAGE', `Erro ao indexar imagem de referência (${resolvedPath}): ${err.message}`);
       return null;
     }
   }
@@ -266,10 +326,12 @@ class ImageService {
   }
 
   /**
-   * Process image replacement with Color Theme, Perceptual dHash, and Hash matching
+   * Process image replacement strictly by visual comparison (Perceptual dHash and Exact Hash).
+   * Will ONLY replace if the incoming image is actually a known coupon banner image.
+   * Product photos will never be replaced.
    */
   public async processImageReplacement(text: string, originalBuffer: Buffer | null): Promise<Buffer | null> {
-    if (!originalBuffer && !text) {
+    if (!originalBuffer || originalBuffer.length === 0) {
       return originalBuffer;
     }
 
@@ -277,57 +339,31 @@ class ImageService {
       await this.initDefaultRules();
     }
 
-    const lowerText = (text || '').toLowerCase();
+    const inSha256 = crypto.createHash('sha256').update(originalBuffer).digest('hex');
+    const inMd5 = crypto.createHash('md5').update(originalBuffer).digest('hex');
+    const inDHash = await this.computeDHash(originalBuffer);
 
-    let inSha256 = '';
-    let inMd5 = '';
-    let inDHash: { binary: string; hex: string } | null = null;
-    let inPixels: Buffer | null = null;
-    let inColorTheme: 'YELLOW_ML' | 'BLUE_MAGALU' | 'UNKNOWN' = 'UNKNOWN';
-
-    if (originalBuffer && originalBuffer.length > 0) {
-      inSha256 = crypto.createHash('sha256').update(originalBuffer).digest('hex');
-      inMd5 = crypto.createHash('md5').update(originalBuffer).digest('hex');
-      inDHash = await this.computeDHash(originalBuffer);
-      inPixels = await this.getNormalizedPixels(originalBuffer);
-      inColorTheme = await this.detectColorTheme(originalBuffer);
+    if (!inDHash) {
+      return originalBuffer;
     }
 
     for (const rule of this.rules) {
       let isMatch = false;
       let matchReason = '';
 
-      // 1. Color Theme Match (Direct Yellow for ML or Blue for Magalu)
-      if (inColorTheme !== 'UNKNOWN' && inColorTheme === rule.theme) {
-        // Confirm with dHash or keywords or structure
-        if (inDHash && rule.cachedRefs) {
-          for (const ref of rule.cachedRefs) {
-            const dist = this.hammingDistance(inDHash.binary, ref.dHashBinary);
-            if (dist <= 22) {
-              isMatch = true;
-              matchReason = `Tema de cor (${rule.theme}) + dHash correspondente (distância ${dist}/64 bits)`;
-              break;
-            }
-          }
-        }
-        if (!isMatch) {
-          isMatch = true;
-          matchReason = `Tema visual de cor exclusivo do ${rule.name}`;
-        }
-      }
-
-      // 2. Exact MD5 / SHA-256 Hash Match
-      if (!isMatch && rule.cachedRefs) {
+      if (rule.cachedRefs && rule.cachedRefs.length > 0) {
         for (const ref of rule.cachedRefs) {
-          if (inSha256 && (inSha256 === ref.sha256 || inMd5 === ref.md5)) {
+          // 1. Exact Hash Match
+          if (inSha256 === ref.sha256 || inMd5 === ref.md5) {
             isMatch = true;
             matchReason = `Hash exato idêntico (MD5: ${inMd5})`;
             break;
           }
 
-          if (inDHash && ref.dHashBinary) {
+          // 2. Perceptual dHash Match (Distance <= 14 indicates visual banner match)
+          if (ref.dHashBinary) {
             const dist = this.hammingDistance(inDHash.binary, ref.dHashBinary);
-            if (dist <= 18) {
+            if (dist <= 14) {
               const hashMatchPct = (((64 - dist) / 64) * 100).toFixed(1);
               isMatch = true;
               matchReason = `Perceptual dHash (${hashMatchPct}% precisão, dist ${dist}/64)`;
@@ -337,29 +373,29 @@ class ImageService {
         }
       }
 
-      // 3. Keyword Fallback in Text
-      if (!isMatch && lowerText) {
-        const matchedKeyword = rule.keywords.some((kw) => lowerText.includes(kw));
-        if (matchedKeyword) {
-          isMatch = true;
-          matchReason = `Palavra-chave detectada no texto da mensagem`;
-        }
-      }
-
       // If matched, replace with clean image
       if (isMatch) {
-        if (fs.existsSync(rule.cleanImagePath)) {
+        let cleanPath = rule.cleanImagePath;
+        if (!fs.existsSync(cleanPath)) {
+          const fallback = path.join(ASSETS_BANNERS_DIR, path.basename(rule.cleanImagePath));
+          if (fs.existsSync(fallback)) {
+            cleanPath = fallback;
+          }
+        }
+
+        if (fs.existsSync(cleanPath)) {
           try {
-            const cleanBuffer = fs.readFileSync(rule.cleanImagePath);
-            logger.success('IMAGE', `🎯 Regra acionada [${rule.name}] via ${matchReason}! Imagem substituída com precisão pelo banner limpo.`);
+            const cleanBuffer = fs.readFileSync(cleanPath);
+            logger.success('IMAGE', `🎯 Regra acionada [${rule.name}] via ${matchReason}! Imagem de banner substituída pelo banner limpo.`);
             return cleanBuffer;
           } catch (err: any) {
-            logger.error('IMAGE', `Erro ao carregar banner limpo (${rule.cleanImagePath}): ${err.message}`);
+            logger.error('IMAGE', `Erro ao carregar banner limpo (${cleanPath}): ${err.message}`);
           }
         }
       }
     }
 
+    // Default: keep the original product image intact
     return originalBuffer;
   }
 }

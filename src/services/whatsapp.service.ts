@@ -67,7 +67,11 @@ class WhatsAppService extends EventEmitter {
         printQRInTerminal: false,
         auth: state,
         browser: ['OferdayBot', 'Chrome', '1.0.0'],
-        markOnlineOnConnect: false
+        markOnlineOnConnect: false,
+        syncFullHistory: false,
+        shouldSyncHistoryMessage: () => false,
+        emitOwnEvents: false,
+        linkPreviewImageThumbnailWidth: 0
       });
 
       this.sock.ev.on('creds.update', saveCreds);
@@ -89,6 +93,10 @@ class WhatsAppService extends EventEmitter {
 
         if (connection === 'close') {
           this.isConnecting = false;
+          if (this.presenceInterval) {
+            clearInterval(this.presenceInterval);
+            this.presenceInterval = null;
+          }
           const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
           const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
@@ -112,13 +120,26 @@ class WhatsAppService extends EventEmitter {
           const userJid = this.sock?.user?.id || 'Conectado';
           logger.success('WHATSAPP', `Conexão do WhatsApp estabelecida com sucesso! (${userJid})`);
           
-          // Send offline/unavailable presence once on connect so WhatsApp servers never show user as active
+          // Send offline/unavailable presence on connect so WhatsApp servers never show user as active
           try {
             await this.sock?.sendPresenceUpdate('unavailable');
             logger.info('WHATSAPP', 'Modo silencioso ativo (Offline / Unavailable): notificações no celular 100% liberadas.');
           } catch {
             // ignore
           }
+
+          if (this.presenceInterval) {
+            clearInterval(this.presenceInterval);
+          }
+          this.presenceInterval = setInterval(async () => {
+            if (this.sock && this.status === 'connected') {
+              try {
+                await this.sock.sendPresenceUpdate('unavailable');
+              } catch {
+                // ignore
+              }
+            }
+          }, 45000);
 
           this.emit('status_change', this.getStatus());
         }

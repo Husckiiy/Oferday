@@ -15,6 +15,12 @@ export interface AppConfig {
   forwarder: {
     active: boolean;
   };
+  filters: {
+    blacklist: string[]; // Termos que BLOQUEIAM a mensagem inteira (descarte de spam)
+    removeTerms?: string[]; // Termos/linhas que são REMOVIDOS do texto mantendo a oferta
+    removeWatermarks: boolean;
+    dedupHours: number;
+  };
   affiliate: {
     mlAppId: string;
     mlSecretKey: string;

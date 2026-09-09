@@ -10,6 +10,7 @@ import { ConnectionStatus } from '../types/index.js';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
 const SESSION_FILE = path.join(DATA_DIR, 'telegram.session');
+const PROCESSED_FILE = path.join(DATA_DIR, 'telegram_processed.json');
 
 export interface TelegramAuthPending {
   phoneNumber: string;
@@ -26,9 +27,38 @@ class TelegramService extends EventEmitter {
   private listeningChannels: Map<string, { id?: string; username?: string; title?: string }> = new Map();
   private isConnecting: boolean = false;
   private messageHandler: ((event: NewMessageEvent) => Promise<void>) | null = null;
+  private processedMessageKeys: Set<string> = new Set<string>();
 
   constructor() {
     super();
+    this.loadProcessedKeys();
+  }
+
+  private loadProcessedKeys(): void {
+    try {
+      if (fs.existsSync(PROCESSED_FILE)) {
+        const raw = fs.readFileSync(PROCESSED_FILE, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          this.processedMessageKeys = new Set(parsed);
+          logger.info('TELEGRAM', `Carregados ${this.processedMessageKeys.size} IDs de mensagens processadas do disco.`);
+        }
+      }
+    } catch (err: any) {
+      logger.warn('TELEGRAM', `Aviso ao carregar mensagens processadas: ${err.message}`);
+    }
+  }
+
+  private saveProcessedKeys(): void {
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      const arr = Array.from(this.processedMessageKeys).slice(-2000);
+      fs.writeFileSync(PROCESSED_FILE, JSON.stringify(arr), 'utf-8');
+    } catch (err: any) {
+      logger.warn('TELEGRAM', `Erro ao salvar histórico de mensagens processadas: ${err.message}`);
+    }
   }
 
   public getStatus(): { status: ConnectionStatus; channel: string | null; me?: any } {
@@ -356,17 +386,50 @@ class TelegramService extends EventEmitter {
     const channelNames = Array.from(this.listeningChannels.values()).map((c) => `@${c.username || c.title}`);
     this.listeningChannel = channelNames.join(', ') || channelListOrInput;
 
-    // Seed initial message IDs so poller does not re-forward past historical messages
-    for (const [key, ch] of this.listeningChannels.entries()) {
-      try {
-        const entity = ch.username || ch.id || key;
-        const initialMsgs = await this.client.getMessages(entity, { limit: 5 });
-        for (const msg of initialMsgs) {
-          const normChatId = this.normalize(msg.chatId || (msg.peerId as any)?.channelId || ch.id || key);
-          this.processedMessageKeys.add(`${normChatId}_${msg.id}`);
+    // Check for missed messages or seed history
+    if (this.processedMessageKeys.size === 0) {
+      // First boot on clean database: seed current messages so we don't spam old history
+      for (const [key, ch] of this.listeningChannels.entries()) {
+        try {
+          const entity = ch.username || ch.id || key;
+          const initialMsgs = await this.client.getMessages(entity, { limit: 10 });
+          for (const msg of initialMsgs) {
+            const normChatId = this.normalize(msg.chatId || (msg.peerId as any)?.channelId || ch.id || key);
+            this.processedMessageKeys.add(`${normChatId}_${msg.id}`);
+          }
+        } catch {
+          // ignore
         }
-      } catch {
-        // ignore
+      }
+      this.saveProcessedKeys();
+    } else {
+      // Container restart or reconnection: catch up on any messages posted while offline (last 30 minutes)
+      logger.info('TELEGRAM', `Catch-Up Ativo: Verificando se houve mensagens enviadas durante a reinicialização...`);
+      for (const [key, ch] of this.listeningChannels.entries()) {
+        try {
+          const entity = ch.username || ch.id || key;
+          const recentMsgs = await this.client.getMessages(entity, { limit: 10 });
+          // Process in chronological order (oldest to newest)
+          const chronological = [...recentMsgs].reverse();
+          const nowSec = Math.floor(Date.now() / 1000);
+
+          for (const msg of chronological) {
+            const normChatId = this.normalize(msg.chatId || (msg.peerId as any)?.channelId || ch.id || key);
+            const msgKey = `${normChatId}_${msg.id}`;
+            if (!this.processedMessageKeys.has(msgKey)) {
+              const msgAgeSec = nowSec - (msg.date || 0);
+              if (msgAgeSec < 30 * 60) {
+                logger.info('TELEGRAM', `[Catch-Up] Recuperando mensagem #${msg.id} de "${ch.title || key}" postada durante reinício (${Math.round(msgAgeSec / 60)} min atrás)!`);
+                await this.dispatchMessage(msg, ch.title || ch.username || key);
+              } else {
+                this.processedMessageKeys.add(msgKey);
+              }
+            }
+          }
+          this.saveProcessedKeys();
+        } catch (err: any) {
+          logger.warn('TELEGRAM', `Aviso no Catch-Up do canal ${ch.title || key}: ${err.message}`);
+        }
       }
     }
 
@@ -375,7 +438,6 @@ class TelegramService extends EventEmitter {
     this.emit('status_change', this.getStatus());
   }
 
-  private processedMessageKeys: Set<string> = new Set<string>();
   private keepAliveInterval: NodeJS.Timeout | null = null;
   private pollerInterval: NodeJS.Timeout | null = null;
 
@@ -442,6 +504,7 @@ class TelegramService extends EventEmitter {
         return;
       }
       this.processedMessageKeys.add(msgKey);
+      this.saveProcessedKeys();
 
       // Keep set bounded
       if (this.processedMessageKeys.size > 3000) {

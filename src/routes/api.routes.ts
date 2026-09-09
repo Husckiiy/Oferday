@@ -1,9 +1,11 @@
+import fs from 'fs';
+import path from 'path';
 import { Router, Request, Response } from 'express';
 import { telegramService } from '../services/telegram.service.js';
 import { whatsappService } from '../services/whatsapp.service.js';
 import { configService } from '../config/config.service.js';
 import { logger } from '../services/logger.service.js';
-
+import { imageService } from '../services/image.service.js';
 import { forwarderService } from '../services/forwarder.service.js';
 import { affiliateService } from '../services/affiliate.service.js';
 import { meliAuthService } from '../services/meli-auth.service.js';
@@ -350,6 +352,86 @@ apiRouter.post('/meli/auth-code', async (req: Request, res: Response) => {
     const rUri = redirectUri || configService.getConfig().affiliate?.mlRedirectUri || 'https://localhost';
     const tokens = await meliAuthService.exchangeAuthorizationCode(code, rUri);
     res.json({ success: true, message: 'Código trocado por tokens com sucesso!', status: meliAuthService.getTokenStatus() });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// --- Filters & Blacklist Management ---
+apiRouter.get('/filters', (req: Request, res: Response) => {
+  const config = configService.getConfig();
+  res.json({
+    success: true,
+    filters: config.filters || {
+      blacklist: ['instagram.com', 'tiktok.com', 'grupo vip'],
+      removeTerms: ['bot de moedas', 'economizandobot', 't.me/economizandobot', '(anuncio)', '@economizandocomjp'],
+      removeWatermarks: true,
+      dedupHours: 4
+    }
+  });
+});
+
+apiRouter.post('/filters', (req: Request, res: Response) => {
+  try {
+    const { blacklist, removeTerms, removeWatermarks, dedupHours } = req.body;
+    const current = configService.getConfig();
+    const updated = configService.saveConfig({
+      filters: {
+        ...current.filters,
+        blacklist: Array.isArray(blacklist) ? blacklist : current.filters?.blacklist || [],
+        removeTerms: Array.isArray(removeTerms) ? removeTerms : current.filters?.removeTerms || [],
+        removeWatermarks: typeof removeWatermarks === 'boolean' ? removeWatermarks : current.filters?.removeWatermarks ?? true,
+        dedupHours: typeof dedupHours === 'number' ? dedupHours : current.filters?.dedupHours ?? 4
+      }
+    });
+    res.json({ success: true, message: 'Filtros salvos com sucesso!', filters: updated.filters });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// --- Banner Upload & Management ---
+apiRouter.get('/banners/status', (req: Request, res: Response) => {
+  try {
+    const status = imageService.getBannerStatus();
+    res.json({ success: true, ...status });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+apiRouter.post('/banners/upload', async (req: Request, res: Response) => {
+  try {
+    const { store, imageBase64 } = req.body;
+    if (!store || !imageBase64) {
+      return res.status(400).json({ success: false, error: 'Loja (store: MELI ou MAGALU) e imagem em base64 são obrigatórios.' });
+    }
+
+    const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(cleanBase64, 'base64');
+
+    if (buffer.length < 500) {
+      return res.status(400).json({ success: false, error: 'Arquivo de imagem inválido ou muito pequeno.' });
+    }
+
+    const filename = store.toUpperCase() === 'MAGALU' ? 'alerta_cupons_magalu_limpo.jpg' : 'alerta_cupons_ml_limpo.jpg';
+    const dataDir = path.resolve(process.cwd(), 'data', 'banners');
+    const assetsDir = path.resolve(process.cwd(), 'assets', 'banners');
+
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    if (!fs.existsSync(assetsDir)) fs.mkdirSync(assetsDir, { recursive: true });
+
+    fs.writeFileSync(path.join(dataDir, filename), buffer);
+    fs.writeFileSync(path.join(assetsDir, filename), buffer);
+
+    await imageService.reload();
+    logger.success('IMAGE', `Novo banner carregado para [${store.toUpperCase()}] com sucesso! (${buffer.length} bytes)`);
+
+    res.json({
+      success: true,
+      message: `Banner de ${store.toUpperCase()} atualizado com sucesso!`,
+      status: imageService.getBannerStatus()
+    });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

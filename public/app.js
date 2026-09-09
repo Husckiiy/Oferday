@@ -10,10 +10,10 @@ let appState = {
   feed: [],
   autoScroll: true,
   sourceChannels: [
-    { id: '1', name: 'Jp tech', url: 'https://t.me/jptechofertasgerais', members: '~1682 membros', type: 'telegram' },
-    { id: '2', name: 'Economizando com JP', url: 'https://t.me/EconomizandocomJP', members: '~2889 membros', type: 'telegram' },
-    { id: '3', name: 'Promos Tech', url: 'https://t.me/Promos_tech1', members: '~3309 membros', type: 'telegram' },
-    { id: '4', name: 'Eu', url: 'https://t.me/PortalDOSsachadinhos', members: '~3597 membros', type: 'telegram' }
+    { id: '1', name: 'Jp tech', url: 'https://t.me/jptechofertasgerais', type: 'telegram' },
+    { id: '2', name: 'Economizando com JP', url: 'https://t.me/EconomizandocomJP', type: 'telegram' },
+    { id: '3', name: 'Promos Tech', url: 'https://t.me/Promos_tech1', type: 'telegram' },
+    { id: '4', name: 'Eu', url: 'https://t.me/PortalDOSsachadinhos', type: 'telegram' }
   ]
 };
 
@@ -22,6 +22,13 @@ function openModal(modalId) {
   const modal = document.getElementById(modalId);
   if (modal) {
     modal.classList.add('active');
+    if (modalId === 'modal-stores') {
+      showStoresGrid();
+    }
+    if (modalId === 'modal-watermark') {
+      loadFiltersConfig();
+      loadBannerPreviews();
+    }
     if (window.lucide) lucide.createIcons();
   }
 }
@@ -183,7 +190,6 @@ const sourceChannelsGrid = document.getElementById('sourceChannelsGrid');
 const sourcesCountBadge = document.getElementById('sourcesCountBadge');
 const newChName = document.getElementById('newChName');
 const newChUrl = document.getElementById('newChUrl');
-const newChMembers = document.getElementById('newChMembers');
 const btnAddSourceChannel = document.getElementById('btnAddSourceChannel');
 const resolvedJidBadge = document.getElementById('resolvedJidBadge');
 
@@ -254,7 +260,6 @@ function renderSourceChannels() {
           <span class="status-dot-mini dot-green"></span>
           <span>Monitorando</span>
         </span>
-        <span class="channel-members-text">${escapeHtml(ch.members || '~1000 membros')}</span>
       </div>
     `;
 
@@ -268,7 +273,6 @@ function renderSourceChannels() {
 btnAddSourceChannel?.addEventListener('click', () => {
   const name = newChName.value.trim();
   const url = newChUrl.value.trim();
-  const members = newChMembers.value.trim() || `~${Math.floor(Math.random() * 3000 + 1000)} membros`;
 
   if (!name || !url) {
     showToast('Informe o nome e link/@handle do canal.', 'error');
@@ -279,14 +283,12 @@ btnAddSourceChannel?.addEventListener('click', () => {
     id: String(Date.now()),
     name,
     url,
-    members,
     type: 'telegram'
   };
 
   appState.sourceChannels.push(newChannel);
   newChName.value = '';
   newChUrl.value = '';
-  newChMembers.value = '';
 
   renderSourceChannels();
   showToast(`Canal "${name}" adicionado com sucesso!`, 'success');
@@ -301,11 +303,9 @@ window.editSourceChannel = function(id) {
   if (newName === null) return;
   const newUrl = prompt('Novo link ou @handle do canal:', ch.url);
   if (newUrl === null) return;
-  const newMem = prompt('Membros (ex: ~2500 membros):', ch.members || '~2000 membros');
 
   ch.name = newName.trim() || ch.name;
   ch.url = newUrl.trim() || ch.url;
-  if (newMem !== null) ch.members = newMem.trim();
 
   renderSourceChannels();
   showToast('Canal atualizado!', 'success');
@@ -574,7 +574,6 @@ function updateConfigUI(config) {
         id: String(idx + 1),
         name: item.replace('https://t.me/', '').replace('@', ''),
         url: item.startsWith('http') ? item : (item.startsWith('@') ? `https://t.me/${item.replace('@', '')}` : `https://t.me/${item}`),
-        members: `~${Math.floor(1500 + idx * 800)} membros`,
         type: 'telegram'
       }));
     }
@@ -1081,6 +1080,72 @@ async function saveAllConfig(btn) {
 btnSaveConfig?.addEventListener('click', () => saveAllConfig(btnSaveConfig));
 btnSaveConfigRouting?.addEventListener('click', () => saveAllConfig(btnSaveConfigRouting));
 
+// --- 5-Store Cards Grid & Store Details Switcher ---
+const storesGridOverview = document.getElementById('storesGridOverview');
+const storesDetailContainer = document.getElementById('storesDetailContainer');
+const btnBackToStoresGrid = document.getElementById('btnBackToStoresGrid');
+const btnCancelStoreDetail = document.getElementById('btnCancelStoreDetail');
+const btnSaveConfigDetail = document.getElementById('btnSaveConfigDetail');
+const storeDetailTitle = document.getElementById('storeDetailTitle');
+const storeDetailSubtitle = document.getElementById('storeDetailSubtitle');
+
+const storeFormMap = {
+  meli: { id: 'formStoreMeli', title: 'Mercado Livre', subtitle: 'Parâmetros de afiliação e Linkbuilder meli.la' },
+  amazon: { id: 'formStoreAmazon', title: 'Amazon Brasil', subtitle: 'Tag de associado e SiteStripe API' },
+  shopee: { id: 'formStoreShopee', title: 'Shopee Brasil', subtitle: 'Credenciais da API Oficial GraphQL (s.shopee.com.br)' },
+  magalu: { id: 'formStoreMagalu', title: 'Magazine Luiza', subtitle: 'Nome da loja Parceiro Magalu / Magazine Você' },
+  aliexpress: { id: 'formStoreAliexpress', title: 'AliExpress', subtitle: 'App Key, Secret e Tracking ID do AliExpress' }
+};
+
+function showStoreDetail(storeKey) {
+  const storeInfo = storeFormMap[storeKey];
+  if (!storeInfo) return;
+
+  if (storesGridOverview) storesGridOverview.style.display = 'none';
+  if (storesDetailContainer) storesDetailContainer.style.display = 'block';
+
+  // Hide all forms first
+  Object.values(storeFormMap).forEach((s) => {
+    const el = document.getElementById(s.id);
+    if (el) el.style.display = 'none';
+  });
+
+  // Show active form
+  const activeForm = document.getElementById(storeInfo.id);
+  if (activeForm) activeForm.style.display = 'block';
+
+  if (storeDetailTitle) storeDetailTitle.textContent = storeInfo.title;
+  if (storeDetailSubtitle) storeDetailSubtitle.textContent = storeInfo.subtitle;
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function showStoresGrid() {
+  if (storesDetailContainer) storesDetailContainer.style.display = 'none';
+  if (storesGridOverview) storesGridOverview.style.display = 'block';
+  if (window.lucide) lucide.createIcons();
+}
+
+document.querySelectorAll('[data-open-store-config]').forEach((btn) => {
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    const storeKey = btn.getAttribute('data-open-store-config');
+    showStoreDetail(storeKey);
+  });
+});
+
+btnBackToStoresGrid?.addEventListener('click', (e) => {
+  e.preventDefault();
+  showStoresGrid();
+});
+
+btnCancelStoreDetail?.addEventListener('click', (e) => {
+  e.preventDefault();
+  showStoresGrid();
+});
+
+btnSaveConfigDetail?.addEventListener('click', () => saveAllConfig(btnSaveConfigDetail));
+
 // --- Simulator / Manual Send ---
 btnSimulate?.addEventListener('click', async () => {
   const text = simText?.value.trim() || '';
@@ -1217,6 +1282,236 @@ btnClearLogs?.addEventListener('click', async () => {
   }
 });
 
+// ==========================================================================
+// FILTROS, LIMPEZA DE TEXTO & BANNER MANAGER CONTROLLER
+// ==========================================================================
+let removeTermsItems = [
+  'bot de moedas',
+  'economizandobot',
+  't.me/economizandobot',
+  '(anuncio)',
+  '@economizandocomjp'
+];
+
+let blacklistItems = [
+  'instagram.com',
+  'tiktok.com',
+  'grupo vip'
+];
+
+// Elements for Option 1: Remove Terms
+const inputRemoveTerm = document.getElementById('inputRemoveTerm');
+const btnAddRemoveTerm = document.getElementById('btnAddRemoveTerm');
+const removeTermsTagsContainer = document.getElementById('removeTermsTagsContainer');
+
+// Elements for Option 2: Strict Blacklist
+const inputBlacklistTerm = document.getElementById('inputBlacklistTerm');
+const btnAddBlacklistTerm = document.getElementById('btnAddBlacklistTerm');
+const blacklistTagsContainer = document.getElementById('blacklistTagsContainer');
+
+const btnSaveBlacklistConfig = document.getElementById('btnSaveBlacklistConfig');
+const fileUploadMeli = document.getElementById('fileUploadMeli');
+const fileUploadMagalu = document.getElementById('fileUploadMagalu');
+const previewMeliBanner = document.getElementById('previewMeliBanner');
+const previewMagaluBanner = document.getElementById('previewMagaluBanner');
+
+// 1. Render Remove Terms (Option 1)
+function renderRemoveTermsTags() {
+  if (!removeTermsTagsContainer) return;
+  removeTermsTagsContainer.innerHTML = '';
+
+  if (removeTermsItems.length === 0) {
+    removeTermsTagsContainer.innerHTML = '<span class="text-muted" style="font-size: 0.8rem;">Nenhum termo para remoção. Adicione palavras ou links indesejados acima.</span>';
+    return;
+  }
+
+  removeTermsItems.forEach((term, index) => {
+    const tag = document.createElement('div');
+    tag.className = 'blacklist-tag';
+    tag.style.borderColor = '#10b981';
+    tag.style.background = 'rgba(16, 185, 129, 0.1)';
+    tag.innerHTML = `
+      <span style="color: #10b981;">✂️ ${escapeHtml(term)}</span>
+      <button type="button" class="btn-remove-tag" onclick="removeRemoveTermTag(${index})" title="Remover termo" style="color: #10b981;">&times;</button>
+    `;
+    removeTermsTagsContainer.appendChild(tag);
+  });
+}
+
+window.removeRemoveTermTag = function(index) {
+  removeTermsItems.splice(index, 1);
+  renderRemoveTermsTags();
+};
+
+btnAddRemoveTerm?.addEventListener('click', () => {
+  const val = inputRemoveTerm?.value.trim();
+  if (!val) return;
+  const cleanVal = val.toLowerCase();
+  if (!removeTermsItems.includes(cleanVal)) {
+    removeTermsItems.push(cleanVal);
+    renderRemoveTermsTags();
+  }
+  if (inputRemoveTerm) inputRemoveTerm.value = '';
+});
+
+inputRemoveTerm?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    btnAddRemoveTerm?.click();
+  }
+});
+
+// 2. Render Blacklist Tags (Option 2)
+function renderBlacklistTags() {
+  if (!blacklistTagsContainer) return;
+  blacklistTagsContainer.innerHTML = '';
+
+  if (blacklistItems.length === 0) {
+    blacklistTagsContainer.innerHTML = '<span class="text-muted" style="font-size: 0.8rem;">Nenhum termo na blacklist. Adicione palavras ou links que devem bloquear a mensagem inteira.</span>';
+    return;
+  }
+
+  blacklistItems.forEach((term, index) => {
+    const tag = document.createElement('div');
+    tag.className = 'blacklist-tag';
+    tag.innerHTML = `
+      <span>🚫 ${escapeHtml(term)}</span>
+      <button type="button" class="btn-remove-tag" onclick="removeBlacklistTag(${index})" title="Remover termo">&times;</button>
+    `;
+    blacklistTagsContainer.appendChild(tag);
+  });
+}
+
+window.removeBlacklistTag = function(index) {
+  blacklistItems.splice(index, 1);
+  renderBlacklistTags();
+};
+
+btnAddBlacklistTerm?.addEventListener('click', () => {
+  const val = inputBlacklistTerm?.value.trim();
+  if (!val) return;
+  const cleanVal = val.toLowerCase();
+  if (!blacklistItems.includes(cleanVal)) {
+    blacklistItems.push(cleanVal);
+    renderBlacklistTags();
+  }
+  if (inputBlacklistTerm) inputBlacklistTerm.value = '';
+});
+
+inputBlacklistTerm?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    btnAddBlacklistTerm?.click();
+  }
+});
+
+btnSaveBlacklistConfig?.addEventListener('click', async () => {
+  if (btnSaveBlacklistConfig) {
+    btnSaveBlacklistConfig.disabled = true;
+    btnSaveBlacklistConfig.textContent = 'Salvando...';
+  }
+  try {
+    const res = await fetch('/api/filters', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        blacklist: blacklistItems,
+        removeTerms: removeTermsItems
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Filtros de Limpeza e Blacklist salvos com sucesso!', 'success');
+      closeAllModals();
+    } else {
+      showToast(`Erro ao salvar: ${data.error}`, 'error');
+    }
+  } catch (err) {
+    showToast(`Erro: ${err.message}`, 'error');
+  } finally {
+    if (btnSaveBlacklistConfig) {
+      btnSaveBlacklistConfig.disabled = false;
+      btnSaveBlacklistConfig.textContent = 'Salvar Configurações';
+    }
+  }
+});
+
+async function loadFiltersConfig() {
+  try {
+    const res = await fetch('/api/filters');
+    const data = await res.json();
+    if (data.success && data.filters) {
+      if (Array.isArray(data.filters.blacklist)) {
+        blacklistItems = data.filters.blacklist;
+        renderBlacklistTags();
+      }
+      if (Array.isArray(data.filters.removeTerms)) {
+        removeTermsItems = data.filters.removeTerms;
+        renderRemoveTermsTags();
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao carregar filtros:', err);
+  }
+}
+
+async function loadBannerPreviews() {
+  try {
+    const res = await fetch('/api/banners/status');
+    const data = await res.json();
+    if (data.success) {
+      if (data.mlPreview && previewMeliBanner) {
+        previewMeliBanner.src = data.mlPreview;
+      }
+      if (data.magaluPreview && previewMagaluBanner) {
+        previewMagaluBanner.src = data.magaluPreview;
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao carregar prévia de banners:', err);
+  }
+}
+
+// Upload Banner Handler
+async function handleBannerUpload(file, store) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const base64 = e.target.result;
+    showToast(`Enviando novo banner de ${store}...`, 'info');
+    try {
+      const res = await fetch('/api/banners/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ store, imageBase64: base64 })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Banner de ${store} atualizado com sucesso!`, 'success');
+        if (store === 'MELI' && previewMeliBanner) previewMeliBanner.src = base64;
+        if (store === 'MAGALU' && previewMagaluBanner) previewMagaluBanner.src = base64;
+      } else {
+        showToast(`Erro: ${data.error}`, 'error');
+      }
+    } catch (err) {
+      showToast(`Erro ao subir imagem: ${err.message}`, 'error');
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+fileUploadMeli?.addEventListener('change', (e) => {
+  if (e.target.files && e.target.files[0]) {
+    handleBannerUpload(e.target.files[0], 'MELI');
+  }
+});
+
+fileUploadMagalu?.addEventListener('change', (e) => {
+  if (e.target.files && e.target.files[0]) {
+    handleBannerUpload(e.target.files[0], 'MAGALU');
+  }
+});
+
 // --- Initial Load ---
 async function loadConfigDirectly() {
   try {
@@ -1233,7 +1528,12 @@ async function loadConfigDirectly() {
 
 window.addEventListener('DOMContentLoaded', () => {
   renderSourceChannels();
+  renderRemoveTermsTags();
+  renderBlacklistTags();
   loadConfigDirectly();
+  loadFiltersConfig();
+  loadBannerPreviews();
   loadMeliTokenStatus();
   setupSSE();
 });
+

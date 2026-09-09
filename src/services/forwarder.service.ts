@@ -16,11 +16,19 @@ interface SentOfferRecord {
   sentAt: number;
 }
 
+interface SentMessageHistoryItem {
+  text: string;
+  tokens: Set<string>;
+  channel: string;
+  sentAt: number;
+}
+
 class ForwarderService extends EventEmitter {
   private initialized = false;
   private recentMessages: ForwardedMessageItem[] = [];
   private maxHistory = 50;
   private sentOffers: Map<string, SentOfferRecord> = new Map();
+  private sentMessagesHistory: SentMessageHistoryItem[] = [];
   private readonly DEDUP_WINDOW_MS = 4 * 60 * 60 * 1000; // 4 hours deduplication window
 
   public initialize(): void {
@@ -45,6 +53,99 @@ class ForwarderService extends EventEmitter {
         this.sentOffers.delete(key);
       }
     }
+    this.sentMessagesHistory = this.sentMessagesHistory.filter((item) => now - item.sentAt < this.DEDUP_WINDOW_MS);
+  }
+
+  private extractTokens(text: string): Set<string> {
+    const clean = text
+      .toLowerCase()
+      .replace(/https?:\/\/[^\s]+/g, '')
+      .replace(/[^a-z0-9áéíóúãõâêîôûç]/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const words = clean.split(' ').filter((w) => w.length > 2);
+    return new Set(words);
+  }
+
+  private computeJaccardSimilarity(tokensA: Set<string>, tokensB: Set<string>): number {
+    if (tokensA.size === 0 || tokensB.size === 0) return 0;
+    let intersection = 0;
+    for (const t of tokensA) {
+      if (tokensB.has(t)) intersection++;
+    }
+    const union = tokensA.size + tokensB.size - intersection;
+    return union > 0 ? intersection / union : 0;
+  }
+
+  public extractFingerprints(text: string, affResults: any[]): { productFps: string[]; announcementFps: string[] } {
+    const productFps: string[] = [];
+    const announcementFps: string[] = [];
+
+    // 1. Product IDs (MLB, ASIN, SKU, Shopee ID)
+    for (const res of affResults) {
+      const fp = affiliateService.extractProductFingerprint(res.canonicalProductUrl) || 
+                 affiliateService.extractProductFingerprint(res.finalResolvedUrl) || 
+                 affiliateService.extractProductFingerprint(res.originalUrl);
+      if (fp) {
+        productFps.push(fp);
+      } else {
+        // Campaign or Showcase list URL fingerprint
+        try {
+          const u = new URL(res.finalResolvedUrl || res.originalUrl);
+          if (u.pathname && (u.pathname.includes('/cupons') || u.pathname.includes('/landing') || u.pathname.includes('/promocao') || u.pathname.includes('/m/'))) {
+            announcementFps.push(`campaign_${crypto.createHash('md5').update(u.origin + u.pathname).digest('hex')}`);
+          }
+        } catch {}
+      }
+    }
+
+    if (text) {
+      // 2. Coupon Code Extraction (Only for generic announcements without product IDs)
+      const couponRegex1 = /(?:cupom|c[oó]digo|c[oó]d|off|desconto)\s*[:：\-–—]?\s*([A-Za-z0-9_\-]{4,25})/gi;
+      let match: RegExpExecArray | null;
+      const nonCoupons = [
+        'MERCADO', 'MAGALU', 'SHOPEE', 'AMAZON', 'PRODUTOS', 'PRODUTO', 'SELECIONADOS',
+        'CONTA', 'LIMITADO', 'HTTPS', 'HTTP', 'PARA', 'COM', 'SEM', 'POR', 'QUE',
+        'TEM', 'EM', 'ESTA', 'ESTE', 'APROVEITEM', 'TODOS', 'TODAS', 'LINK', 'LISTA',
+        'AQUI', 'ACESSE', 'AGORA', 'COMPRAS', 'COMPRA', 'VALIDO', 'VÁLIDO', 'RESGATE'
+      ];
+      while ((match = couponRegex1.exec(text)) !== null) {
+        const code = match[1].toUpperCase().trim();
+        if (code.length >= 4 && !nonCoupons.includes(code)) {
+          announcementFps.push(`coupon_${code}`);
+        }
+      }
+
+      // Standalone coupon codes
+      const standaloneCodes = text.match(/\b([A-Z]{3,15}\d{1,8}[A-Z0-9]*|\d{1,5}[A-Z]{3,10}[A-Z0-9]*)\b/g);
+      if (standaloneCodes) {
+        for (const rawCode of standaloneCodes) {
+          const code = rawCode.toUpperCase();
+          if (code.length >= 5 && !code.startsWith('MLB') && !code.startsWith('HTTPS') && !code.startsWith('HTTP') && !code.includes('MERCADOLIVRE')) {
+            announcementFps.push(`coupon_${code}`);
+          }
+        }
+      }
+
+      // 3. Semantic Discount Fingerprint (e.g. "25% OFF + R$ 89 + R$ 50")
+      const percentMatch = text.match(/(\d{1,2}%\s*(?:off|desconto)?)/i);
+      const moneyMatch = text.match(/r\$\s*(\d+)/gi);
+      if (percentMatch && moneyMatch && moneyMatch.length > 0) {
+        const semantic = `discount_${percentMatch[1].replace(/\s+/g, '').toLowerCase()}_${moneyMatch.map(m => m.replace(/\s+/g, '').toLowerCase()).sort().join('_')}`;
+        announcementFps.push(semantic);
+      }
+
+      // 4. Normalized text hash
+      const cleanText = text.replace(/https?:\/\/[^\s]+/g, '').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚãõÃÕâêîôûÂÊÎÔÛçÇ]/g, '').toLowerCase().trim();
+      if (cleanText.length > 25) {
+        announcementFps.push(`text_${crypto.createHash('md5').update(cleanText).digest('hex')}`);
+      }
+    }
+
+    return {
+      productFps: Array.from(new Set(productFps)),
+      announcementFps: Array.from(new Set(announcementFps))
+    };
   }
 
   private async handleTelegramMessage(data: { id: number; text: string; mediaBuffer: Buffer | null; date: number; channel?: string }): Promise<void> {
@@ -54,7 +155,38 @@ class ForwarderService extends EventEmitter {
 
     this.cleanOldSentOffers();
 
-    // Process text through Affiliate Service to convert store links
+    // 1. --- BLACKLIST CHECK (BLOQUEIO TOTAL DE MENSAGEM) ---
+    // If message contains any keyword from blacklist (e.g. instagram.com, tiktok.com, grupo vip):
+    // The entire message is discarded and blocked!
+    const blacklist = config.filters?.blacklist || [];
+    const lowerOriginalText = (data.text || '').toLowerCase();
+    
+    if (blacklist.length > 0 && lowerOriginalText) {
+      const matchedKeyword = blacklist.find((word) => {
+        const cleanWord = word.trim().toLowerCase();
+        return cleanWord && lowerOriginalText.includes(cleanWord);
+      });
+
+      if (matchedKeyword) {
+        logger.warn('FORWARDER', `🚫 Mensagem do canal "${channel}" bloqueada pelo filtro de Blacklist (termo detectado: "${matchedKeyword}").`);
+        const blockedItem: ForwardedMessageItem = {
+          id: Math.random().toString(36).substring(2, 9),
+          telegramMessageId: data.id,
+          channel,
+          text: data.text,
+          hasMedia: !!data.mediaBuffer,
+          mediaBase64: null,
+          destinationJid: destinationJid || 'Não configurado',
+          timestamp: new Date().toLocaleTimeString('pt-BR', { hour12: false }),
+          status: 'failed',
+          error: `Bloqueado por Blacklist ("${matchedKeyword}")`
+        };
+        this.addFeedItem(blockedItem);
+        return;
+      }
+    }
+
+    // 2. Process text through Affiliate Service to convert store links and REMOVE unwanted terms/lines
     let processedText = data.text;
     let affResults: any[] = [];
     if (data.text) {
@@ -67,38 +199,59 @@ class ForwarderService extends EventEmitter {
       }
     }
 
-    // --- ANTI-DUPLICATE DETECTION (CROSS-CHANNEL) ---
-    let duplicateFingerprint: string | null = null;
-    let prevSentRecord: SentOfferRecord | null = null;
-
-    // 1. Check Product ID / SKU fingerprints (Mercado Livre MLB, Amazon ASIN, Magalu SKU, Shopee ID)
-    for (const res of affResults) {
-      const fp = affiliateService.extractProductFingerprint(res.finalResolvedUrl) || affiliateService.extractProductFingerprint(res.originalUrl);
-      if (fp && this.sentOffers.has(fp)) {
-        const record = this.sentOffers.get(fp)!;
-        if (Date.now() - record.sentAt < this.DEDUP_WINDOW_MS) {
-          duplicateFingerprint = fp;
-          prevSentRecord = record;
-          break;
-        }
-      }
+    // If text became empty after sanitization, drop it
+    if (!processedText || processedText.trim().length < 5) {
+      logger.warn('FORWARDER', `🚫 Mensagem do canal "${channel}" vazia após limpeza de termos. Descartada.`);
+      return;
     }
 
-    // 2. Check normalized text hash for coupon announcements without specific product URLs
-    if (!duplicateFingerprint && data.text) {
-      const cleanText = data.text
-        .replace(/https?:\/\/[^\s]+/g, '')
-        .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚãõÃÕâêîôûÂÊÎÔÛçÇ]/g, '')
-        .toLowerCase()
-        .trim();
+    // --- SMART ANTI-DUPLICATE DETECTION (CROSS-CHANNEL) ---
+    let duplicateReason: string | null = null;
+    let prevSentRecord: { channel: string; sentAt: number; detail?: string } | null = null;
 
-      if (cleanText.length > 25) {
-        const textFp = `text_${crypto.createHash('md5').update(cleanText).digest('hex')}`;
-        if (this.sentOffers.has(textFp)) {
-          const record = this.sentOffers.get(textFp)!;
-          if (Date.now() - record.sentAt < this.DEDUP_WINDOW_MS) {
-            duplicateFingerprint = textFp;
-            prevSentRecord = record;
+    const { productFps, announcementFps } = this.extractFingerprints(data.text, affResults);
+    
+    // SCENARIO A: THIS IS A SPECIFIC PRODUCT OFFER (Has Product ID: MLB, ASIN, SKU, etc.)
+    // Only block if the exact SAME product ID was sent before (allows all different deals using the same coupon code!)
+    if (productFps.length > 0) {
+      for (const pFp of productFps) {
+        if (this.sentOffers.has(pFp)) {
+          const rec = this.sentOffers.get(pFp)!;
+          if (Date.now() - rec.sentAt < this.DEDUP_WINDOW_MS) {
+            duplicateReason = `Produto já enviado [${pFp}]`;
+            prevSentRecord = rec;
+            break;
+          }
+        }
+      }
+    } 
+    // SCENARIO B: THIS IS A GENERIC ANNOUNCEMENT / COUPON BANNER (No specific product ID)
+    else {
+      for (const aFp of announcementFps) {
+        if (this.sentOffers.has(aFp)) {
+          const rec = this.sentOffers.get(aFp)!;
+          if (Date.now() - rec.sentAt < this.DEDUP_WINDOW_MS) {
+            duplicateReason = aFp.startsWith('coupon_') ? `Alerta de cupom já divulgado [${aFp.replace('coupon_', '')}]` : `Anúncio duplicado [${aFp}]`;
+            prevSentRecord = rec;
+            break;
+          }
+        }
+      }
+
+      // Check Jaccard similarity ONLY for generic announcements without product IDs
+      if (!duplicateReason && data.text) {
+        const currentTokens = this.extractTokens(data.text);
+        if (currentTokens.size >= 8) {
+          for (const historyItem of this.sentMessagesHistory) {
+            if (Date.now() - historyItem.sentAt < this.DEDUP_WINDOW_MS) {
+              const similarity = this.computeJaccardSimilarity(currentTokens, historyItem.tokens);
+              if (similarity >= 0.75) {
+                const pct = (similarity * 100).toFixed(0);
+                duplicateReason = `Anúncio ${pct}% similar a alerta anterior`;
+                prevSentRecord = { channel: historyItem.channel, sentAt: historyItem.sentAt };
+                break;
+              }
+            }
           }
         }
       }
@@ -132,11 +285,11 @@ class ForwarderService extends EventEmitter {
     this.addFeedItem(item);
 
     // If duplicate detected, block forwarding
-    if (duplicateFingerprint && prevSentRecord) {
+    if (duplicateReason && prevSentRecord) {
       const minutesAgo = Math.max(1, Math.round((Date.now() - prevSentRecord.sentAt) / 60000));
-      logger.warn('FORWARDER', `🚫 Oferta duplicada bloqueada: [${duplicateFingerprint}] já foi enviada há ${minutesAgo} min pelo canal "${prevSentRecord.channel}". Ignorando repasse.`);
+      logger.warn('FORWARDER', `🚫 Oferta/Cupom duplicado bloqueado: [${duplicateReason}] já foi enviado há ${minutesAgo} min pelo canal "${prevSentRecord.channel}". Ignorando repasse.`);
       item.status = 'failed';
-      item.error = `Oferta duplicada (enviada há ${minutesAgo} min por ${prevSentRecord.channel})`;
+      item.error = `Duplicado: ${duplicateReason} (enviado há ${minutesAgo} min por ${prevSentRecord.channel})`;
       this.emit('message_updated', item);
       return;
     }
@@ -174,18 +327,25 @@ class ForwarderService extends EventEmitter {
 
       await whatsappService.sendMessage(destinationJid, processedText, finalMediaBuffer);
       
-      // Register fingerprints as successfully sent
-      for (const res of affResults) {
-        const fp = affiliateService.extractProductFingerprint(res.finalResolvedUrl) || affiliateService.extractProductFingerprint(res.originalUrl);
-        if (fp) {
-          this.sentOffers.set(fp, { fingerprint: fp, channel, sentAt: Date.now() });
+      // Register fingerprints according to type (product deals vs generic announcements)
+      if (productFps.length > 0) {
+        for (const pFp of productFps) {
+          this.sentOffers.set(pFp, { fingerprint: pFp, channel, sentAt: Date.now() });
         }
-      }
-      if (data.text) {
-        const cleanText = data.text.replace(/https?:\/\/[^\s]+/g, '').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚãõÃÕâêîôûÂÊÎÔÛçÇ]/g, '').toLowerCase().trim();
-        if (cleanText.length > 25) {
-          const textFp = `text_${crypto.createHash('md5').update(cleanText).digest('hex')}`;
-          this.sentOffers.set(textFp, { fingerprint: textFp, channel, sentAt: Date.now() });
+      } else {
+        for (const aFp of announcementFps) {
+          this.sentOffers.set(aFp, { fingerprint: aFp, channel, sentAt: Date.now() });
+        }
+        if (data.text) {
+          this.sentMessagesHistory.unshift({
+            text: data.text,
+            tokens: this.extractTokens(data.text),
+            channel,
+            sentAt: Date.now()
+          });
+          if (this.sentMessagesHistory.length > 200) {
+            this.sentMessagesHistory.pop();
+          }
         }
       }
 
@@ -211,6 +371,35 @@ class ForwarderService extends EventEmitter {
   public async sendSimulatedMessage(text: string, imageUrl?: string): Promise<ForwardedMessageItem> {
     const config = configService.getConfig();
     const destinationJid = config.whatsapp.destinationJid;
+
+    // --- BLACKLIST / SPAM FILTER CHECK ---
+    const blacklist = config.filters?.blacklist || [];
+    const lowerOriginalText = (text || '').toLowerCase();
+    
+    if (blacklist.length > 0 && lowerOriginalText) {
+      const matchedKeyword = blacklist.find((word) => {
+        const cleanWord = word.trim().toLowerCase();
+        return cleanWord && lowerOriginalText.includes(cleanWord);
+      });
+
+      if (matchedKeyword) {
+        logger.warn('FORWARDER', `🚫 Mensagem simulada bloqueada pelo filtro de Blacklist (termo detectado: "${matchedKeyword}").`);
+        const blockedItem: ForwardedMessageItem = {
+          id: Math.random().toString(36).substring(2, 9),
+          telegramMessageId: Math.floor(Math.random() * 100000),
+          channel: 'Simulador Manual',
+          text,
+          hasMedia: !!imageUrl,
+          mediaBase64: null,
+          destinationJid: destinationJid || 'Não configurado',
+          timestamp: new Date().toLocaleTimeString('pt-BR', { hour12: false }),
+          status: 'failed',
+          error: `Bloqueado por Blacklist ("${matchedKeyword}")`
+        };
+        this.addFeedItem(blockedItem);
+        return blockedItem;
+      }
+    }
 
     let mediaBuffer: Buffer | null = null;
     let mediaBase64: string | null = null;

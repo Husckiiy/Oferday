@@ -57,12 +57,12 @@
           <div class="nav-sub-items">
             <a href="#" class="nav-sub-item" data-modal="modal-whatsapp" id="sidebarWaItem">
               <span class="status-dot dot-gray" id="sidebarWaDot"></span>
-              <span class="sub-label">WhatsApp (Baileys)</span>
+              <span class="sub-label">WhatsApp</span>
               <span class="status-pill-badge badge-gray" id="sidebarWaBadge">Offline</span>
             </a>
             <a href="#" class="nav-sub-item" data-modal="modal-telegram" id="sidebarTgItem">
               <span class="status-dot dot-gray" id="sidebarTgDot"></span>
-              <span class="sub-label">Telegram (GramJS)</span>
+              <span class="sub-label">Telegram</span>
               <span class="status-pill-badge badge-gray" id="sidebarTgBadge">Offline</span>
             </a>
           </div>
@@ -403,31 +403,146 @@
   
   <!-- MODAL: CONFIGURAR LOJAS (Mercado Livre OAuth, Shopee, Amazon, Magalu, Ali) -->
   <div class="modal-overlay" id="modal-stores">
-    <div class="modal-dialog modal-lg">
-      <div class="modal-header">
-        <div class="modal-title-wrap">
-          <i data-lucide="store" class="modal-title-icon"></i>
-          <div>
-            <h3>Configurar Lojas & Afiliados</h3>
-            <p>Gerencie suas credenciais e tokens de API para conversão de links</p>
+    <div class="modal-dialog modal-xl modal-dark-theme">
+      
+      <!-- VIEW 1: 5-STORE GRID OVERVIEW (Matches User Screenshot) -->
+      <div id="storesGridOverview">
+        <div class="modal-header modal-header-dark">
+          <div class="modal-title-wrap">
+            <i data-lucide="store" class="modal-title-icon text-brand"></i>
+            <div>
+              <h3>Configurar Lojas Afiliadas</h3>
+              <p>Selecione uma loja para gerenciar credenciais, tags e conexões de API</p>
+            </div>
+          </div>
+          <button class="btn-close-modal btn-close-dark" data-close>&times;</button>
+        </div>
+
+        <div class="modal-body modal-body-dark">
+          <div class="stores-shop-grid">
+            
+            <!-- 1. MERCADO LIVRE -->
+            <div class="store-shop-card" data-store-card="meli">
+              <div class="store-shop-banner banner-meli">
+                <svg viewBox="0 0 170 54" class="store-banner-logo" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <!-- Shaking Hands Oval Badge -->
+                  <ellipse cx="28" cy="27" rx="22" ry="18" fill="#FFE600"/>
+                  <path d="M15 28C15 23 20 20 24 22L27 24L30 22C34 20 39 23 39 28C39 33 34 36 30 34L27 32L24 34C20 36 15 33 15 28Z" fill="#2D3277"/>
+                  <path d="M18 27C19 25 23 23 26 25L27 26L28 25C31 23 35 25 36 27" stroke="#FFE600" stroke-width="2" stroke-linecap="round"/>
+                  <!-- Typography -->
+                  <text x="58" y="25" font-family="'Plus Jakarta Sans', -apple-system, sans-serif" font-weight="800" font-size="18" fill="#2D3277" letter-spacing="-0.5">mercado</text>
+                  <text x="58" y="42" font-family="'Plus Jakarta Sans', -apple-system, sans-serif" font-weight="800" font-size="18" fill="#2D3277" letter-spacing="-0.5">livre</text>
+                </svg>
+              </div>
+              <div class="store-shop-body">
+                <h4 class="store-shop-name">Mercado Livre</h4>
+                <button type="button" class="btn-shop-configure" data-open-store-config="meli">Configurar</button>
+              </div>
+            </div>
+
+            <!-- 2. AMAZON -->
+            <div class="store-shop-card" data-store-card="amazon">
+              <div class="store-shop-banner banner-amazon">
+                <svg viewBox="0 0 180 58" class="store-banner-logo" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <text x="14" y="34" font-family="'Plus Jakarta Sans', -apple-system, sans-serif" font-weight="800" font-size="32" fill="#FFFFFF" letter-spacing="-1">amazon</text>
+                  <!-- Amazon Smile Arrow -->
+                  <path d="M26 43C56 56 118 54 146 36" stroke="#FF9900" stroke-width="4" stroke-linecap="round"/>
+                  <path d="M140 33L150 37L144 46" fill="#FF9900"/>
+                </svg>
+              </div>
+              <div class="store-shop-body">
+                <h4 class="store-shop-name">Amazon</h4>
+                <button type="button" class="btn-shop-configure" data-open-store-config="amazon">Configurar</button>
+              </div>
+            </div>
+
+            <!-- 3. SHOPEE -->
+            <div class="store-shop-card" data-store-card="shopee">
+              <div class="store-shop-banner banner-shopee">
+                <div class="shopee-logo-flex">
+                  <svg viewBox="0 0 44 50" class="shopee-bag-icon" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M15 13V9C15 5.5 18 3 22 3C26 3 29 5.5 29 9V13" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round"/>
+                    <rect x="2" y="11" width="40" height="38" rx="8" fill="#FFFFFF"/>
+                    <path d="M28 23C28 20 25.5 18.5 22 18.5C18.5 18.5 16 20 16 22.5C16 27 28 26 28 30.5C28 33 25.5 34.5 22 34.5C18 34.5 16 32.5 16 30" stroke="#EE4D2D" stroke-width="3.2" stroke-linecap="round"/>
+                  </svg>
+                  <span class="shopee-text-logo">Shopee</span>
+                </div>
+              </div>
+              <div class="store-shop-body">
+                <h4 class="store-shop-name">Shopee</h4>
+                <button type="button" class="btn-shop-configure" data-open-store-config="shopee">Configurar</button>
+              </div>
+            </div>
+
+            <!-- 4. MAGALU -->
+            <div class="store-shop-card" data-store-card="magalu">
+              <div class="store-shop-banner banner-magalu">
+                <div class="magalu-wrap">
+                  <span class="magalu-text-logo">magalu</span>
+                  <div class="magalu-gradient-bar"></div>
+                </div>
+              </div>
+              <div class="store-shop-body">
+                <h4 class="store-shop-name">Magalu</h4>
+                <button type="button" class="btn-shop-configure" data-open-store-config="magalu">Configurar</button>
+              </div>
+            </div>
+
+            <!-- 5. ALIEXPRESS -->
+            <div class="store-shop-card" data-store-card="aliexpress">
+              <div class="store-shop-banner banner-ali">
+                <div class="ali-wrap">
+                  <svg viewBox="0 0 54 34" class="ali-bag-icon" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 7C12 21 42 21 42 7" stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round"/>
+                  </svg>
+                  <span class="ali-text-logo">AliExpress</span>
+                </div>
+              </div>
+              <div class="store-shop-body">
+                <h4 class="store-shop-name">Aliexpress</h4>
+                <button type="button" class="btn-shop-configure" data-open-store-config="aliexpress">Configurar</button>
+              </div>
+            </div>
+
           </div>
         </div>
-        <button class="btn-close-modal" data-close>&times;</button>
+
+        <div class="modal-footer modal-footer-dark">
+          <div class="stores-summary-note">
+            <span>✅ 5 lojas suportadas e ativas no conversor automático</span>
+          </div>
+          <button class="btn btn-secondary btn-dark-theme" data-close>Fechar</button>
+        </div>
       </div>
 
-      <div class="modal-body">
-        
-        <!-- Mercado Livre -->
-        <div class="store-box-item">
-          <div class="store-box-header">
-            <div class="store-box-title">
-              <span class="store-tag-badge bg-meli">🟡 Mercado Livre (meli.la)</span>
-              <span class="store-tech-label">OAuth 2.0 Oficial & Linkbuilder</span>
+      <!-- VIEW 2: STORE DETAILED SETTINGS PANEL -->
+      <div id="storesDetailContainer" style="display: none;">
+        <div class="modal-header modal-header-dark">
+          <div class="modal-title-wrap">
+            <button class="btn-back-stores" id="btnBackToStoresGrid" title="Voltar para Lojas">
+              <i data-lucide="arrow-left"></i>
+            </button>
+            <div>
+              <h3 id="storeDetailTitle">Configurar Loja</h3>
+              <p id="storeDetailSubtitle">Parâmetros de afiliação e API</p>
             </div>
-            <span class="badge badge-green" id="meliTokenBadge">OAuth Ativo (24h)</span>
           </div>
-          <div class="store-box-content">
-            <div class="form-row-2">
+          <button class="btn-close-modal btn-close-dark" data-close>&times;</button>
+        </div>
+
+        <div class="modal-body modal-body-dark">
+          
+          <!-- FORM: MERCADO LIVRE -->
+          <div class="store-detail-form" id="formStoreMeli" style="display: none;">
+            <div class="store-config-hero hero-meli">
+              <div class="store-config-hero-left">
+                <span class="store-tag-badge bg-meli">🟡 Mercado Livre (meli.la)</span>
+                <h4>API Oficial Linkbuilder & OAuth 2.0</h4>
+              </div>
+              <span class="badge badge-green" id="meliTokenBadge">Ativo (meli.la)</span>
+            </div>
+            
+            <div class="form-row-2 mt-4">
               <div class="form-group">
                 <label>Tag de Afiliado (matt_word)</label>
                 <input type="text" id="cfgMlTag" value="G20260107233651" placeholder="Ex: G20260107233651">
@@ -448,113 +563,110 @@
               </div>
             </div>
             <div class="token-banner">
-              <span id="meliTokenExpireInfo">Renovação contínua automática 24h ativa no servidor.</span>
+              <span id="meliTokenExpireInfo">Encurtamento meli.la oficial ativo via API Linkbuilder nativa.</span>
               <button class="btn btn-secondary btn-sm" id="btnRefreshMeliToken">🔄 Renovar Token Agora</button>
             </div>
           </div>
-        </div>
 
-        <!-- Shopee -->
-        <div class="store-box-item">
-          <div class="store-box-header">
-            <div class="store-box-title">
-              <span class="store-tag-badge bg-shopee">🟠 Shopee Brasil</span>
-              <span class="store-tech-label">GraphQL API Oficial (s.shopee.com.br)</span>
+          <!-- FORM: AMAZON -->
+          <div class="store-detail-form" id="formStoreAmazon" style="display: none;">
+            <div class="store-config-hero hero-amazon">
+              <div class="store-config-hero-left">
+                <span class="store-tag-badge bg-amazon">📦 Amazon Brasil</span>
+                <h4>SiteStripe API Oficial (amzn.to / link.amazon)</h4>
+              </div>
+              <span class="badge badge-green">SiteStripe Ativo</span>
             </div>
-            <span class="badge badge-green">API Ativa</span>
+
+            <div class="form-group mt-4">
+              <label>Tag de Associado Amazon (Tracking ID)</label>
+              <input type="text" id="cfgAmazonTag" value="ibanez08-20" placeholder="Ex: seunome-20">
+            </div>
           </div>
-          <div class="store-box-content">
-            <div class="form-row-2">
+
+          <!-- FORM: SHOPEE -->
+          <div class="store-detail-form" id="formStoreShopee" style="display: none;">
+            <div class="store-config-hero hero-shopee">
+              <div class="store-config-hero-left">
+                <span class="store-tag-badge bg-shopee">🟠 Shopee Brasil</span>
+                <h4>GraphQL API Oficial (s.shopee.com.br)</h4>
+              </div>
+              <span class="badge badge-green">API Ativa</span>
+            </div>
+
+            <div class="form-row-2 mt-4">
               <div class="form-group">
                 <label>Shopee App ID</label>
-                <input type="text" id="cfgShopeeAppId" value="18378190901">
+                <input type="text" id="cfgShopeeAppId" value="18378190901" placeholder="Shopee App ID">
               </div>
               <div class="form-group">
                 <label>Shopee App Secret</label>
-                <input type="password" id="cfgShopeeAppSecret" value="ITHJMNNGTV4JOSEZLT27UZ3TY7ICCC6L">
+                <input type="password" id="cfgShopeeAppSecret" value="ITHJMNNGTV4JOSEZLT27UZ3TY7ICCC6L" placeholder="Shopee App Secret">
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Amazon -->
-        <div class="store-box-item">
-          <div class="store-box-header">
-            <div class="store-box-title">
-              <span class="store-tag-badge bg-amazon">📦 Amazon Brasil</span>
-              <span class="store-tech-label">SiteStripe API Oficial (link.amazon)</span>
+          <!-- FORM: MAGALU -->
+          <div class="store-detail-form" id="formStoreMagalu" style="display: none;">
+            <div class="store-config-hero hero-magalu">
+              <div class="store-config-hero-left">
+                <span class="store-tag-badge bg-magalu">🔵 Magazine Luiza</span>
+                <h4>Parceiro Magalu / Magazine Você</h4>
+              </div>
+              <span class="badge badge-green">Loja Ativa</span>
             </div>
-            <span class="badge badge-green">SiteStripe Ativo</span>
-          </div>
-          <div class="store-box-content">
-            <div class="form-group">
-              <label>Tag de Associado Amazon</label>
-              <input type="text" id="cfgAmazonTag" value="ibanez08-20">
-            </div>
-          </div>
-        </div>
 
-        <!-- Magazine Luiza -->
-        <div class="store-box-item">
-          <div class="store-box-header">
-            <div class="store-box-title">
-              <span class="store-tag-badge bg-magalu">🔵 Magazine Luiza</span>
-              <span class="store-tech-label">Parceiro Magalu / Magazine Você</span>
-            </div>
-            <span class="badge badge-green">Loja Ativa</span>
-          </div>
-          <div class="store-box-content">
-            <div class="form-group">
-              <label>Nome da Loja Magazine Você</label>
-              <input type="text" id="cfgMagaluTag" value="magazineibanez01">
+            <div class="form-group mt-4">
+              <label>Nome da Loja Magazine Você (Slug)</label>
+              <input type="text" id="cfgMagaluTag" value="magazineibanez01" placeholder="Ex: magazinesualoja">
             </div>
           </div>
-        </div>
 
-        <!-- AliExpress -->
-        <div class="store-box-item">
-          <div class="store-box-header">
-            <div class="store-box-title">
-              <span class="store-tag-badge bg-ali">🔴 AliExpress</span>
-              <span class="store-tech-label">Open Platform API (s.click.aliexpress.com)</span>
+          <!-- FORM: ALIEXPRESS -->
+          <div class="store-detail-form" id="formStoreAliexpress" style="display: none;">
+            <div class="store-config-hero hero-ali">
+              <div class="store-config-hero-left">
+                <span class="store-tag-badge bg-ali">🔴 AliExpress</span>
+                <h4>Open Platform API (s.click.aliexpress.com)</h4>
+              </div>
+              <span class="badge badge-green">API Ativa</span>
             </div>
-            <span class="badge badge-green">API Ativa</span>
-          </div>
-          <div class="store-box-content">
-            <div class="form-row-3">
+
+            <div class="form-row-3 mt-4">
               <div class="form-group">
                 <label>App Key</label>
-                <input type="text" id="cfgAliAppKey" value="544386">
+                <input type="text" id="cfgAliAppKey" value="544386" placeholder="App Key">
               </div>
               <div class="form-group">
                 <label>Tracking ID</label>
-                <input type="text" id="cfgAliTrackingId" value="ibanez">
+                <input type="text" id="cfgAliTrackingId" value="ibanez" placeholder="Tracking ID">
               </div>
               <div class="form-group">
                 <label>App Secret</label>
-                <input type="password" id="cfgAliAppSecret" value="g7NPfxfXQIYYvCHFfTd7VTgRDKgBbYDz">
+                <input type="password" id="cfgAliAppSecret" value="g7NPfxfXQIYYvCHFfTd7VTgRDKgBbYDz" placeholder="App Secret">
               </div>
             </div>
           </div>
+
         </div>
 
+        <div class="modal-footer modal-footer-dark">
+          <button class="btn btn-secondary btn-dark-theme" id="btnCancelStoreDetail">← Voltar</button>
+          <button class="btn btn-primary" id="btnSaveConfigDetail">💾 Salvar Configurações</button>
+        </div>
       </div>
 
-      <div class="modal-footer">
-        <button class="btn btn-secondary" data-close>Cancelar</button>
-        <button class="btn btn-primary" id="btnSaveConfig">💾 Salvar Configurações</button>
-      </div>
     </div>
   </div>
 
-  <!-- MODAL: WHATSAPP CONNECTION (Baileys) -->
+  <!-- MODAL: WHATSAPP CONNECTION -->
   <div class="modal-overlay" id="modal-whatsapp">
     <div class="modal-dialog">
       <div class="modal-header">
         <div class="modal-title-wrap">
           <i data-lucide="smartphone" class="modal-title-icon"></i>
           <div>
-            <h3>Conexão WhatsApp (Baileys)</h3>
+            <h3>Conexão WhatsApp</h3>
             <p>Conecte o bot ao seu WhatsApp para envio nos canais</p>
           </div>
         </div>
@@ -596,14 +708,14 @@
     </div>
   </div>
 
-  <!-- MODAL: TELEGRAM CONNECTION (GramJS) -->
+  <!-- MODAL: TELEGRAM CONNECTION -->
   <div class="modal-overlay" id="modal-telegram">
     <div class="modal-dialog">
       <div class="modal-header">
         <div class="modal-title-wrap">
           <i data-lucide="send" class="modal-title-icon"></i>
           <div>
-            <h3>Origem Telegram (GramJS)</h3>
+            <h3>Origem Telegram</h3>
             <p>Sessão MTProto para escuta de canais de ofertas em tempo real</p>
           </div>
         </div>
@@ -689,34 +801,30 @@
 
       <div class="modal-body">
         
-        <!-- Grid of Channel Cards (Exactly as in uploaded reference image) -->
-        <div class="channels-cards-grid" id="sourceChannelsGrid">
-          <!-- Dynamically populated / pre-rendered cards -->
-        </div>
-
-        <!-- Add Channel Row -->
-        <div class="add-channel-box">
+        <!-- 1. Add Channel Row (TOP) -->
+        <div class="add-channel-box" style="margin-bottom: 1.25rem;">
           <div class="add-channel-title">
             <i data-lucide="plus-circle" class="sub-icon"></i>
             <span>Adicionar Novo Canal de Origem</span>
           </div>
-          <div class="form-row-3" style="margin-top: 0.5rem;">
+          <div class="form-row-2" style="margin-top: 0.5rem;">
             <div class="form-group">
               <label>Nome do Canal</label>
               <input type="text" id="newChName" placeholder="Ex: Jp tech">
             </div>
             <div class="form-group">
               <label>Link ou @handle</label>
-              <input type="text" id="newChUrl" placeholder="https://t.me/... ou @canal">
-            </div>
-            <div class="form-group">
-              <label>Membros (Opcional)</label>
               <div style="display: flex; gap: 0.5rem;">
-                <input type="text" id="newChMembers" placeholder="~2500 membros">
+                <input type="text" id="newChUrl" placeholder="https://t.me/... ou @canal">
                 <button class="btn btn-primary btn-sm" id="btnAddSourceChannel" type="button" style="white-space: nowrap;">+ Adicionar</button>
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- 2. Grid of Channel Cards (MIDDLE) -->
+        <div class="channels-cards-grid" id="sourceChannelsGrid" style="margin-bottom: 1.25rem;">
+          <!-- Dynamically populated / pre-rendered cards -->
         </div>
 
         <!-- Destination Channel Section -->
@@ -899,46 +1007,141 @@
     </div>
   </div>
 
-  <!-- MODAL: ANTI-MARCA D'ÁGUA -->
+  <!-- MODAL: FILTROS & ANTI-MARCA D'ÁGUA -->
   <div class="modal-overlay" id="modal-watermark">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-lg" style="max-width: 780px;">
       <div class="modal-header">
         <div class="modal-title-wrap">
           <i data-lucide="shield-check" class="modal-title-icon"></i>
           <div>
-            <h3>Anti-Marca d'Água & Limpeza de Concorrência</h3>
-            <p>Remove links de canais concorrentes, bots e arrobas automaticamente</p>
+            <h3>Filtros de Mensagens & Banners Personalizados</h3>
+            <p>Gerencie termos e links bloqueados (Blacklist) e substitua banners de cupons pela sua marca</p>
           </div>
         </div>
         <button class="btn-close-modal" data-close>&times;</button>
       </div>
 
-      <div class="modal-body">
-        <div class="toggle-option-row">
-          <div>
-            <strong>Remover @arrobas de canais concorrentes</strong>
-            <p class="text-muted">Limpa menções no texto da mensagem clonada</p>
+      <div class="modal-body" style="max-height: 75vh; overflow-y: auto;">
+        
+        <!-- SECTION 1: LIMPEZA DE TEXTO (REMOVER PALAVRAS/LINHAS MANTENDO A OFERTA) -->
+        <div class="config-section-card">
+          <div class="section-title-wrap">
+            <i data-lucide="scissors" class="section-title-icon" style="color: #10b981;"></i>
+            <div>
+              <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700;">1. Limpeza de Texto (Remover Termos / Linhas das Ofertas)</h4>
+              <p class="text-muted" style="margin: 0.2rem 0 0; font-size: 0.78rem;">
+                Os termos ou linhas abaixo serão <strong>apagados do texto da mensagem</strong> antes de enviar ao seu canal (ex: bot de moedas, aviso de anúncio, links e canais concorrentes). <strong>A oferta continuará sendo enviada normalmente.</strong>
+              </p>
+            </div>
           </div>
-          <span class="badge badge-green">Ativado</span>
-        </div>
-        <div class="toggle-option-row" style="margin-top: 1rem;">
-          <div>
-            <strong>Filtro Anti-Duplicados (4 Horas)</strong>
-            <p class="text-muted">Evita postar a mesma oferta repetida no seu canal</p>
+
+          <div class="blacklist-box">
+            <div style="display: flex; gap: 0.5rem;">
+              <input type="text" id="inputRemoveTerm" placeholder="Ex: bot de moedas, (anuncio), economizandobot, @canalconcorrente" style="flex: 1;">
+              <button class="btn btn-primary btn-sm" id="btnAddRemoveTerm" type="button" style="white-space: nowrap;">
+                <i data-lucide="plus"></i> Adicionar
+              </button>
+            </div>
+
+            <div class="blacklist-tags-container" id="removeTermsTagsContainer" style="margin-top: 0.5rem;">
+              <!-- Dynamically rendered tags -->
+            </div>
           </div>
-          <span class="badge badge-green">Ativado</span>
         </div>
-        <div class="toggle-option-row" style="margin-top: 1rem;">
-          <div>
-            <strong>Limpeza de Links t.me / Moeda Bot</strong>
-            <p class="text-muted">Remove links de bots externos de moedas ou canais</p>
+
+        <!-- SECTION 2: BLACKLIST ESTRITA (BLOQUEIO TOTAL DA MENSAGEM) -->
+        <div class="config-section-card" style="margin-top: 1.25rem;">
+          <div class="section-title-wrap">
+            <i data-lucide="ban" class="section-title-icon" style="color: #ef4444;"></i>
+            <div>
+              <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700;">2. Bloqueio Total de Mensagem (Blacklist Estrita)</h4>
+              <p class="text-muted" style="margin: 0.2rem 0 0; font-size: 0.78rem;">
+                Se a mensagem contiver qualquer um destes termos (ex: redes sociais ou spam), a mensagem será <strong>100% descartada</strong> e não irá para o canal.
+              </p>
+            </div>
           </div>
-          <span class="badge badge-green">Ativado</span>
+
+          <div class="blacklist-box">
+            <div style="display: flex; gap: 0.5rem;">
+              <input type="text" id="inputBlacklistTerm" placeholder="Ex: instagram.com, tiktok.com, grupo vip" style="flex: 1;">
+              <button class="btn btn-primary btn-sm" id="btnAddBlacklistTerm" type="button" style="white-space: nowrap;">
+                <i data-lucide="plus"></i> Adicionar
+              </button>
+            </div>
+
+            <div class="blacklist-tags-container" id="blacklistTagsContainer" style="margin-top: 0.5rem;">
+              <!-- Dynamically rendered tags -->
+            </div>
+          </div>
         </div>
+
+        <!-- SECTION 2: GERENCIADOR DE BANNERS DE CUPONS -->
+        <div class="config-section-card" style="margin-top: 1.25rem;">
+          <div class="section-title-wrap">
+            <i data-lucide="image" class="section-title-icon" style="color: #3b82f6;"></i>
+            <div>
+              <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700;">Substituição de Banners de Cupons</h4>
+              <p class="text-muted" style="margin: 0.2rem 0 0; font-size: 0.78rem;">
+                O bot detecta visualmente banners de cupons de canais concorrentes e substitui pela <strong>sua arte personalizada</strong>.
+              </p>
+            </div>
+          </div>
+
+          <div class="banners-grid-row">
+            <!-- Card Mercado Livre -->
+            <div class="banner-card-item">
+              <div class="banner-card-header">
+                <span class="banner-store-badge badge-meli">🟡 Mercado Livre</span>
+                <span class="badge badge-green" style="font-size: 0.7rem;">Ativo</span>
+              </div>
+              <img id="previewMeliBanner" src="/banners/alerta_cupons_ml_limpo.jpg" alt="Banner ML" class="banner-preview-img" onerror="this.src='/data/banners/alerta_cupons_ml_limpo.jpg'">
+              <div class="banner-upload-btn-wrap">
+                <input type="file" id="fileUploadMeli" accept="image/*" style="display: none;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('fileUploadMeli').click()">
+                  <i data-lucide="upload"></i> Trocar Banner Mercado Livre
+                </button>
+              </div>
+            </div>
+
+            <!-- Card Magalu -->
+            <div class="banner-card-item">
+              <div class="banner-card-header">
+                <span class="banner-store-badge badge-magalu">🔵 Magalu</span>
+                <span class="badge badge-green" style="font-size: 0.7rem;">Ativo</span>
+              </div>
+              <img id="previewMagaluBanner" src="/banners/alerta_cupons_magalu_limpo.jpg" alt="Banner Magalu" class="banner-preview-img" onerror="this.src='/data/banners/alerta_cupons_magalu_limpo.jpg'">
+              <div class="banner-upload-btn-wrap">
+                <input type="file" id="fileUploadMagalu" accept="image/*" style="display: none;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('fileUploadMagalu').click()">
+                  <i data-lucide="upload"></i> Trocar Banner Magalu
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 3: PROTEÇÕES COMPLEMENTARES -->
+        <div class="config-section-card" style="margin-top: 1.25rem;">
+          <div class="toggle-option-row">
+            <div>
+              <strong>Remover @arrobas de canais concorrentes</strong>
+              <p class="text-muted">Limpa automaticamente menções a outros canais no texto da mensagem</p>
+            </div>
+            <span class="badge badge-green">Ativado</span>
+          </div>
+          <div class="toggle-option-row" style="margin-top: 0.85rem;">
+            <div>
+              <strong>Filtro Anti-Duplicados (Cross-Channel 4 Horas)</strong>
+              <p class="text-muted">Evita repassar o mesmo produto repetido se múltiplos canais postarem</p>
+            </div>
+            <span class="badge badge-green">Ativado</span>
+          </div>
+        </div>
+
       </div>
 
       <div class="modal-footer">
-        <button class="btn btn-primary" data-close>Salvar Configurações</button>
+        <button class="btn btn-primary" id="btnSaveBlacklistConfig">Salvar Configurações</button>
       </div>
     </div>
   </div>

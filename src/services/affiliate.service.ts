@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { configService } from '../config/config.service.js';
+import { configService, DEFAULT_CONFIG } from '../config/config.service.js';
 import { logger } from './logger.service.js';
 import { meliAuthService } from './meli-auth.service.js';
 import { urlShortenerService } from './url-shortener.service.js';
@@ -10,12 +10,89 @@ export interface AffiliateResult {
   originalUrl: string;
   store: SupportedStore;
   finalResolvedUrl: string;
+  canonicalProductUrl?: string;
   affiliateUrl: string;
   replaced: boolean;
 }
 
 export class AffiliateService {
   private userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
+  private keepAliveTimer: NodeJS.Timeout | null = null;
+
+  constructor() {
+    this.startKeepAlive();
+  }
+
+  private startKeepAlive(): void {
+    if (this.keepAliveTimer) clearInterval(this.keepAliveTimer);
+    // Runs heartbeat every 20 minutes to keep Amazon and ML session active
+    this.keepAliveTimer = setInterval(async () => {
+      await this.pingAmazonSiteStripeKeepAlive();
+    }, 20 * 60 * 1000);
+  }
+
+  private mergeCookies(oldCookieStr: string, setCookieHeaders: string[]): string {
+    const cookieMap = new Map<string, string>();
+    oldCookieStr.split(';').forEach((pair) => {
+      const parts = pair.trim().split('=');
+      if (parts.length >= 2) {
+        cookieMap.set(parts[0].trim(), parts.slice(1).join('=').trim());
+      }
+    });
+
+    setCookieHeaders.forEach((header) => {
+      const firstPart = header.split(';')[0];
+      const parts = firstPart.trim().split('=');
+      if (parts.length >= 2) {
+        cookieMap.set(parts[0].trim(), parts.slice(1).join('=').trim());
+      }
+    });
+
+    return Array.from(cookieMap.entries()).map(([k, v]) => `${k}=${v}`).join('; ');
+  }
+
+  public async pingAmazonSiteStripeKeepAlive(): Promise<void> {
+    const config = configService.getConfig();
+    const cookie = config.affiliate?.amazonCookie || process.env.AMAZON_COOKIE || '';
+    const tag = config.affiliate?.amazonTag || 'ibanez08-20';
+    if (!cookie || cookie.length < 50) return;
+
+    try {
+      const pingUrl = `https://www.amazon.com.br/associates/sitestripe/getShortUrl?longUrl=${encodeURIComponent('https://www.amazon.com.br/dp/B07Y3WXDTN')}&marketplaceId=526970&storeId=${tag}`;
+      const res = await fetch(pingUrl, {
+        headers: {
+          'User-Agent': this.userAgent,
+          'Accept': 'application/json, text/javascript, */*; q=0.01',
+          'Referer': 'https://www.amazon.com.br/',
+          'X-Requested-With': 'XMLHttpRequest',
+          'Cookie': cookie
+        },
+        signal: AbortSignal.timeout(10000)
+      });
+
+      if (res.ok) {
+        const getSetCookie = (res.headers as any).getSetCookie;
+        if (typeof getSetCookie === 'function') {
+          const newCookies = getSetCookie.call(res.headers);
+          if (Array.isArray(newCookies) && newCookies.length > 0) {
+            const merged = this.mergeCookies(cookie, newCookies);
+            if (merged !== cookie) {
+              configService.saveConfig({
+                affiliate: {
+                  ...config.affiliate,
+                  amazonCookie: merged
+                }
+              });
+              logger.info('AFFILIATE', 'Amazon SiteStripe: Cookies de sessão atualizados automaticamente via keep-alive.');
+            }
+          }
+        }
+        logger.info('AFFILIATE', 'Amazon SiteStripe: Heartbeat keep-alive executado (sessão ativa).');
+      }
+    } catch (err: any) {
+      logger.warn('AFFILIATE', `Aviso no keep-alive da Amazon SiteStripe: ${err.message}`);
+    }
+  }
 
   // Store Regex Patterns
   private readonly STORE_PATTERNS = [
@@ -184,7 +261,19 @@ export class AffiliateService {
     try {
       const parsed = new URL(url);
 
-      // 1. Ensure pathname is valid and not malformed
+      // 1. Do not append query params to meli.la shortlinks or /sec/ (shortlinks cannot be retagged via query params)
+      if (parsed.hostname.includes('meli.la') || parsed.pathname.startsWith('/sec/')) {
+        return url;
+      }
+
+      // 2. Do not tag competitor social/vitrine URLs directly (e.g. /social/concorrente)
+      if (parsed.pathname.includes('/social/') || parsed.pathname.includes('/lista/') || parsed.pathname.includes('/lists/')) {
+        const config = configService.getConfig();
+        const customListUrl = config.affiliate?.mlListShortUrl || process.env.ML_LIST_SHORT_URL || 'https://meli.la/2H1hvz6';
+        return customListUrl;
+      }
+
+      // 3. Ensure pathname is valid and not malformed
       // If it's a /p/MLB... catalog link, we can keep /p/MLBxxxx
       const pMatch = parsed.pathname.match(/\/p\/(MLB\d+)/i);
       if (pMatch) {
@@ -204,7 +293,7 @@ export class AffiliateService {
         }
       }
 
-      // 2. List of junk / tracking / competitor parameters to strip completely
+      // 4. List of junk / tracking / competitor parameters to strip completely
       const junkParams = [
         'ref',
         'forceInApp',
@@ -235,7 +324,7 @@ export class AffiliateService {
 
       junkParams.forEach((param) => parsed.searchParams.delete(param));
 
-      // 3. Attach your affiliate tag
+      // 5. Attach your affiliate tag
       if (tag) {
         if (tag.includes('=')) {
           const tagParams = new URLSearchParams(tag);
@@ -247,26 +336,30 @@ export class AffiliateService {
           parsed.searchParams.set('matt_tool', '3120588434');
         }
       }
-
       return parsed.toString();
     } catch {
       return url;
     }
   }
 
-  /**
-   * Generates official https://meli.la/xxxx link using Mercado Livre's Linkbuilder API if cookie is provided.
-   */
-  public async generateOfficialMeliShortLink(productUrl: string, tag: string): Promise<string | null> {
-    const config = configService.getConfig();
-    const cookie = config.affiliate?.meliCookie || process.env.ML_COOKIE || process.env.MELI_COOKIE || process.env.MERCADOLIVRE_COOKIE || '';
+  private meliCsrfToken: string | null = null;
 
-    if (!cookie) {
-      return null;
+  /**
+   * Retrieves CSRF token either from cookie or by fetching linkbuilder page with fallback.
+   */
+  private async getMeliCsrfToken(cookie: string): Promise<string> {
+    // 1. Check if _csrf is directly in the cookie string
+    const cookieMatch = cookie.match(/_csrf=([^;]+)/);
+    if (cookieMatch && cookieMatch[1]) {
+      this.meliCsrfToken = cookieMatch[1].trim();
+      return this.meliCsrfToken;
+    }
+
+    if (this.meliCsrfToken) {
+      return this.meliCsrfToken;
     }
 
     try {
-      // 1. Get dynamic CSRF Token from Linkbuilder page
       logger.info('AFFILIATE', 'Mercado Livre: Obtendo token CSRF do Linkbuilder oficial...');
       const pageResp = await fetch('https://www.mercadolivre.com.br/afiliados/linkbuilder', {
         headers: {
@@ -277,25 +370,41 @@ export class AffiliateService {
         signal: AbortSignal.timeout(6000)
       });
 
-      if (!pageResp.ok) {
-        logger.warn('AFFILIATE', `Mercado Livre: Falha ao acessar Linkbuilder (HTTP ${pageResp.status})`);
-        return null;
-      }
-
-      const html = await pageResp.text();
-      let csrfToken = '';
-      const m = html.match(/(?:csrfToken|_csrf|csrf)[\"':\s]+[\"']([^\"']+)[\"']/i);
-      if (m && m[1]) {
-        csrfToken = m[1];
-      } else {
-        const cookieMatch = cookie.match(/_csrf=([^;]+)/);
-        if (cookieMatch) {
-          csrfToken = cookieMatch[1];
+      if (pageResp.ok) {
+        const html = await pageResp.text();
+        const m = html.match(/(?:csrfToken|_csrf|csrf)[\"':\s]+[\"']([^\"']+)[\"']/i);
+        if (m && m[1]) {
+          this.meliCsrfToken = m[1].trim();
+          return this.meliCsrfToken;
         }
       }
+    } catch (err: any) {
+      logger.warn('AFFILIATE', `Aviso ao obter CSRF via página: ${err.message}`);
+    }
 
+    return '';
+  }
+
+  /**
+   * Generates official https://meli.la/xxxx link using Mercado Livre's Linkbuilder API if cookie is provided.
+   */
+  public async generateOfficialMeliShortLink(productUrl: string, tag: string): Promise<string | null> {
+    const config = configService.getConfig();
+    let cookie = config.affiliate?.meliCookie || process.env.ML_COOKIE || process.env.MELI_COOKIE || process.env.MERCADOLIVRE_COOKIE || '';
+
+    if (!cookie || cookie.length < 50) {
+      cookie = DEFAULT_CONFIG.affiliate?.meliCookie || '';
+    }
+
+    if (!cookie) {
+      logger.warn('AFFILIATE', 'Mercado Livre: Cookie de afiliados não encontrado.');
+      return null;
+    }
+
+    try {
+      const csrfToken = await this.getMeliCsrfToken(cookie);
       if (!csrfToken) {
-        logger.warn('AFFILIATE', 'Mercado Livre: CSRF token não encontrado na página.');
+        logger.warn('AFFILIATE', 'Mercado Livre: CSRF token não encontrado no cookie.');
         return null;
       }
 
@@ -305,12 +414,14 @@ export class AffiliateService {
         if (match) apiTag = match[1];
       }
       if (!apiTag || apiTag === '6282693331910478') {
-        apiTag = 'G20260107233651';
+        apiTag = config.affiliate?.mlAffiliateTag || config.affiliate?.meliAffiliateTag || DEFAULT_CONFIG.affiliate.mlAffiliateTag || 'G20260107233651';
       }
 
-      logger.info('AFFILIATE', `Mercado Livre: Chamando Linkbuilder com tag ${apiTag}...`);
+      // Ensure clean URL for Linkbuilder
+      const cleanUrl = this.cleanAndTagMercadoLivreUrl(productUrl, '');
 
-      // 2. Call official Linkbuilder createLink endpoint
+      logger.info('AFFILIATE', `Mercado Livre: Solicitando encurtador meli.la oficial para ${cleanUrl} (Tag: ${apiTag}, Cookie: ${cookie.length} chars)...`);
+
       const postResp = await fetch('https://www.mercadolivre.com.br/affiliate-program/api/v2/affiliates/createLink', {
         method: 'POST',
         headers: {
@@ -323,22 +434,26 @@ export class AffiliateService {
           'Cookie': cookie
         },
         body: JSON.stringify({
-          urls: [productUrl],
+          urls: [cleanUrl],
           tag: apiTag
         }),
         signal: AbortSignal.timeout(8000)
       });
 
-      logger.info('AFFILIATE', `Mercado Livre: Linkbuilder POST status HTTP ${postResp.status}`);
-
       if (postResp.ok) {
         const data: any = await postResp.json();
         if (Array.isArray(data?.urls) && data.urls.length > 0) {
-          const shortUrl = data.urls[0]?.short_url || data.urls[0]?.url;
+          const firstResult = data.urls[0];
+          const shortUrl = firstResult?.short_url || firstResult?.url;
           if (shortUrl && (shortUrl.includes('meli.la') || shortUrl.includes('mercadolivre.com/sec'))) {
             return shortUrl;
           }
+          if (firstResult?.message) {
+            logger.warn('AFFILIATE', `Mercado Livre Linkbuilder resposta: ${firstResult.message}`);
+          }
         }
+      } else {
+        logger.warn('AFFILIATE', `Mercado Livre: Linkbuilder POST retornou HTTP ${postResp.status}`);
       }
     } catch (err: any) {
       logger.warn('AFFILIATE', `Aviso ao gerar meli.la oficial via Linkbuilder: ${err.message}`);
@@ -420,41 +535,90 @@ export class AffiliateService {
   }
 
   /**
+   * Extracts tokens (words > 2 chars) for matching
+   */
+  private extractTokens(text: string): string[] {
+    return text
+      .toLowerCase()
+      .replace(/https?:\/\/[^\s]+/g, '')
+      .replace(/[^a-z0-9áéíóúãõâêîôûç]/gi, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length > 2);
+  }
+
+  /**
    * Extracts the underlying featured product from a Mercado Livre social recommendation page
    */
-  public async extractProductFromSocialPage(socialUrl: string): Promise<string | null> {
+  public async extractProductFromSocialPage(socialUrl: string, postText?: string): Promise<string | null> {
     try {
       const res = await fetch(socialUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'User-Agent': this.userAgent,
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
         },
-        signal: AbortSignal.timeout(6000)
+        signal: AbortSignal.timeout(8000)
       });
       if (!res.ok) return null;
       const html = await res.text();
+      const unescaped = html.replace(/\\u002F/g, '/').replace(/\\u0026/g, '&');
 
-      // 1. Check for featured product link in recommendations / card-featured (Priority 1: gets full valid URL)
-      const featuredMatch = html.match(/href=["'](https?:\/\/www\.mercadolivre\.com\.br\/[^"']+\/up\/MLBU[^"']+)["']/i) ||
-                            html.match(/href=["'](https?:\/\/produto\.mercadolivre\.com\.br\/MLB[^"']+)["']/i) ||
-                            html.match(/href=["'](https?:\/\/www\.mercadolivre\.com\.br\/p\/MLB[^"']+)["']/i);
+      // 1. Collect all candidate product URLs
+      const candidateUrls = new Set<string>();
+      const regexes = [
+        /(?:https?:\/\/)?(?:www\.)?mercadolivre\.com\.br\/[^"'\s<>]+\/(?:p|up)\/(?:MLB|MLBU)[0-9A-Za-z_-]+/gi,
+        /(?:https?:\/\/)?(?:produto|www)\.mercadolivre\.com\.br\/MLB-?[0-9]+[^\s"'<>?]*/gi,
+        /"url"\s*:\s*"([^"]*(?:mercadolivre\.com\.br|produto\.mercadolivre)[^"]*(?:\/p\/|\/up\/|MLB)[^"]*)"/gi
+      ];
+
+      for (const reg of regexes) {
+        let m: RegExpExecArray | null;
+        while ((m = reg.exec(unescaped)) !== null) {
+          let rawUrl = (m[1] || m[0]).trim();
+          if (!rawUrl.startsWith('http')) {
+            rawUrl = 'https://' + rawUrl.replace(/^\/+/, '');
+          }
+          const clean = rawUrl.split('?')[0].split('#')[0];
+          if (clean.includes('/p/MLB') || clean.includes('/up/MLBU') || clean.includes('produto.mercadolivre.com.br/MLB')) {
+            candidateUrls.add(clean);
+          }
+        }
+      }
+
+      const list = Array.from(candidateUrls);
+      if (list.length === 0) return null;
+
+      // 2. If postText is available, score candidates based on keyword overlap
+      if (postText) {
+        const postTokens = this.extractTokens(postText);
+        let bestUrl = list[0];
+        let maxScore = -1;
+
+        for (const url of list) {
+          const urlTokens = this.extractTokens(url.replace(/https?:\/\/[^/]+\//, ''));
+          let score = 0;
+          for (const pt of postTokens) {
+            if (urlTokens.includes(pt)) score++;
+          }
+          if (score > maxScore) {
+            maxScore = score;
+            bestUrl = url;
+          }
+        }
+
+        if (maxScore > 0) {
+          return bestUrl;
+        }
+      }
+
+      // 3. Fallback: Priority to card-featured or first candidate
+      const featuredMatch = unescaped.match(/"id"\s*:\s*"card-featured"[\s\S]*?"url"\s*:\s*"([^"]+)"/i);
       if (featuredMatch && featuredMatch[1]) {
-        return featuredMatch[1].replace(/&amp;/g, '&').split('?')[0];
+        let raw = featuredMatch[1];
+        if (!raw.startsWith('http')) raw = 'https://' + raw.replace(/^\/+/, '');
+        return raw.split('?')[0].split('#')[0];
       }
 
-      // 2. Check for item_id in pdp_filters
-      const pdpMatch = html.match(/item_id%3A(MLB-?\d+)/i) || html.match(/item_id=(MLB-?\d+)/i);
-      if (pdpMatch) {
-        const digits = pdpMatch[1].replace(/\D/g, '');
-        return `https://produto.mercadolivre.com.br/MLB-${digits}-_JM`;
-      }
-
-      // 3. Check for wid=MLB...
-      const widMatch = html.match(/wid=(MLB\d+)/i);
-      if (widMatch) {
-        const digits = widMatch[1].replace(/\D/g, '');
-        return `https://produto.mercadolivre.com.br/MLB-${digits}-_JM`;
-      }
+      return list[0];
     } catch (err: any) {
       logger.warn('AFFILIATE', `Aviso ao extrair produto da página social: ${err.message}`);
     }
@@ -463,49 +627,68 @@ export class AffiliateService {
 
   /**
    * Official Mercado Livre Affiliate Link Generator.
-   * Generates clean, official Mercado Livre canonical links or official meli.la showcase links.
+   * Generates clean, direct official Mercado Livre canonical links with affiliate tag.
    */
-  public async gerarAfiliadoMercadoLivre(finalUrl: string): Promise<string> {
+  public async gerarAfiliadoMercadoLivre(finalUrl: string, postText?: string): Promise<{ affiliateUrl: string; canonicalProductUrl?: string }> {
     const config = configService.getConfig();
-    const tag = config.affiliate?.mlAffiliateTag || config.affiliate?.meliAffiliateTag || process.env.ML_AFFILIATE_TAG || process.env.MELI_AFFILIATE_TAG || '';
+    const tag = config.affiliate?.mlAffiliateTag || config.affiliate?.meliAffiliateTag || process.env.ML_AFFILIATE_TAG || process.env.MELI_AFFILIATE_TAG || 'G20260107233651';
     const customListUrl = config.affiliate?.mlListShortUrl || process.env.ML_LIST_SHORT_URL || 'https://meli.la/2H1hvz6';
 
     let targetUrl = finalUrl;
-    const isListOrSocial = finalUrl.toLowerCase().includes('/social/') || finalUrl.toLowerCase().includes('/lista/') || finalUrl.toLowerCase().includes('/lists');
+    let canonicalProductUrl: string | undefined = undefined;
 
-    // 1. Se for link social/recomendação -> extrai o produto real destacado da página
-    if (isListOrSocial) {
-      logger.info('AFFILIATE', 'Mercado Livre: Link social/vitrine detectado. Extraindo produto real da página...');
-      const extractedProduct = await this.extractProductFromSocialPage(finalUrl);
-      if (extractedProduct) {
-        logger.success('AFFILIATE', `Mercado Livre: Produto real extraído com sucesso: ${extractedProduct}`);
-        targetUrl = extractedProduct;
-      } else if (customListUrl) {
-        logger.success('AFFILIATE', `Mercado Livre: Vitrine geral convertida para sua vitrine oficial: ${customListUrl}`);
-        return customListUrl;
+    // 1. Se ainda for shortlink (meli.la ou /sec/) que não resolveu anteriormente, tenta resolver novamente
+    if (targetUrl.includes('meli.la/') || targetUrl.includes('mercadolivre.com/sec/')) {
+      const resolvedAgain = await this.resolveFinalUrl(targetUrl);
+      if (resolvedAgain && !resolvedAgain.includes('meli.la/') && !resolvedAgain.includes('mercadolivre.com/sec/')) {
+        targetUrl = resolvedAgain;
       }
     }
 
-    // 2. Tenta gerar meli.la oficial usando OAuth 2.0 ou Linkbuilder Cookie
+    // 2. Se for link social/recomendação (/social/ ou /lista/ ou /lists/) -> extrai o produto real destacado da página
+    const isListOrSocial = targetUrl.toLowerCase().includes('/social/') || targetUrl.toLowerCase().includes('/lista/') || targetUrl.toLowerCase().includes('/lists');
+    if (isListOrSocial) {
+      logger.info('AFFILIATE', 'Mercado Livre: Link social/vitrine detectado. Extraindo produto real da página...');
+      const extractedProduct = await this.extractProductFromSocialPage(targetUrl, postText);
+      if (extractedProduct) {
+        logger.success('AFFILIATE', `Mercado Livre: Produto real extraído com sucesso: ${extractedProduct}`);
+        targetUrl = extractedProduct;
+        canonicalProductUrl = extractedProduct;
+      } else if (customListUrl) {
+        logger.success('AFFILIATE', `Mercado Livre: Vitrine geral convertida para sua vitrine oficial: ${customListUrl}`);
+        return { affiliateUrl: customListUrl, canonicalProductUrl: customListUrl };
+      }
+    } else {
+      canonicalProductUrl = targetUrl;
+    }
+
+    // 3. Proteção Absoluta: se targetUrl ainda for um shortlink do concorrente ou social do concorrente que não pôde ser resolvido:
+    if (targetUrl.includes('meli.la/') || targetUrl.includes('mercadolivre.com/sec/') || targetUrl.toLowerCase().includes('/social/')) {
+      logger.warn('AFFILIATE', `Mercado Livre: Destino não resolvido em produto único. Substituindo pela sua vitrine oficial: ${customListUrl}`);
+      return { affiliateUrl: customListUrl, canonicalProductUrl: customListUrl };
+    }
+
+    // 4. Tenta gerar meli.la oficial usando Linkbuilder Cookie ou OAuth 2.0
     const rawCleanUrl = this.cleanAndTagMercadoLivreUrl(targetUrl, '');
     
-    // 2a. Linkbuilder API / Cookie (meli.la)
+    // 4a. Linkbuilder API / Cookie (meli.la)
     const officialMeliLa = await this.generateOfficialMeliShortLink(rawCleanUrl, tag);
     if (officialMeliLa) {
       logger.success('AFFILIATE', `Mercado Livre: Link curto oficial meli.la gerado via Linkbuilder: ${officialMeliLa}`);
-      return officialMeliLa;
+      return { affiliateUrl: officialMeliLa, canonicalProductUrl };
     }
 
-    // 2b. OAuth API (Auto-refresh)
+    // 4b. OAuth API (Auto-refresh)
     const oauthMeliLa = await this.generateMeliLinkViaOAuth(rawCleanUrl, tag);
     if (oauthMeliLa) {
       logger.success('AFFILIATE', `Mercado Livre: Link curto oficial meli.la gerado via OAuth: ${oauthMeliLa}`);
-      return oauthMeliLa;
+      return { affiliateUrl: oauthMeliLa, canonicalProductUrl };
     }
 
+    // 4c. Fallback de link canônico oficial do produto direto com a sua tag de afiliado
     const cleanedProductUrl = this.cleanAndTagMercadoLivreUrl(targetUrl, tag);
     logger.success('AFFILIATE', `Mercado Livre: Link oficial de produto gerado: ${cleanedProductUrl}`);
-    return cleanedProductUrl;
+    return { affiliateUrl: cleanedProductUrl, canonicalProductUrl };
   }
 
   /**
@@ -581,7 +764,10 @@ export class AffiliateService {
    */
   public async generateOfficialAmazonShortLink(longUrl: string, tag: string): Promise<string | null> {
     const config = configService.getConfig();
-    const cookie = config.affiliate?.amazonCookie || process.env.AMAZON_COOKIE || '';
+    let cookie = config.affiliate?.amazonCookie || process.env.AMAZON_COOKIE || '';
+    if (!cookie || cookie.length < 50) {
+      cookie = DEFAULT_CONFIG.affiliate?.amazonCookie || '';
+    }
 
     if (!cookie) {
       return null;
@@ -602,6 +788,21 @@ export class AffiliateService {
       });
 
       if (res.ok) {
+        const getSetCookie = (res.headers as any).getSetCookie;
+        if (typeof getSetCookie === 'function') {
+          const newCookies = getSetCookie.call(res.headers);
+          if (Array.isArray(newCookies) && newCookies.length > 0) {
+            const merged = this.mergeCookies(cookie, newCookies);
+            if (merged !== cookie) {
+              configService.saveConfig({
+                affiliate: {
+                  ...config.affiliate,
+                  amazonCookie: merged
+                }
+              });
+            }
+          }
+        }
         const data: any = await res.json();
         const shortUrl = data.shortUrl || data.url;
         if (shortUrl && (shortUrl.includes('amazon') || shortUrl.includes('amzn.to'))) {
@@ -746,18 +947,30 @@ export class AffiliateService {
     const config = configService.getConfig();
     const tag = config.affiliate?.aliexpressTrackingId || process.env.ALIEXPRESS_AFFILIATE_TAG || 'ibanez';
 
-    // 1. Tenta gerar link oficial s.click via API
+    // 1. Tenta gerar link oficial s.click via API diretamente na URL
     const officialShort = await this.generateOfficialAliexpressShortLink(finalUrl, tag);
     if (officialShort) {
       logger.success('AFFILIATE', `AliExpress: Link curto oficial gerado via API: ${officialShort}`);
       return officialShort;
     }
 
-    // 2. Fallback de link canônico oficial
-    const itemMatch = finalUrl.match(/\/item\/(\d+)\.html/i) || finalUrl.match(/item\/(\d+)/i);
+    // 2. Extrai o ID do item decodificando URLs do star.aliexpress ou encoded
+    let decoded = finalUrl;
+    try {
+      decoded = decodeURIComponent(finalUrl);
+    } catch {}
+
+    const itemMatch = decoded.match(/\/item\/(\d+)/i) || decoded.match(/item_id=(\d+)/i) || decoded.match(/productId=(\d+)/i);
     if (itemMatch) {
-      const aliUrl = `https://pt.aliexpress.com/item/${itemMatch[1]}.html?aff_fcid=${tag}&tt=CPS_NORMAL`;
-      logger.success('AFFILIATE', `AliExpress: Link oficial gerado: ${aliUrl}`);
+      const cleanItemUrl = `https://pt.aliexpress.com/item/${itemMatch[1]}.html`;
+      // Tenta gerar short link usando a URL limpa do item
+      const itemShort = await this.generateOfficialAliexpressShortLink(cleanItemUrl, tag);
+      if (itemShort) {
+        logger.success('AFFILIATE', `AliExpress: Link curto oficial gerado via API para item #${itemMatch[1]}: ${itemShort}`);
+        return itemShort;
+      }
+      const aliUrl = `${cleanItemUrl}?aff_fcid=${tag}&tt=CPS_NORMAL`;
+      logger.success('AFFILIATE', `AliExpress: Link oficial de produto gerado: ${aliUrl}`);
       return aliUrl;
     }
 
@@ -776,20 +989,20 @@ export class AffiliateService {
   /**
    * Dispatches generation to the appropriate store method.
    */
-  public async generateAffiliateUrl(store: SupportedStore, finalUrl: string): Promise<string> {
+  public async generateAffiliateUrl(store: SupportedStore, finalUrl: string, postText?: string): Promise<{ affiliateUrl: string; canonicalProductUrl?: string }> {
     switch (store) {
       case 'MERCADO_LIVRE':
-        return await this.gerarAfiliadoMercadoLivre(finalUrl);
+        return await this.gerarAfiliadoMercadoLivre(finalUrl, postText);
       case 'SHOPEE':
-        return await this.gerarAfiliadoShopee(finalUrl);
+        return { affiliateUrl: await this.gerarAfiliadoShopee(finalUrl), canonicalProductUrl: finalUrl };
       case 'AMAZON':
-        return await this.gerarAfiliadoAmazon(finalUrl);
+        return { affiliateUrl: await this.gerarAfiliadoAmazon(finalUrl), canonicalProductUrl: finalUrl };
       case 'MAGALU':
-        return await this.gerarAfiliadoMagalu(finalUrl);
+        return { affiliateUrl: await this.gerarAfiliadoMagalu(finalUrl), canonicalProductUrl: finalUrl };
       case 'ALIEXPRESS':
-        return await this.gerarAfiliadoAliexpress(finalUrl);
+        return { affiliateUrl: await this.gerarAfiliadoAliexpress(finalUrl), canonicalProductUrl: finalUrl };
       default:
-        return finalUrl;
+        return { affiliateUrl: finalUrl, canonicalProductUrl: finalUrl };
     }
   }
 
@@ -816,48 +1029,56 @@ export class AffiliateService {
 
     logger.info('AFFILIATE', `Detectado(s) ${uniqueUrls.length} link(s) na mensagem.`);
 
-    for (const originalUrl of uniqueUrls) {
-      try {
-        logger.info('AFFILIATE', `Processando link original: ${originalUrl}`);
-        const finalResolvedUrl = await this.resolveFinalUrl(originalUrl);
-        logger.info('AFFILIATE', `Link final resolvido: ${finalResolvedUrl}`);
+    const processedResults = await Promise.all(
+      uniqueUrls.map(async (originalUrl) => {
+        try {
+          logger.info('AFFILIATE', `Processando link original: ${originalUrl}`);
+          const finalResolvedUrl = await this.resolveFinalUrl(originalUrl);
+          logger.info('AFFILIATE', `Link final resolvido: ${finalResolvedUrl}`);
 
-        // Identify store from BOTH the final expanded destination URL and the original URL
-        let store = this.identifyStore(finalResolvedUrl);
-        if (store === 'UNKNOWN') {
-          store = this.identifyStore(originalUrl);
+          // Identify store from BOTH the final expanded destination URL and the original URL
+          let store = this.identifyStore(finalResolvedUrl);
+          if (store === 'UNKNOWN') {
+            store = this.identifyStore(originalUrl);
+          }
+
+          if (store === 'UNKNOWN') {
+            logger.info('AFFILIATE', `Link ${originalUrl} não pertence a nenhuma das 5 lojas suportadas. Mantendo original.`);
+            return null;
+          }
+
+          logger.info('AFFILIATE', `Loja identificada: ${store}`);
+          const genResult = await this.generateAffiliateUrl(store, finalResolvedUrl, text);
+          const affiliateUrl = genResult.affiliateUrl;
+
+          return {
+            originalUrl,
+            store,
+            finalResolvedUrl,
+            canonicalProductUrl: genResult.canonicalProductUrl,
+            affiliateUrl: affiliateUrl || originalUrl,
+            replaced: !!affiliateUrl && affiliateUrl !== originalUrl
+          };
+        } catch (err: any) {
+          logger.error('AFFILIATE', `Erro ao processar link ${originalUrl}: ${err.message}`);
+          return {
+            originalUrl,
+            store: 'UNKNOWN' as SupportedStore,
+            finalResolvedUrl: originalUrl,
+            affiliateUrl: originalUrl,
+            replaced: false
+          };
         }
+      })
+    );
 
-        if (store === 'UNKNOWN') {
-          logger.info('AFFILIATE', `Link ${originalUrl} não pertence a nenhuma das 5 lojas suportadas. Mantendo original.`);
-          continue;
-        }
-
-        logger.info('AFFILIATE', `Loja identificada: ${store}`);
-        const affiliateUrl = await this.generateAffiliateUrl(store, finalResolvedUrl);
-
-        if (affiliateUrl && affiliateUrl !== originalUrl) {
-          logger.success('AFFILIATE', `Substituindo [${store}]: ${originalUrl} -> ${affiliateUrl}`);
-          // Replace all instances of originalUrl with affiliateUrl
-          updatedText = updatedText.split(originalUrl).join(affiliateUrl);
-        }
-
-        results.push({
-          originalUrl,
-          store,
-          finalResolvedUrl,
-          affiliateUrl: affiliateUrl || originalUrl,
-          replaced: !!affiliateUrl && affiliateUrl !== originalUrl
-        });
-      } catch (err: any) {
-        logger.error('AFFILIATE', `Erro ao processar link ${originalUrl}: ${err.message}`);
-        results.push({
-          originalUrl,
-          store: 'UNKNOWN',
-          finalResolvedUrl: originalUrl,
-          affiliateUrl: originalUrl,
-          replaced: false
-        });
+    for (const res of processedResults) {
+      if (!res) continue;
+      results.push(res);
+      if (res.replaced && res.affiliateUrl && res.affiliateUrl !== res.originalUrl) {
+        logger.success('AFFILIATE', `Substituindo [${res.store}]: ${res.originalUrl} -> ${res.affiliateUrl}`);
+        // Replace all instances of originalUrl with affiliateUrl
+        updatedText = updatedText.split(res.originalUrl).join(res.affiliateUrl);
       }
     }
 
@@ -868,10 +1089,21 @@ export class AffiliateService {
   }
 
   /**
-   * Sanitizes competitor promotions, telegram channels, coin bots and self-promotions
+   * Sanitizes competitor promotions, telegram channels, coin bots, custom removeTerms keywords and self-promotions.
+   * Strips matching lines/terms so valid product offers can still be forwarded cleanly.
    */
   public sanitizeCompetitorText(text: string): string {
     if (!text) return '';
+
+    const config = configService.getConfig();
+    const removeTerms = config.filters?.removeTerms || [
+      'bot de moedas',
+      'economizandobot',
+      't.me/economizandobot',
+      '(anuncio)',
+      '@economizandocomjp'
+    ];
+    const lowerRemoveTerms = removeTerms.map((b) => b.trim().toLowerCase()).filter(Boolean);
 
     const lines = text.split('\n');
     const cleanedLines: string[] = [];
@@ -880,7 +1112,17 @@ export class AffiliateService {
       const trimmed = line.trim();
       const lower = trimmed.toLowerCase();
 
-      // Drop lines promoting competitor bots (coin bots, coupon bots, etc.)
+      // 1. Check dynamic removeTerms keywords from config
+      const matchesRemoveTerm = lowerRemoveTerms.some((kw) => lower.includes(kw));
+      if (matchesRemoveTerm) {
+        // If line is ONLY an unwanted promotion / bot link (does NOT contain a store product link), drop this line
+        const hasStoreLink = /meli\.la|mercadolivre|shopee|amzn\.to|amazon|magazinevoce|magazineluiza|aliexpress/i.test(line);
+        if (!hasStoreLink) {
+          continue;
+        }
+      }
+
+      // 2. Drop lines promoting competitor bots (coin bots, coupon bots, etc.)
       if (
         lower.includes('bot de moedas') ||
         lower.includes('bot de cupom') ||
@@ -891,7 +1133,7 @@ export class AffiliateService {
         continue;
       }
 
-      // Drop lines promoting competitor Telegram channels, groups, or direct t.me links
+      // 3. Drop lines promoting competitor Telegram channels, groups, or direct t.me links
       if (
         lower.includes('t.me/') ||
         lower.includes('telegram.me/') ||
@@ -918,20 +1160,35 @@ export class AffiliateService {
         continue;
       }
 
-      // Remove competitor handles
-      const cleanedHandleLine = line
+      // 4. Remove lines that are only "(ANUNCIO)" or "ANUNCIO"
+      if (/^\(?\s*an[uú]ncio\s*\)?$/i.test(line.trim())) {
+        continue;
+      }
+
+      // 5. Remove competitor handles
+      let cleanedHandleLine = line
         .replace(/@economizandocomjp\b/gi, '')
         .replace(/@economizandobot\b/gi, '')
         .replace(/@promos_tech1\b/gi, '')
         .replace(/@jptechofertasgerais\b/gi, '')
         .replace(/@portaldossachadinhos\b/gi, '')
-        .trim();
+        .replace(/\(?\s*an[uú]ncio\s*\)?$/i, '');
+
+      // Remove any removeTerms that appear as inline words
+      for (const rTerm of lowerRemoveTerms) {
+        if (rTerm.length >= 2 && !rTerm.includes('http')) {
+          const reg = new RegExp(rTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+          cleanedHandleLine = cleanedHandleLine.replace(reg, '');
+        }
+      }
+
+      cleanedHandleLine = cleanedHandleLine.trim();
 
       if (/^[-\s:•*~#_]+$/.test(cleanedHandleLine)) {
         continue;
       }
 
-      cleanedLines.push(line);
+      cleanedLines.push(cleanedHandleLine);
     }
 
     return cleanedLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
@@ -944,9 +1201,9 @@ export class AffiliateService {
     if (!url) return null;
     const lower = url.toLowerCase();
 
-    // Mercado Livre (MLB12345678 or /p/MLBxxxx)
+    // Mercado Livre (MLB12345678, MLBU12345678, /p/MLBxxxx, /up/MLBUxxxx)
     if (lower.includes('mercadolivre') || lower.includes('meli.la')) {
-      const mlbMatch = url.match(/(MLB-?\d+)/i) || url.match(/\/p\/([a-zA-Z0-9]+)/i);
+      const mlbMatch = url.match(/(MLBU?-?\d+)/i) || url.match(/\/p\/([a-zA-Z0-9]+)/i) || url.match(/\/up\/([a-zA-Z0-9]+)/i);
       if (mlbMatch) {
         return `ml_${mlbMatch[1].replace('-', '').toUpperCase()}`;
       }
