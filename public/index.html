@@ -107,9 +107,12 @@
           <span class="nav-label">Monitoramento</span>
         </a>
 
-        <a href="#" class="nav-item" data-modal="modal-simulation">
-          <i data-lucide="send" class="nav-icon"></i>
-          <span class="nav-label">Disparo Manual</span>
+        <a href="#" class="nav-item" data-modal="modal-simulation" id="sidebarManualItem">
+          <div class="nav-group-left">
+            <i data-lucide="send" class="nav-icon"></i>
+            <span class="nav-label">Disparo Manual</span>
+          </div>
+          <span class="queue-count-badge hidden" id="sidebarManualBadge">0</span>
         </a>
 
         <a href="#" class="nav-item" data-modal="modal-queue">
@@ -868,40 +871,110 @@
     </div>
   </div>
 
-  <!-- MODAL: DISPARO MANUAL / SIMULADOR -->
+  <!-- MODAL: CENTRAL DE DISPARO MANUAL & FILA DE OFERTAS -->
   <div class="modal-overlay" id="modal-simulation">
-    <div class="modal-dialog">
-      <div class="modal-header">
+    <div class="modal-dialog modal-xl modal-dark-theme">
+      
+      <div class="modal-header modal-header-dark">
         <div class="modal-title-wrap">
-          <i data-lucide="send" class="modal-title-icon"></i>
+          <i data-lucide="send" class="modal-title-icon text-brand"></i>
           <div>
-            <h3>Disparo Manual & Simulador</h3>
-            <p>Teste o envio de uma oferta diretamente para seu canal do WhatsApp</p>
+            <h3>Central de Disparo Manual</h3>
+            <p>Revise suas ofertas selecionadas, personalize o texto antes do envio e dispare com 1 clique para o WhatsApp</p>
           </div>
         </div>
-        <button class="btn-close-modal" data-close>&times;</button>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <button type="button" class="btn btn-secondary btn-sm" id="btnClearManualQueue" title="Limpar todos os produtos da fila">
+            <i data-lucide="trash-2"></i> <span>Limpar Fila</span>
+          </button>
+          <button type="button" class="btn btn-primary btn-sm" id="btnDispatchAllManual" title="Disparar todas as ofertas da fila em lote">
+            <i data-lucide="send"></i> <span>Disparar Todos (<span id="manualQueueBtnCount">0</span>)</span>
+          </button>
+          <button class="btn-close-modal btn-close-dark" data-close>&times;</button>
+        </div>
       </div>
 
-      <div class="modal-body">
+      <div class="modal-body modal-body-dark">
         
-        <div class="form-group">
-          <label>Texto da Oferta</label>
-          <textarea id="simText" rows="4">🔥 [OFERTA TESTE] Fone de Ouvido Bluetooth TWS Pro
-💰 Por apenas R$ 79,90 com Frete Grátis!
-👉 Compre aqui: https://produto.mercadolivre.com.br/MLB-6233177660-_JM</textarea>
+        <!-- Navigation Tabs: Queue vs Custom -->
+        <div class="manual-tabs-bar">
+          <button type="button" class="manual-tab-btn active" id="tabBtnManualQueue" data-tab="queue">
+            <i data-lucide="list-checks" style="width: 15px; height: 15px;"></i>
+            <span>Fila de Ofertas (<strong id="manualQueueCountBadge">0</strong>)</span>
+          </button>
+          <button type="button" class="manual-tab-btn" id="tabBtnManualCustom" data-tab="custom">
+            <i data-lucide="edit" style="width: 15px; height: 15px;"></i>
+            <span>Criar Disparo Avulso / Teste</span>
+          </button>
         </div>
 
-        <div class="form-group">
-          <label>URL da Imagem (Opcional)</label>
-          <input type="text" id="simImage" value="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500">
+        <!-- TAB 1: FILA DE OFERTAS SELECIONADAS -->
+        <div id="paneManualQueue" class="manual-tab-pane active">
+          
+          <!-- Empty State -->
+          <div id="manualQueueEmptyState" class="manual-queue-empty">
+            <i data-lucide="package-open" class="empty-icon"></i>
+            <h4>Sua fila de disparo manual está vazia</h4>
+            <p>Vá em <strong>Divulgador & Ofertas</strong> ou <strong>Achadinhos Shopee</strong> e clique no botão <strong>"+ Disparo manual"</strong> em qualquer oferta para trazê-la para cá e personalizar a mensagem antes de disparar.</p>
+            <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+              <button type="button" class="btn btn-primary btn-sm" data-modal="modal-promoter">
+                <i data-lucide="megaphone"></i> <span>Abrir Divulgador & Ofertas</span>
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" data-modal="modal-shopee-finder">
+                <i data-lucide="shopping-bag"></i> <span>Ver Achadinhos Shopee</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Queue Items Grid / List -->
+          <div id="manualQueueList" class="manual-queue-items-list hidden">
+            <!-- Dynamic items rendered via JS -->
+          </div>
+
+        </div>
+
+        <!-- TAB 2: DISPARO AVULSO / TESTE -->
+        <div id="paneManualCustom" class="manual-tab-pane hidden">
+          <div class="config-section-card" style="padding: 1.25rem;">
+            <div class="form-group">
+              <label class="form-label">
+                <i data-lucide="message-square" style="width: 14px; height: 14px; color: var(--accent-orange);"></i>
+                Texto da Mensagem Avulsa (Suporta Formatação do WhatsApp)
+              </label>
+              <textarea id="simText" class="form-control form-control-dark" rows="6" placeholder="Digite a mensagem promocional com link de afiliado...">⚡ *OFERTA IMPERDÍVEL!* 🛍️
+
+🔥 *Fone de Ouvido Bluetooth TWS Pro*
+💰 Por apenas *R$ 79,90* com Frete Grátis!
+
+🛒 Compre aqui: https://produto.mercadolivre.com.br/MLB-6233177660-_JM</textarea>
+            </div>
+
+            <div class="form-group" style="margin-top: 1rem;">
+              <label class="form-label">
+                <i data-lucide="image" style="width: 14px; height: 14px; color: #3b82f6;"></i>
+                URL da Imagem / Foto do Produto (Opcional)
+              </label>
+              <input type="text" id="simImage" class="form-control form-control-dark" value="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600" placeholder="https://...">
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; margin-top: 1.25rem;">
+              <button type="button" class="btn btn-primary" id="btnSimulate">
+                <i data-lucide="send"></i> <span>🚀 Disparar Oferta Avulsa no WhatsApp</span>
+              </button>
+            </div>
+          </div>
         </div>
 
       </div>
 
-      <div class="modal-footer">
-        <button class="btn btn-secondary" data-close>Fechar</button>
-        <button class="btn btn-primary" id="btnSimulate">🚀 Disparar Oferta no WhatsApp</button>
+      <div class="modal-footer modal-footer-dark" style="justify-content: space-between;">
+        <span class="text-muted" style="font-size: 0.8rem;">
+          <i data-lucide="shield-check" style="width: 14px; height: 14px; color: #10b981;"></i>
+          Links são automaticamente convertidos para seu ID de Afiliado ao disparar.
+        </span>
+        <button class="btn btn-secondary btn-sm" data-close>Fechar</button>
       </div>
+
     </div>
   </div>
 
@@ -1249,6 +1322,86 @@
           <button type="button" class="btn btn-primary btn-sm" data-close>Concluído</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ACHADINHOS SHOPEE (100% OFERTAS SHOPEE) -->
+  <div class="modal-overlay" id="modal-shopee-finder">
+    <div class="modal-dialog modal-xl modal-dark-theme">
+      
+      <div class="modal-header modal-header-dark">
+        <div class="modal-title-wrap">
+          <i data-lucide="shopping-bag" class="modal-title-icon" style="color: #ee4d2d;"></i>
+          <div>
+            <h3>Achadinhos Shopee (Ofertas Oficiais)</h3>
+            <p>Garimpo em tempo real direto da API Oficial da Shopee com links de afiliado automáticos</p>
+          </div>
+        </div>
+        <button class="btn-close-modal btn-close-dark" data-close>&times;</button>
+      </div>
+
+      <div class="modal-body modal-body-dark" style="padding: 1.25rem 1.5rem;">
+        
+        <!-- Controls Bar for Shopee -->
+        <div class="divulgador-controls-wrap">
+          <!-- Search Bar -->
+          <div class="divulgador-search-box">
+            <i data-lucide="search" class="search-icon"></i>
+            <input type="text" id="inputShopeeSearch" placeholder="Buscar achadinho ou produto na Shopee..." autocomplete="off">
+            <button type="button" id="btnClearShopeeSearch" class="btn-clear-search hidden">&times;</button>
+          </div>
+
+          <!-- Category Pills -->
+          <div class="divulgador-category-pills" id="shopeeCategoryPills">
+            <button type="button" class="cat-pill active" data-cat="ALL">Todos os Nichos</button>
+            <button type="button" class="cat-pill" data-cat="Achadinhos">✨ Achadinhos Virais</button>
+            <button type="button" class="cat-pill" data-cat="Tech">⚡ Tech & Celular</button>
+            <button type="button" class="cat-pill" data-cat="Casa">🏠 Casa & Cozinha</button>
+            <button type="button" class="cat-pill" data-cat="Beleza">💄 Beleza & Skincare</button>
+            <button type="button" class="cat-pill" data-cat="Moda">👟 Moda & Calçados</button>
+          </div>
+        </div>
+
+        <!-- Shopee Grid Container -->
+        <div class="divulgador-grid-container">
+          <div id="shopeeGrid" class="divulgador-grid">
+            <!-- Dynamic Cards Loaded via JavaScript -->
+          </div>
+
+          <!-- Empty State -->
+          <div id="shopeeEmptyState" class="divulgador-empty-state hidden">
+            <i data-lucide="shopping-bag" class="empty-icon" style="color: #ee4d2d;"></i>
+            <h4>Nenhum achadinho encontrado na Shopee</h4>
+            <p>Tente ajustar a categoria ou o termo de busca acima.</p>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="modal-footer modal-footer-dark" style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+        <div class="divulgador-footer-info">
+          <strong id="shopeeCountText" style="color: #ffffff; font-size: 0.88rem;">Carregando achadinhos da Shopee...</strong>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div class="divulgador-pagination" id="shopeePagination">
+          <button type="button" class="btn btn-secondary btn-sm" id="btnShopeePrev" disabled>
+            <i data-lucide="chevron-left"></i> Anterior
+          </button>
+          <span id="shopeePageInfo" style="font-size: 0.82rem; font-weight: 600; color: var(--dark-text-muted); padding: 0 0.4rem;">Página 1</span>
+          <button type="button" class="btn btn-secondary btn-sm" id="btnShopeeNext" disabled>
+            Próxima <i data-lucide="chevron-right"></i>
+          </button>
+        </div>
+
+        <div class="modal-footer-actions">
+          <button type="button" class="btn btn-secondary btn-sm" id="btnHarvestShopee" title="Sincronizar promoções com a API Oficial da Shopee">
+            <i data-lucide="sparkles"></i> <span>Atualizar Shopee</span>
+          </button>
+          <button type="button" class="btn btn-primary btn-sm" data-close>Concluído</button>
+        </div>
+      </div>
+
     </div>
   </div>
 

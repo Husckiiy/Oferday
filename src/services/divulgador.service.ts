@@ -516,17 +516,23 @@ class DivulgadorService {
     const finalAffiliateUrl = affiliateProcessed.text || offer.productUrl;
     const config = configService.getConfig();
 
-    // 2. Montar texto promocional usando o Template Service configurado
-    const messageText = templateService.render(config.template?.customTemplate, {
-      title: offer.title,
-      store: offer.store,
-      originalPrice: offer.originalPrice,
-      promoPrice: offer.promoPrice,
-      discountPercent: offer.discountPercent,
-      coupon: offer.coupon,
-      affiliateUrl: finalAffiliateUrl,
-      category: offer.category
-    });
+    // 2. Montar texto promocional (se tiver customMessageText vindo do Disparo Manual, usa ele diretamente)
+    let messageText = '';
+    const customText = (offer as any)?.customMessageText || (offerIdOrData as any)?.customMessageText;
+    if (customText && typeof customText === 'string' && customText.trim().length > 0) {
+      messageText = customText.trim();
+    } else {
+      messageText = templateService.render(config.template?.customTemplate, {
+        title: offer.title,
+        store: offer.store,
+        originalPrice: offer.originalPrice,
+        promoPrice: offer.promoPrice,
+        discountPercent: offer.discountPercent,
+        coupon: offer.coupon,
+        affiliateUrl: finalAffiliateUrl,
+        category: offer.category
+      });
+    }
 
     // 3. Processar e baixar imagem diretamente da fonte
     let finalMediaBuffer: Buffer | null = null;

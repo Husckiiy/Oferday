@@ -1540,6 +1540,8 @@ window.addEventListener('DOMContentLoaded', () => {
   setupSSE();
   initDivulgadorEvents();
   initTemplateEvents();
+  initManualQueueEvents();
+  initShopeeFinderEvents();
 });
 
 // ==========================================================================
@@ -1702,11 +1704,15 @@ function renderDivulgadorGrid(offers) {
 
         <div class="offer-card-footer">
           <a href="${offer.productUrl}" target="_blank" rel="noopener noreferrer" class="btn-offer-view" title="Ver produto na loja">
-            <i data-lucide="external-link" style="width: 16px; height: 16px;"></i>
+            <i data-lucide="external-link" style="width: 15px; height: 15px;"></i>
           </a>
-          <button type="button" class="btn-offer-dispatch" data-dispatch-id="${offer.id}">
-            <i data-lucide="send" style="width: 15px; height: 15px;"></i>
-            <span>Disparar Agora</span>
+          <button type="button" class="btn-offer-manual" data-manual-id="${offer.id}" title="Adicionar à fila de Disparo Manual para personalizar a mensagem">
+            <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
+            <span>Disparo manual</span>
+          </button>
+          <button type="button" class="btn-offer-dispatch" data-dispatch-id="${offer.id}" title="Disparar direto para o WhatsApp">
+            <i data-lucide="send" style="width: 14px; height: 14px;"></i>
+            <span>Disparar</span>
           </button>
         </div>
       </div>
@@ -1716,6 +1722,12 @@ function renderDivulgadorGrid(offers) {
     const btnDispatch = card.querySelector('.btn-offer-dispatch');
     btnDispatch?.addEventListener('click', () => {
       dispatchDivulgadorOffer(offer, btnDispatch);
+    });
+
+    // Bind manual queue button
+    const btnManual = card.querySelector('.btn-offer-manual');
+    btnManual?.addEventListener('click', () => {
+      addToManualDispatchQueue(offer, btnManual);
     });
 
     grid.appendChild(card);
@@ -2178,3 +2190,574 @@ function initTemplateEvents() {
     });
   });
 }
+
+// ==========================================================================
+// CENTRAL DE DISPARO MANUAL (FILA DE OFERTAS & EDIÇÃO INDIVIDUAL)
+// ==========================================================================
+const manualQueueState = {
+  queue: []
+};
+
+function loadManualQueueFromStorage() {
+  try {
+    const raw = localStorage.getItem('oferday_manual_queue');
+    if (raw) {
+      manualQueueState.queue = JSON.parse(raw) || [];
+    }
+  } catch {
+    manualQueueState.queue = [];
+  }
+  updateManualQueueBadges();
+  renderManualQueueList();
+}
+
+function saveManualQueueToStorage() {
+  try {
+    localStorage.setItem('oferday_manual_queue', JSON.stringify(manualQueueState.queue));
+  } catch {}
+  updateManualQueueBadges();
+}
+
+function updateManualQueueBadges() {
+  const count = manualQueueState.queue.length;
+  const sidebarBadge = document.getElementById('sidebarManualBadge');
+  const modalBadge = document.getElementById('manualQueueCountBadge');
+  const btnCount = document.getElementById('manualQueueBtnCount');
+
+  if (sidebarBadge) {
+    sidebarBadge.textContent = count;
+    if (count > 0) sidebarBadge.classList.remove('hidden');
+    else sidebarBadge.classList.add('hidden');
+  }
+
+  if (modalBadge) modalBadge.textContent = count;
+  if (btnCount) btnCount.textContent = count;
+}
+
+function addToManualDispatchQueue(offer, btnElement) {
+  if (!offer) return;
+
+  // Gerar mensagem inicial usando o template padrão configurado
+  const defaultFormattedText = renderClientTemplate(templateState.currentTemplate || templateState.presets[0]?.template, {
+    title: offer.title,
+    store: offer.store,
+    originalPrice: offer.originalPrice,
+    promoPrice: offer.promoPrice,
+    discountPercent: offer.discountPercent,
+    coupon: offer.coupon,
+    affiliateUrl: offer.productUrl,
+    category: offer.category
+  });
+
+  const existingIdx = manualQueueState.queue.findIndex(item => item.id === offer.id);
+  if (existingIdx !== -1) {
+    showToast('ℹ️ Este produto já está na sua fila de Disparo Manual!');
+  } else {
+    manualQueueState.queue.push({
+      id: offer.id || String(Date.now()),
+      title: offer.title,
+      store: offer.store,
+      imageUrl: offer.imageUrl,
+      productUrl: offer.productUrl,
+      originalPrice: offer.originalPrice,
+      promoPrice: offer.promoPrice,
+      discountPercent: offer.discountPercent,
+      coupon: offer.coupon,
+      category: offer.category,
+      customMessageText: defaultFormattedText,
+      addedAt: new Date().toISOString()
+    });
+
+    saveManualQueueToStorage();
+    renderManualQueueList();
+    showToast('📋 Produto adicionado ao Disparo Manual! Você pode editar a mensagem antes de enviar.');
+  }
+
+  if (btnElement) {
+    btnElement.classList.add('added');
+    btnElement.innerHTML = `<i data-lucide="check" style="width: 14px; height: 14px;"></i> <span>Adicionado</span>`;
+    if (window.lucide) lucide.createIcons();
+  }
+}
+
+function removeFromManualQueue(itemId) {
+  manualQueueState.queue = manualQueueState.queue.filter(item => item.id !== itemId);
+  saveManualQueueToStorage();
+  renderManualQueueList();
+  showToast('🗑️ Oferta removida da fila de disparo.');
+}
+
+function renderManualQueueList() {
+  const container = document.getElementById('manualQueueList');
+  const emptyState = document.getElementById('manualQueueEmptyState');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  if (manualQueueState.queue.length === 0) {
+    if (emptyState) emptyState.classList.remove('hidden');
+    container.classList.add('hidden');
+    return;
+  }
+
+  if (emptyState) emptyState.classList.add('hidden');
+  container.classList.remove('hidden');
+
+  manualQueueState.queue.forEach((item) => {
+    const storeInfo = storeConfigsUI[item.store] || { name: item.store, emoji: '🛍️', color: '#f97316' };
+    const card = document.createElement('div');
+    card.className = 'manual-queue-item-card';
+
+    const safeImg = item.imageUrl || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=400&q=80';
+    const oldPriceStr = item.originalPrice && item.originalPrice > item.promoPrice ? `<s style="color: var(--dark-text-muted); font-size: 0.78rem;">R$ ${formatCurrencyBRL(item.originalPrice)}</s> ` : '';
+    const discountStr = item.discountPercent ? ` <span class="offer-discount-badge" style="font-size: 0.7rem;">-${item.discountPercent}%</span>` : '';
+
+    card.innerHTML = `
+      <div class="queue-item-thumb">
+        <img src="${safeImg}" alt="${escapeHtml(item.title)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.src='/api/proxy-image?url=' + encodeURIComponent('${encodeURIComponent(safeImg)}')">
+      </div>
+
+      <div class="queue-item-editor">
+        <div class="queue-item-header">
+          <span class="offer-store-tag" style="color: ${storeInfo.color};">
+            <span>${storeInfo.emoji}</span> ${storeInfo.name}
+          </span>
+          <div style="font-size: 0.82rem; font-weight: 700; color: #22c55e;">
+            ${oldPriceStr}R$ ${formatCurrencyBRL(item.promoPrice)}${discountStr}
+          </div>
+        </div>
+
+        <div class="queue-item-title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>
+
+        <label style="font-size: 0.72rem; color: var(--dark-text-muted); font-weight: 600; display: flex; align-items: center; gap: 0.3rem;">
+          <i data-lucide="edit-2" style="width: 12px; height: 12px; color: var(--accent-orange);"></i>
+          Mensagem personalizada da oferta (edite à vontade antes de disparar):
+        </label>
+        
+        <textarea class="queue-item-textarea" rows="5" spellcheck="false">${escapeHtml(item.customMessageText || '')}</textarea>
+      </div>
+
+      <div class="queue-item-actions">
+        <button type="button" class="btn-queue-dispatch" data-item-id="${item.id}">
+          <i data-lucide="send" style="width: 14px; height: 14px;"></i>
+          <span>Disparar Agora</span>
+        </button>
+        <button type="button" class="btn-queue-remove" data-remove-id="${item.id}">
+          <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
+          <span>Remover</span>
+        </button>
+      </div>
+    `;
+
+    // Bind textarea edit auto-save
+    const textarea = card.querySelector('.queue-item-textarea');
+    textarea?.addEventListener('input', () => {
+      item.customMessageText = textarea.value;
+      saveManualQueueToStorage();
+    });
+
+    // Bind dispatch single
+    const btnDispatch = card.querySelector('.btn-queue-dispatch');
+    btnDispatch?.addEventListener('click', () => {
+      dispatchSingleManualOffer(item, textarea?.value || item.customMessageText, btnDispatch);
+    });
+
+    // Bind remove
+    const btnRemove = card.querySelector('.btn-queue-remove');
+    btnRemove?.addEventListener('click', () => {
+      removeFromManualQueue(item.id);
+    });
+
+    container.appendChild(card);
+  });
+
+  if (window.lucide) lucide.createIcons();
+}
+
+async function dispatchSingleManualOffer(item, customText, btnElement) {
+  if (btnElement.classList.contains('loading')) return;
+
+  const originalContent = btnElement.innerHTML;
+  btnElement.classList.add('loading');
+  btnElement.innerHTML = `<span>Enviando...</span>`;
+
+  try {
+    const res = await fetch('/api/divulgador/dispatch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        offerData: {
+          ...item,
+          customMessageText: customText || item.customMessageText
+        }
+      })
+    });
+
+    const data = await res.json();
+    if (data && data.success) {
+      btnElement.classList.remove('loading');
+      btnElement.classList.add('dispatched');
+      btnElement.innerHTML = `<i data-lucide="check" style="width: 14px; height: 14px;"></i> <span>Disparado!</span>`;
+      showToast('🚀 Oferta disparada para o WhatsApp com sucesso!');
+
+      // Remove after 1.5s
+      setTimeout(() => {
+        removeFromManualQueue(item.id);
+      }, 1500);
+    } else {
+      showToast('⚠️ Falha ao disparar. Verifique se o WhatsApp está conectado.');
+      btnElement.classList.remove('loading');
+      btnElement.innerHTML = originalContent;
+    }
+  } catch (err) {
+    showToast('❌ Erro de conexão ao disparar oferta.');
+    btnElement.classList.remove('loading');
+    btnElement.innerHTML = originalContent;
+  }
+}
+
+async function dispatchAllManualQueue(btnElement) {
+  if (manualQueueState.queue.length === 0) {
+    showToast('ℹ️ A fila de disparo manual está vazia.');
+    return;
+  }
+
+  if (btnElement.classList.contains('loading')) return;
+
+  const originalContent = btnElement.innerHTML;
+  btnElement.classList.add('loading');
+  btnElement.innerHTML = `<span>Disparando lote...</span>`;
+  showToast(`🚀 Iniciando envio em lote de ${manualQueueState.queue.length} ofertas...`);
+
+  const queueCopy = [...manualQueueState.queue];
+  let sentCount = 0;
+
+  for (let i = 0; i < queueCopy.length; i++) {
+    const item = queueCopy[i];
+    try {
+      await fetch('/api/divulgador/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          offerData: {
+            ...item,
+            customMessageText: item.customMessageText
+          }
+        })
+      });
+      sentCount++;
+    } catch {}
+
+    // Delay between messages to avoid spam
+    if (i < queueCopy.length - 1) {
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+
+  manualQueueState.queue = [];
+  saveManualQueueToStorage();
+  renderManualQueueList();
+
+  btnElement.classList.remove('loading');
+  btnElement.innerHTML = originalContent;
+  showToast(`🎉 ${sentCount} ofertas disparadas com sucesso para o WhatsApp!`);
+}
+
+function initManualQueueEvents() {
+  loadManualQueueFromStorage();
+
+  // Tab switching
+  const tabBtnQueue = document.getElementById('tabBtnManualQueue');
+  const tabBtnCustom = document.getElementById('tabBtnManualCustom');
+  const paneQueue = document.getElementById('paneManualQueue');
+  const paneCustom = document.getElementById('paneManualCustom');
+
+  tabBtnQueue?.addEventListener('click', () => {
+    tabBtnQueue.classList.add('active');
+    tabBtnCustom?.classList.remove('active');
+    paneQueue?.classList.add('active');
+    paneCustom?.classList.add('hidden');
+    paneCustom?.classList.remove('active');
+    paneQueue?.classList.remove('hidden');
+    renderManualQueueList();
+  });
+
+  tabBtnCustom?.addEventListener('click', () => {
+    tabBtnCustom.classList.add('active');
+    tabBtnQueue?.classList.remove('active');
+    paneCustom?.classList.add('active');
+    paneCustom?.classList.remove('hidden');
+    paneQueue?.classList.add('hidden');
+    paneQueue?.classList.remove('active');
+  });
+
+  // Clear queue
+  const btnClear = document.getElementById('btnClearManualQueue');
+  btnClear?.addEventListener('click', () => {
+    if (manualQueueState.queue.length === 0) return;
+    if (confirm('Deseja realmente limpar todos os produtos da fila de disparo manual?')) {
+      manualQueueState.queue = [];
+      saveManualQueueToStorage();
+      renderManualQueueList();
+      showToast('🗑️ Fila de disparo limpa.');
+    }
+  });
+
+  // Dispatch All
+  const btnDispatchAll = document.getElementById('btnDispatchAllManual');
+  btnDispatchAll?.addEventListener('click', () => {
+    dispatchAllManualQueue(btnDispatchAll);
+  });
+}
+
+// ==========================================================================
+// ACHADINHOS SHOPEE (EXCLUSIVAMENTE PROMOÇÕES SHOPEE) CONTROLLER
+// ==========================================================================
+const shopeeState = {
+  category: 'ALL',
+  search: '',
+  page: 1,
+  limit: 12,
+  totalPages: 1,
+  total: 0,
+  offers: [],
+  isLoading: false
+};
+
+async function loadShopeeOffers() {
+  const grid = document.getElementById('shopeeGrid');
+  const emptyState = document.getElementById('shopeeEmptyState');
+  const countText = document.getElementById('shopeeCountText');
+  const pageInfo = document.getElementById('shopeePageInfo');
+  const btnPrev = document.getElementById('btnShopeePrev');
+  const btnNext = document.getElementById('btnShopeeNext');
+
+  if (shopeeState.isLoading) return;
+  shopeeState.isLoading = true;
+
+  if (grid) grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: var(--dark-text-muted);"><i data-lucide="loader" class="animate-spin" style="width: 28px; height: 28px; margin-bottom: 0.5rem;"></i><p>Carregando achadinhos da Shopee...</p></div>`;
+  if (window.lucide) lucide.createIcons();
+
+  try {
+    const params = new URLSearchParams();
+    params.append('store', 'SHOPEE');
+    if (shopeeState.category !== 'ALL') params.append('category', shopeeState.category);
+    if (shopeeState.search.trim().length > 0) params.append('search', shopeeState.search.trim());
+    params.append('page', String(shopeeState.page));
+    params.append('limit', String(shopeeState.limit));
+
+    const res = await fetch(`/api/divulgador/offers?${params.toString()}`);
+    if (res.ok) {
+      const data = await res.json();
+      shopeeState.offers = data.offers || [];
+      shopeeState.total = data.total || 0;
+      shopeeState.totalPages = data.totalPages || 1;
+      shopeeState.page = data.page || 1;
+
+      renderShopeeGrid(shopeeState.offers);
+
+      if (countText) {
+        countText.textContent = `${shopeeState.total} achadinhos da Shopee encontrados`;
+      }
+      if (pageInfo) {
+        pageInfo.textContent = `Página ${shopeeState.page} de ${shopeeState.totalPages}`;
+      }
+      if (btnPrev) btnPrev.disabled = shopeeState.page <= 1;
+      if (btnNext) btnNext.disabled = shopeeState.page >= shopeeState.totalPages;
+    }
+  } catch (err) {
+    console.error('Erro ao buscar achadinhos da Shopee:', err);
+  } finally {
+    shopeeState.isLoading = false;
+  }
+}
+
+function renderShopeeGrid(offers) {
+  const grid = document.getElementById('shopeeGrid');
+  const emptyState = document.getElementById('shopeeEmptyState');
+  if (!grid) return;
+
+  grid.innerHTML = '';
+
+  if (!offers || offers.length === 0) {
+    if (emptyState) emptyState.classList.remove('hidden');
+    return;
+  }
+
+  if (emptyState) emptyState.classList.add('hidden');
+
+  offers.forEach((offer) => {
+    const card = document.createElement('div');
+    card.className = 'offer-card';
+
+    const discountHtml = offer.discountPercent
+      ? `<span class="offer-discount-badge" style="background: #ee4d2d;">-${offer.discountPercent}%</span>`
+      : '';
+
+    const couponHtml = offer.coupon
+      ? `<span class="offer-coupon-badge">🎟️ ${offer.coupon}</span>`
+      : '';
+
+    const oldPriceHtml = offer.originalPrice && offer.originalPrice > offer.promoPrice
+      ? `<div class="offer-price-old">R$ ${formatCurrencyBRL(offer.originalPrice)}</div>`
+      : '';
+
+    const safeProxyUrl = `/api/proxy-image?url=${encodeURIComponent(offer.imageUrl)}`;
+
+    card.innerHTML = `
+      <div class="offer-card-top">
+        <span class="offer-store-tag" style="color: #ee4d2d;">
+          <span>🟠</span> Shopee Oficial
+        </span>
+        <span class="offer-time-tag">${timeAgo(offer.postedAt)}</span>
+      </div>
+
+      <div class="offer-img-wrap">
+        ${discountHtml}
+        <img src="${offer.imageUrl}" 
+             alt="${escapeHtml(offer.title)}" 
+             class="offer-product-img" 
+             loading="lazy" 
+             referrerpolicy="no-referrer"
+             onerror="if(!this.dataset.retry){this.dataset.retry=1;this.src='${safeProxyUrl}';}else{this.src='https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=400&q=80';}">
+      </div>
+
+      <div class="offer-card-body">
+        <div class="offer-badges-row">
+          <span class="offer-category-badge" style="border-color: rgba(238, 77, 45, 0.4); color: #fdba74;">${offer.category || 'Achadinhos'}</span>
+          ${couponHtml}
+        </div>
+
+        <h4 class="offer-title" title="${escapeHtml(offer.title)}">${escapeHtml(offer.title)}</h4>
+
+        <div class="offer-price-box">
+          ${oldPriceHtml}
+          <div class="offer-price-current">R$ ${formatCurrencyBRL(offer.promoPrice)}</div>
+        </div>
+
+        <div class="offer-card-footer">
+          <a href="${offer.productUrl}" target="_blank" rel="noopener noreferrer" class="btn-offer-view" title="Ver produto na Shopee">
+            <i data-lucide="external-link" style="width: 15px; height: 15px;"></i>
+          </a>
+          <button type="button" class="btn-offer-manual" data-manual-id="${offer.id}" title="Adicionar à fila de Disparo Manual para personalizar a mensagem">
+            <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
+            <span>Disparo manual</span>
+          </button>
+          <button type="button" class="btn-offer-dispatch" data-dispatch-id="${offer.id}" title="Disparar direto para o WhatsApp">
+            <i data-lucide="send" style="width: 14px; height: 14px;"></i>
+            <span>Disparar</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    // Bind dispatch button
+    const btnDispatch = card.querySelector('.btn-offer-dispatch');
+    btnDispatch?.addEventListener('click', () => {
+      dispatchDivulgadorOffer(offer, btnDispatch);
+    });
+
+    // Bind manual queue button
+    const btnManual = card.querySelector('.btn-offer-manual');
+    btnManual?.addEventListener('click', () => {
+      addToManualDispatchQueue(offer, btnManual);
+    });
+
+    grid.appendChild(card);
+  });
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function initShopeeFinderEvents() {
+  // Category pills
+  const catPills = document.querySelectorAll('#shopeeCategoryPills .cat-pill');
+  catPills.forEach((pill) => {
+    pill.addEventListener('click', () => {
+      catPills.forEach((p) => p.classList.remove('active'));
+      pill.classList.add('active');
+      shopeeState.category = pill.getAttribute('data-cat') || 'ALL';
+      shopeeState.page = 1;
+      loadShopeeOffers();
+    });
+  });
+
+  // Search Input
+  const searchInput = document.getElementById('inputShopeeSearch');
+  const btnClearSearch = document.getElementById('btnClearShopeeSearch');
+
+  let debounceTimer;
+  searchInput?.addEventListener('input', (e) => {
+    const val = e.target.value;
+    if (val.trim().length > 0) {
+      btnClearSearch?.classList.remove('hidden');
+    } else {
+      btnClearSearch?.classList.add('hidden');
+    }
+
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      shopeeState.search = val;
+      shopeeState.page = 1;
+      loadShopeeOffers();
+    }, 350);
+  });
+
+  btnClearSearch?.addEventListener('click', () => {
+    if (searchInput) searchInput.value = '';
+    btnClearSearch.classList.add('hidden');
+    shopeeState.search = '';
+    shopeeState.page = 1;
+    loadShopeeOffers();
+  });
+
+  // Harvest Shopee Button
+  const btnHarvest = document.getElementById('btnHarvestShopee');
+  btnHarvest?.addEventListener('click', async () => {
+    const originalText = btnHarvest.innerHTML;
+    btnHarvest.disabled = true;
+    btnHarvest.innerHTML = `<span>Sincronizando...</span>`;
+    showToast('🔎 Sincronizando com a API Oficial da Shopee...');
+
+    try {
+      const res = await fetch('/api/divulgador/harvest', { method: 'POST' });
+      const data = await res.json();
+      if (data && data.success) {
+        showToast('🎉 Achadinhos da Shopee atualizados com sucesso!');
+        loadShopeeOffers();
+      }
+    } catch {
+      showToast('⚠️ Sincronização em segundo plano.');
+    } finally {
+      btnHarvest.disabled = false;
+      btnHarvest.innerHTML = originalText;
+      if (window.lucide) lucide.createIcons();
+    }
+  });
+
+  // Pagination
+  const btnPrev = document.getElementById('btnShopeePrev');
+  const btnNext = document.getElementById('btnShopeeNext');
+
+  btnPrev?.addEventListener('click', () => {
+    if (shopeeState.page > 1) {
+      shopeeState.page--;
+      loadShopeeOffers();
+    }
+  });
+
+  btnNext?.addEventListener('click', () => {
+    if (shopeeState.page < shopeeState.totalPages) {
+      shopeeState.page++;
+      loadShopeeOffers();
+    }
+  });
+
+  // Load when opening modal
+  document.querySelectorAll('[data-modal="modal-shopee-finder"]').forEach((el) => {
+    el.addEventListener('click', () => {
+      loadShopeeOffers();
+    });
+  });
+}
+
