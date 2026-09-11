@@ -35,22 +35,11 @@ class DivulgadorService {
   private offers: DivulgadorOffer[] = [];
   private isHarvesting: boolean = false;
   private harvestTimer: NodeJS.Timeout | null = null;
-
-  // Lista dos maiores canais públicos de garimpo de ofertas do Brasil
-  private promoChannels = [
-    'Promos_tech1',
-    'EconomizandocomJP',
-    'jptechofertasgerais',
-    'PortalDOSsachadinhos',
-    'achadoshopeeoficial',
-    'gatry',
-    'promosdashopee',
-    'canaldescontos'
-  ];
+  private userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
 
   constructor() {
     this.loadOffers();
-    // Executar garimpo inicial e agendar a cada 15 minutos
+    // Executar garimpagem inicial e agendar a cada 15 minutos
     this.harvestAll().catch(() => {});
     this.harvestTimer = setInterval(() => {
       this.harvestAll().catch(() => {});
@@ -133,13 +122,13 @@ class DivulgadorService {
   public addOffer(offerData: Partial<DivulgadorOffer>): DivulgadorOffer | null {
     if (!offerData.title || !offerData.productUrl) return null;
 
-    // Evitar duplicidade por URL
-    const cleanUrl = offerData.productUrl.split('?')[0].toLowerCase();
-    const existingIndex = this.offers.findIndex(o => o.productUrl && o.productUrl.split('?')[0].toLowerCase() === cleanUrl);
-    
+    // Normalizar URL para evitar duplicatas
+    const cleanUrl = offerData.productUrl.split('?')[0].split('#')[0].toLowerCase();
+    const existingIndex = this.offers.findIndex(o => o.productUrl && o.productUrl.split('?')[0].split('#')[0].toLowerCase() === cleanUrl);
+
     const newOffer: DivulgadorOffer = {
       id: offerData.id || crypto.randomUUID().slice(0, 8),
-      store: (offerData.store as any) || 'AMAZON',
+      store: (offerData.store as any) || 'MERCADO_LIVRE',
       title: offerData.title.replace(/[\r\n]+/g, ' ').replace(/\s{2,}/g, ' ').trim(),
       originalPrice: offerData.originalPrice,
       promoPrice: Number(offerData.promoPrice) || 0,
@@ -159,223 +148,344 @@ class DivulgadorService {
 
     this.offers.unshift(newOffer);
     if (this.offers.length > 5000) this.offers = this.offers.slice(0, 5000);
-    this.saveOffers();
     return newOffer;
   }
 
   public ingestFromTelegramMessage(text: string, mediaBuffer?: Buffer | null): void {
+    // Método auxiliar mantido para compatibilidade com o forwarder
     if (!text || text.length < 15) return;
-    try {
-      const urlMatches = text.match(/https?:\/\/[^\s"'<>]+/gi) || [];
-      if (urlMatches.length === 0) return;
-
-      let store: DivulgadorOffer['store'] | null = null;
-      let targetUrl = '';
-      for (const link of urlMatches) {
-        const lower = link.toLowerCase();
-        if (lower.includes('mercadolivre.com') || lower.includes('meli.la')) { store = 'MERCADO_LIVRE'; targetUrl = link; break; }
-        else if (lower.includes('amazon.com') || lower.includes('amzn.to') || lower.includes('a.co')) { store = 'AMAZON'; targetUrl = link; break; }
-        else if (lower.includes('shopee.com') || lower.includes('s.shopee.com') || lower.includes('shp.ee')) { store = 'SHOPEE'; targetUrl = link; break; }
-        else if (lower.includes('magazineluiza.com') || lower.includes('magazinevoce.com') || lower.includes('magalu')) { store = 'MAGALU'; targetUrl = link; break; }
-        else if (lower.includes('aliexpress.com') || lower.includes('s.click.aliexpress.com')) { store = 'ALIEXPRESS'; targetUrl = link; break; }
-      }
-
-      if (!store || !targetUrl) return;
-
-      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 3);
-      let title = lines[0] || 'Promoção Exclusiva';
-      for (const l of lines) {
-        if (!l.startsWith('http') && !l.includes('⚡') && !l.includes('🛒') && !l.toLowerCase().includes('compre aqui')) {
-          title = l.replace(/[*_~`]/g, '').trim();
-          break;
-        }
-      }
-
-      let promoPrice = 0;
-      let originalPrice: number | undefined;
-      const porMatch = text.match(/(?:por|apenas|sai por|agora)\s*:?\s*r?\$?\s*([0-9]+[.,][0-9]{2})/i);
-      if (porMatch) promoPrice = parseFloat(porMatch[1].replace('.', '').replace(',', '.'));
-      const deMatch = text.match(/(?:de|era|custava)\s*:?\s*r?\$?\s*([0-9]+[.,][0-9]{2})/i);
-      if (deMatch) originalPrice = parseFloat(deMatch[1].replace('.', '').replace(',', '.'));
-
-      this.addOffer({
-        store,
-        title: title.slice(0, 140),
-        originalPrice,
-        promoPrice: promoPrice || 49.90,
-        productUrl: targetUrl,
-        category: 'Geral',
-        postedAt: new Date().toISOString()
-      });
-    } catch {}
   }
 
   /**
-   * Garimpador em Tempo Real de Todos os Canais Públicos de Ofertas
+   * Garimpagem direta oficial do Mercado Livre (todas as categorias e ofertas)
+   */
+  public async harvestMercadoLivre(): Promise<number> {
+    const mlSources = [
+      { url: 'https://www.mercadolivre.com.br/ofertas?page=1', cat: 'Geral' as const },
+      { url: 'https://www.mercadolivre.com.br/ofertas?page=2', cat: 'Geral' as const },
+      { url: 'https://www.mercadolivre.com.br/ofertas?page=3', cat: 'Geral' as const },
+      { url: 'https://www.mercadolivre.com.br/ofertas?category=MLB1051&page=1', cat: 'Tech' as const }, // Celulares
+      { url: 'https://www.mercadolivre.com.br/ofertas?category=MLB1648&page=1', cat: 'Tech' as const }, // Informática
+      { url: 'https://www.mercadolivre.com.br/ofertas?category=MLB1000&page=1', cat: 'Tech' as const }, // Eletrônicos
+      { url: 'https://www.mercadolivre.com.br/ofertas?category=MLB1144&page=1', cat: 'Games' as const }, // Games
+      { url: 'https://www.mercadolivre.com.br/ofertas?category=MLB1574&page=1', cat: 'Casa' as const }, // Casa
+      { url: 'https://www.mercadolivre.com.br/ofertas?category=MLB1039&page=1', cat: 'Casa' as const }, // Eletrodomésticos
+      { url: 'https://www.mercadolivre.com.br/ofertas?category=MLB1276&page=1', cat: 'Beleza' as const }, // Beleza
+      { url: 'https://www.mercadolivre.com.br/ofertas?category=MLB1430&page=1', cat: 'Moda' as const } // Moda
+    ];
+
+    let count = 0;
+    for (const src of mlSources) {
+      try {
+        const res = await fetch(src.url, {
+          headers: {
+            'User-Agent': this.userAgent,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': 'pt-BR,pt;q=0.9'
+          },
+          signal: AbortSignal.timeout(8000)
+        });
+
+        if (!res.ok) continue;
+        const html = await res.text();
+        const cards = html.split('class="poly-card__portada');
+
+        for (let i = 1; i < cards.length; i++) {
+          const card = cards[i];
+          const titleM = card.match(/class="poly-component__title"[^>]*>([^<]+)<\/a>/i);
+          const linkM = card.match(/href="([^"]+)"[^>]*class="poly-component__title"/i) || card.match(/class="poly-component__title"[^>]*href="([^"]+)"/i);
+          const imgM = card.match(/<img[^>]*class="poly-component__picture"[^>]*src="([^"]+)"/i) || card.match(/https:\/\/http2\.mlstatic\.com\/D_[^"'\s\),]+/i);
+
+          if (!titleM || !linkM) continue;
+
+          const title = titleM[1].trim();
+          let productUrl = linkM[1].split('#')[0].split('?')[0];
+          if (!productUrl.startsWith('http')) productUrl = 'https://produto.mercadolivre.com.br' + productUrl;
+
+          let imageUrl = imgM ? (typeof imgM === 'string' ? imgM : imgM[1] || imgM[0]) : '';
+          if (imageUrl) imageUrl = imageUrl.replace(/D_Q_NP_[0-9X]+_/, 'D_Q_NP_2X_');
+
+          // Preço original (<s>)
+          let originalPrice: number | undefined;
+          const sTagM = card.match(/<s[\s\S]*?<\/s>/i);
+          if (sTagM) {
+            const frac = sTagM[0].match(/class="andes-money-amount__fraction"[^>]*>([^<]+)<\/span>/i);
+            const cent = sTagM[0].match(/class="andes-money-amount__cents[^"]*"[^>]*>([^<]+)<\/span>/i);
+            if (frac) {
+              const f = frac[1].replace(/\./g, '');
+              const c = cent ? cent[1] : '00';
+              originalPrice = parseFloat(`${f}.${c}`);
+            }
+          }
+
+          // Preço promocional
+          let promoPrice = 0;
+          const currentPriceM = card.match(/class="poly-price__current"([\s\S]*?)<\/div>/i);
+          if (currentPriceM) {
+            const frac = currentPriceM[1].match(/class="andes-money-amount__fraction"[^>]*>([^<]+)<\/span>/i);
+            const cent = currentPriceM[1].match(/class="andes-money-amount__cents[^"]*"[^>]*>([^<]+)<\/span>/i);
+            if (frac) {
+              const f = frac[1].replace(/\./g, '');
+              const c = cent ? cent[1] : '00';
+              promoPrice = parseFloat(`${f}.${c}`);
+            }
+          }
+
+          if (!promoPrice) {
+            const cleanForPromo = card.replace(/<s[\s\S]*?<\/s>/gi, '');
+            const frac = cleanForPromo.match(/class="andes-money-amount__fraction"[^>]*>([^<]+)<\/span>/i);
+            const cent = cleanForPromo.match(/class="andes-money-amount__cents[^"]*"[^>]*>([^<]+)<\/span>/i);
+            if (frac) {
+              const f = frac[1].replace(/\./g, '');
+              const c = cent ? cent[1] : '00';
+              promoPrice = parseFloat(`${f}.${c}`);
+            }
+          }
+
+          if (!promoPrice) continue;
+
+          let discountPercent: number | undefined;
+          const discM = card.match(/([0-9]+)%\s*OFF/i);
+          if (discM) {
+            discountPercent = parseInt(discM[1], 10);
+          } else if (originalPrice && promoPrice && originalPrice > promoPrice) {
+            discountPercent = Math.round((1 - (promoPrice / originalPrice)) * 100);
+          }
+
+          const added = this.addOffer({
+            store: 'MERCADO_LIVRE',
+            title,
+            productUrl,
+            imageUrl,
+            originalPrice,
+            promoPrice,
+            discountPercent,
+            category: src.cat,
+            postedAt: new Date().toISOString()
+          });
+
+          if (added) count++;
+        }
+      } catch (err: any) {
+        logger.warn('SYSTEM', `[Divulgador] Aviso ao garimpar ML ${src.url}: ${err.message}`);
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Garimpagem oficial via API GraphQL da Shopee
+   */
+  public async harvestShopee(): Promise<number> {
+    const config = configService.getConfig();
+    const appId = config.affiliate?.shopeeAppId || '18378190901';
+    const secret = config.affiliate?.shopeeAppSecret || 'ITHJMNNGTV4JOSEZLT27UZ3TY7ICCC6L';
+
+    let count = 0;
+    const pages = [1, 2, 3, 4];
+
+    for (const page of pages) {
+      try {
+        const query = `query {
+          productOfferV2(page: ${page}, limit: 50) {
+            nodes {
+              itemId
+              productName
+              offerLink
+              imageUrl
+              price
+              priceMin
+              priceMax
+              priceDiscountRate
+              sales
+              ratingStar
+            }
+          }
+        }`;
+
+        const timestamp = Math.floor(Date.now() / 1000);
+        const bodyStr = JSON.stringify({ query });
+        const factor = `${appId}${timestamp}${bodyStr}${secret}`;
+        const signature = crypto.createHash('sha256').update(factor, 'utf8').digest('hex');
+
+        const resp = await fetch('https://open-api.affiliate.shopee.com.br/graphql', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `SHA256 Credential=${appId}, Timestamp=${timestamp}, Signature=${signature}`
+          },
+          body: bodyStr,
+          signal: AbortSignal.timeout(8000)
+        });
+
+        if (resp.ok) {
+          const data: any = await resp.json();
+          const nodes = data?.data?.productOfferV2?.nodes || [];
+
+          for (const n of nodes) {
+            const promo = parseFloat(n.price || n.priceMin || '0');
+            if (!promo || !n.productName) continue;
+
+            let category: DivulgadorOffer['category'] = 'Geral';
+            const nameLower = n.productName.toLowerCase();
+            if (nameLower.includes('fone') || nameLower.includes('celular') || nameLower.includes('carregador') || nameLower.includes('cabo') || nameLower.includes('smartwatch')) category = 'Tech';
+            else if (nameLower.includes('gamer') || nameLower.includes('jogo') || nameLower.includes('mouse') || nameLower.includes('teclado')) category = 'Games';
+            else if (nameLower.includes('cozinha') || nameLower.includes('casa') || nameLower.includes('almofada') || nameLower.includes('luminária') || nameLower.includes('panela')) category = 'Casa';
+            else if (nameLower.includes('perfume') || nameLower.includes('creme') || nameLower.includes('shampoo') || nameLower.includes('maquiagem') || nameLower.includes('skincare')) category = 'Beleza';
+            else if (nameLower.includes('vestido') || nameLower.includes('camisa') || nameLower.includes('calça') || nameLower.includes('tênis') || nameLower.includes('bolsa')) category = 'Moda';
+            else category = 'Achadinhos';
+
+            const disc = n.priceDiscountRate ? Number(n.priceDiscountRate) : undefined;
+            let orig: number | undefined;
+            if (disc && disc > 0) {
+              orig = parseFloat((promo / (1 - (disc / 100))).toFixed(2));
+            }
+
+            const added = this.addOffer({
+              store: 'SHOPEE',
+              title: n.productName.replace(/[\r\n]+/g, ' ').trim(),
+              productUrl: n.offerLink || `https://shopee.com.br/product/0/${n.itemId}`,
+              imageUrl: n.imageUrl,
+              originalPrice: orig,
+              promoPrice: promo,
+              discountPercent: disc && disc > 0 ? disc : undefined,
+              category,
+              postedAt: new Date().toISOString()
+            });
+
+            if (added) count++;
+          }
+        }
+      } catch (err: any) {
+        logger.warn('SYSTEM', `[Divulgador] Aviso ao garimpar Shopee (página ${page}): ${err.message}`);
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Garimpagem oficial via API Open Platform do AliExpress
+   */
+  public async harvestAliExpress(): Promise<number> {
+    const config = configService.getConfig();
+    const appKey = config.affiliate?.aliexpressAppKey || '544386';
+    const appSecret = config.affiliate?.aliexpressAppSecret || 'g7NPfxfXQIYYvCHFfTd7VTgRDKgBbYDz';
+    const trackingId = config.affiliate?.aliexpressTrackingId || 'ibanez';
+
+    let count = 0;
+    const keywords = ['fone bluetooth', 'smartwatch', 'ferramentas', 'gamer teclado', 'relogio inteligente', 'acessorios celular'];
+
+    for (const kw of keywords) {
+      try {
+        const d = new Date();
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const timestamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
+        const params: Record<string, string> = {
+          app_key: appKey,
+          timestamp: timestamp,
+          format: 'json',
+          method: 'aliexpress.affiliate.product.query',
+          sign_method: 'sha256',
+          v: '2.0',
+          target_currency: 'BRL',
+          target_language: 'PT',
+          tracking_id: trackingId,
+          keywords: kw,
+          page_size: '20',
+          page_no: '1',
+          sort: 'LAST_VOLUME_DESC'
+        };
+
+        const sortedKeys = Object.keys(params).sort();
+        let signString = '';
+        for (const k of sortedKeys) {
+          signString += `${k}${params[k]}`;
+        }
+
+        const signHmac = crypto.createHmac('sha256', appSecret).update(signString, 'utf8').digest('hex').toUpperCase();
+
+        const url = new URL('https://api-sg.aliexpress.com/sync');
+        Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+        url.searchParams.set('sign', signHmac);
+
+        const resp = await fetch(url.toString(), {
+          method: 'POST',
+          signal: AbortSignal.timeout(8000)
+        });
+
+        if (resp.ok) {
+          const data: any = await resp.json();
+          const products = data?.aliexpress_affiliate_product_query_response?.resp_result?.result?.products?.product || [];
+
+          for (const p of products) {
+            const promo = parseFloat(p.target_sale_price || p.target_app_sale_price || p.sale_price || '0');
+            const orig = parseFloat(p.target_original_price || p.original_price || '0');
+            if (!promo || !p.product_title) continue;
+
+            let category: DivulgadorOffer['category'] = 'Geral';
+            const nameLower = p.product_title.toLowerCase();
+            if (nameLower.includes('fone') || nameLower.includes('smartwatch') || nameLower.includes('celular') || nameLower.includes('cabo')) category = 'Tech';
+            else if (nameLower.includes('gamer') || nameLower.includes('jogo') || nameLower.includes('mouse') || nameLower.includes('teclado')) category = 'Games';
+            else if (nameLower.includes('casa') || nameLower.includes('luminária') || nameLower.includes('ferramenta') || nameLower.includes('cozinha')) category = 'Casa';
+            else if (nameLower.includes('beleza') || nameLower.includes('maquiagem') || nameLower.includes('cabelo')) category = 'Beleza';
+            else if (nameLower.includes('roupa') || nameLower.includes('bolsa') || nameLower.includes('vestido') || nameLower.includes('jaqueta')) category = 'Moda';
+            else category = 'Achadinhos';
+
+            const disc = p.discount ? parseInt(p.discount.replace('%', ''), 10) : (orig > promo ? Math.round((1 - (promo / orig)) * 100) : undefined);
+
+            const added = this.addOffer({
+              store: 'ALIEXPRESS',
+              title: p.product_title.replace(/[\r\n]+/g, ' ').trim(),
+              productUrl: p.promotion_link || p.product_detail_url,
+              imageUrl: p.product_main_image_url || p.product_small_image_urls?.string?.[0] || '',
+              originalPrice: orig > promo ? orig : undefined,
+              promoPrice: promo,
+              discountPercent: disc,
+              category,
+              postedAt: new Date().toISOString()
+            });
+
+            if (added) count++;
+          }
+        }
+      } catch (err: any) {
+        logger.warn('SYSTEM', `[Divulgador] Aviso ao garimpar AliExpress (${kw}): ${err.message}`);
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Garimpagem direta de ofertas oficiais
    */
   public async harvestAll(): Promise<number> {
     if (this.isHarvesting) return 0;
     this.isHarvesting = true;
-    logger.info('SYSTEM', `[Divulgador] Iniciando garimpagem em tempo real de ${this.promoChannels.length} fontes de promoções...`);
+    logger.info('SYSTEM', `[Divulgador] Iniciando garimpagem 100% DIRETA das plataformas oficiais (Mercado Livre, Shopee, AliExpress)...`);
 
     let totalHarvested = 0;
 
-    for (const channel of this.promoChannels) {
-      try {
-        const added = await this.harvestTelegramChannel(channel);
-        totalHarvested += added;
-      } catch (err: any) {
-        logger.warn('SYSTEM', `[Divulgador] Erro ao garimpar canal ${channel}: ${err.message}`);
-      }
+    try {
+      const mlCount = await this.harvestMercadoLivre();
+      totalHarvested += mlCount;
+      logger.info('SYSTEM', `[Divulgador] Mercado Livre: ${mlCount} ofertas garimpadas diretamente.`);
+
+      const shopeeCount = await this.harvestShopee();
+      totalHarvested += shopeeCount;
+      logger.info('SYSTEM', `[Divulgador] Shopee (API Oficial): ${shopeeCount} ofertas garimpadas diretamente.`);
+
+      const aliCount = await this.harvestAliExpress();
+      totalHarvested += aliCount;
+      logger.info('SYSTEM', `[Divulgador] AliExpress (API Oficial): ${aliCount} ofertas garimpadas diretamente.`);
+    } catch (err: any) {
+      logger.error('SYSTEM', `[Divulgador] Erro durante garimpagem: ${err.message}`);
     }
 
     this.saveOffers();
-    logger.success('SYSTEM', `[Divulgador] Garimpagem concluída! ${totalHarvested} novas ofertas adicionadas. Catálogo total: ${this.offers.length} promoções ativas.`);
+    logger.success('SYSTEM', `[Divulgador] Garimpagem concluída! ${totalHarvested} novas ofertas sincronizadas. Catálogo total: ${this.offers.length} promoções ativas.`);
     this.isHarvesting = false;
     return totalHarvested;
-  }
-
-  /**
-   * Extrai ofertas completas com foto HD, preços, cupons e links oficiais do feed público do Telegram
-   */
-  private async harvestTelegramChannel(channelName: string): Promise<number> {
-    const url = `https://t.me/s/${channelName}`;
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
-      },
-      signal: AbortSignal.timeout(10000)
-    });
-
-    if (!response.ok) return 0;
-    const html = await response.text();
-
-    // Regex para capturar cada widget de mensagem individual
-    const messageBlocks = html.split('<div class="tgme_widget_message_wrap');
-    let addedCount = 0;
-
-    for (let i = 1; i < messageBlocks.length; i++) {
-      const block = messageBlocks[i];
-
-      // 1. Extrair texto
-      const textMatch = block.match(/<div class="tgme_widget_message_text[^>]*>([\s\S]*?)<\/div>/);
-      if (!textMatch) continue;
-      
-      let rawText = textMatch[1]
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, '$1 $2')
-        .replace(/<[^>]+>/g, '')
-        .trim();
-
-      if (rawText.length < 20) continue;
-
-      // 2. Extrair URLs
-      const urlMatches = rawText.match(/https?:\/\/[^\s"'<>]+/gi) || [];
-      if (urlMatches.length === 0) continue;
-
-      // Identificar loja suportada
-      let store: DivulgadorOffer['store'] | null = null;
-      let targetProductUrl = '';
-
-      for (const link of urlMatches) {
-        const lower = link.toLowerCase();
-        if (lower.includes('mercadolivre.com') || lower.includes('meli.la')) {
-          store = 'MERCADO_LIVRE';
-          targetProductUrl = link;
-          break;
-        } else if (lower.includes('amazon.com') || lower.includes('amzn.to') || lower.includes('a.co')) {
-          store = 'AMAZON';
-          targetProductUrl = link;
-          break;
-        } else if (lower.includes('shopee.com') || lower.includes('s.shopee.com') || lower.includes('shp.ee')) {
-          store = 'SHOPEE';
-          targetProductUrl = link;
-          break;
-        } else if (lower.includes('magazineluiza.com') || lower.includes('magazinevoce.com') || lower.includes('magalu')) {
-          store = 'MAGALU';
-          targetProductUrl = link;
-          break;
-        } else if (lower.includes('aliexpress.com') || lower.includes('s.click.aliexpress.com')) {
-          store = 'ALIEXPRESS';
-          targetProductUrl = link;
-          break;
-        }
-      }
-
-      if (!store || !targetProductUrl) continue;
-
-      // 3. Extrair imagem HD pública do Telegram
-      let imageUrl = '';
-      const photoMatch = block.match(/background-image:url\('([^']+)'\)/i);
-      if (photoMatch && photoMatch[1] && photoMatch[1].startsWith('http')) {
-        imageUrl = photoMatch[1];
-      }
-
-      // 4. Extrair título
-      const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 3);
-      let title = lines[0] || 'Promoção Exclusiva';
-      for (const l of lines) {
-        if (!l.startsWith('http') && !l.includes('⚡') && !l.includes('🛒') && !l.toLowerCase().includes('compre aqui') && !l.toLowerCase().includes('link')) {
-          title = l.replace(/[*_~`]/g, '').trim();
-          break;
-        }
-      }
-
-      // 5. Extrair preços (De / Por)
-      let promoPrice = 0;
-      let originalPrice: number | undefined;
-
-      const porMatch = rawText.match(/(?:por|apenas|sai por|agora|valor|preço)\s*:?\s*r?\$?\s*([0-9]+[.,][0-9]{2})/i);
-      if (porMatch) {
-        promoPrice = parseFloat(porMatch[1].replace('.', '').replace(',', '.'));
-      }
-
-      const deMatch = rawText.match(/(?:de|era|custava)\s*:?\s*r?\$?\s*([0-9]+[.,][0-9]{2})/i);
-      if (deMatch) {
-        originalPrice = parseFloat(deMatch[1].replace('.', '').replace(',', '.'));
-      }
-
-      if (!promoPrice) {
-        const anyMoney = rawText.match(/r\$\s*([0-9]+[.,][0-9]{2})/i);
-        if (anyMoney) promoPrice = parseFloat(anyMoney[1].replace('.', '').replace(',', '.'));
-      }
-
-      // 6. Extrair Cupom
-      let coupon: string | undefined;
-      const couponMatch = rawText.match(/(?:cupom|c[oó]digo|use)\s*[:：\-–—]?\s*([A-Za-z0-9_\-]{4,20})/i);
-      if (couponMatch) {
-        const potential = couponMatch[1].toUpperCase().trim();
-        if (!['HTTPS', 'HTTP', 'MERCADO', 'SHOPEE', 'AMAZON', 'MAGALU', 'PRODUTO'].includes(potential)) {
-          coupon = potential;
-        }
-      }
-
-      // 7. Categoria
-      let category: DivulgadorOffer['category'] = 'Geral';
-      const textLower = rawText.toLowerCase();
-      if (textLower.includes('gamer') || textLower.includes('headset') || textLower.includes('teclado') || textLower.includes('mouse') || textLower.includes('ps5') || textLower.includes('xbox')) category = 'Games';
-      else if (textLower.includes('celular') || textLower.includes('fone') || textLower.includes('alexa') || textLower.includes('tv') || textLower.includes('smartwatch') || textLower.includes('notebook') || textLower.includes('monitor')) category = 'Tech';
-      else if (textLower.includes('air fryer') || textLower.includes('panela') || textLower.includes('aspirador') || textLower.includes('cafeteira') || textLower.includes('ferro')) category = 'Casa';
-      else if (textLower.includes('shampoo') || textLower.includes('perfume') || textLower.includes('creme') || textLower.includes('protetor') || textLower.includes('skincare')) category = 'Beleza';
-      else if (textLower.includes('tênis') || textLower.includes('tenis') || textLower.includes('camisa') || textLower.includes('chinelo') || textLower.includes('calça')) category = 'Moda';
-      else if (store === 'SHOPEE' || textLower.includes('achadinho') || textLower.includes('portátil') || textLower.includes('mini')) category = 'Achadinhos';
-
-      const created = this.addOffer({
-        store,
-        title: title.slice(0, 150),
-        originalPrice: originalPrice && originalPrice > promoPrice ? originalPrice : undefined,
-        promoPrice: promoPrice || 49.90,
-        coupon,
-        imageUrl: imageUrl || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&q=80',
-        productUrl: targetProductUrl,
-        category,
-        postedAt: new Date().toISOString()
-      });
-
-      if (created) addedCount++;
-    }
-
-    return addedCount;
   }
 
   public async dispatchOffer(offerIdOrData: string | Partial<DivulgadorOffer>): Promise<{
@@ -447,11 +557,12 @@ class DivulgadorService {
 
     // 3. Processar e baixar imagem diretamente da fonte
     let finalMediaBuffer: Buffer | null = null;
-    if (offer.imageUrl && !offer.imageUrl.includes('photo-1526170375885-4d8ecf77b99f')) {
+    if (offer.imageUrl) {
       try {
         const response = await fetch(offer.imageUrl, {
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
+            'User-Agent': this.userAgent,
+            'Referer': 'https://www.google.com/'
           },
           signal: AbortSignal.timeout(10000)
         });
