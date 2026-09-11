@@ -284,10 +284,10 @@ export class AffiliateService {
         if (mlbuMatch) {
           parsed.pathname = `/up/${mlbuMatch[1]}`;
         } else {
-          // If it's a bare /MLB1234567 or /MLB-1234567 without slug or _JM, format it as /MLB-1234567-_JM
-          const mlbBareMatch = parsed.pathname.match(/^\/?(MLB-?\d+)$/i);
-          if (mlbBareMatch) {
-            const digits = mlbBareMatch[1].replace(/\D/g, '');
+          // If it's a product MLB link (with or without long slug), clean to /MLB-12345678-_JM
+          const mlbMatch = parsed.pathname.match(/(MLB-?\d+)/i);
+          if (mlbMatch) {
+            const digits = mlbMatch[1].replace(/\D/g, '');
             parsed.pathname = `/MLB-${digits}-_JM`;
           }
         }
@@ -685,11 +685,10 @@ export class AffiliateService {
       return { affiliateUrl: oauthMeliLa, canonicalProductUrl };
     }
 
-    // 4c. Fallback de link canônico oficial do produto direto com a sua tag de afiliado
+    // 4c. Fallback de link canônico oficial do Mercado Livre direto com a sua tag de afiliado
     const cleanedProductUrl = this.cleanAndTagMercadoLivreUrl(targetUrl, tag);
-    const shortenedProductUrl = await urlShortenerService.shorten(cleanedProductUrl);
-    logger.success('AFFILIATE', `Mercado Livre: Link oficial encurtado gerado: ${shortenedProductUrl}`);
-    return { affiliateUrl: shortenedProductUrl, canonicalProductUrl };
+    logger.success('AFFILIATE', `Mercado Livre: Link oficial direto de produto gerado: ${cleanedProductUrl}`);
+    return { affiliateUrl: cleanedProductUrl, canonicalProductUrl };
   }
 
   /**
@@ -738,26 +737,25 @@ export class AffiliateService {
       }
     }
 
-    // 2. Fallback de parâmetros oficiais com encurtamento
+    // 2. Link oficial direto da Shopee com parâmetros de comissão
     const cleanTag = appId.includes('an_') ? (appId.match(/(an_\d+)/)?.[1] || 'an_18378190901') : `an_${appId}`;
-    let shopeeUrl = finalUrl;
     const match = finalUrl.match(/i\.(\d+)\.(\d+)/);
     if (match) {
-      shopeeUrl = `https://shopee.com.br/product/${match[1]}/${match[2]}?utm_source=${cleanTag}&mmp_pid=${cleanTag}`;
-    } else {
-      try {
-        const parsed = new URL(finalUrl);
-        parsed.searchParams.set('utm_source', cleanTag);
-        parsed.searchParams.set('mmp_pid', cleanTag);
-        shopeeUrl = parsed.toString();
-      } catch {
-        shopeeUrl = finalUrl;
-      }
+      const shopeeUrl = `https://shopee.com.br/product/${match[1]}/${match[2]}?utm_source=${cleanTag}&mmp_pid=${cleanTag}`;
+      logger.success('AFFILIATE', `Shopee: Link oficial direto gerado: ${shopeeUrl}`);
+      return shopeeUrl;
     }
 
-    const shortened = await urlShortenerService.shorten(shopeeUrl);
-    logger.success('AFFILIATE', `Shopee: Link oficial encurtado gerado: ${shortened}`);
-    return shortened;
+    try {
+      const parsed = new URL(finalUrl);
+      parsed.searchParams.set('utm_source', cleanTag);
+      parsed.searchParams.set('mmp_pid', cleanTag);
+      const shopeeUrl = parsed.toString();
+      logger.success('AFFILIATE', `Shopee: Link oficial direto gerado: ${shopeeUrl}`);
+      return shopeeUrl;
+    } catch {
+      return finalUrl;
+    }
   }
 
   /**
@@ -842,16 +840,15 @@ export class AffiliateService {
       }
     }
 
-    // 1. Tenta gerar o link curto oficial via SiteStripe API
+    // 1. Tenta gerar o link curto oficial via SiteStripe API (amzn.to)
     const officialShort = await this.generateOfficialAmazonShortLink(targetLongUrl, tag);
     if (officialShort) {
       logger.success('AFFILIATE', `Amazon: Link curto oficial SiteStripe gerado: ${officialShort}`);
       return officialShort;
     }
 
-    const shortened = await urlShortenerService.shorten(targetLongUrl);
-    logger.success('AFFILIATE', `Amazon: Link oficial encurtado gerado: ${shortened}`);
-    return shortened;
+    logger.success('AFFILIATE', `Amazon: Link oficial direto gerado: ${targetLongUrl}`);
+    return targetLongUrl;
   }
 
   /**
@@ -863,22 +860,21 @@ export class AffiliateService {
 
     const cleanStore = storeName.replace(/^https?:\/\//, '').replace(/magazinevoce\.com\.br\/?/, '').replace(/\//g, '') || 'magazineibanez01';
 
-    let magaluUrl = finalUrl;
     const prodMatch = finalUrl.match(/\/(?:p|produto)\/([a-zA-Z0-9]+)/i) || finalUrl.match(/sku=([a-zA-Z0-9]+)/i) || finalUrl.match(/codigo_produto=([a-zA-Z0-9]+)/i);
     if (prodMatch) {
-      magaluUrl = `https://www.magazinevoce.com.br/${cleanStore}/p/${prodMatch[1]}/`;
-    } else {
-      try {
-        const parsed = new URL(finalUrl);
-        magaluUrl = `https://www.magazinevoce.com.br/${cleanStore}${parsed.pathname}`;
-      } catch {
-        magaluUrl = finalUrl;
-      }
+      const magaluUrl = `https://www.magazinevoce.com.br/${cleanStore}/p/${prodMatch[1]}/`;
+      logger.success('AFFILIATE', `Magalu: Link oficial gerado: ${magaluUrl}`);
+      return magaluUrl;
     }
 
-    const shortened = await urlShortenerService.shorten(magaluUrl);
-    logger.success('AFFILIATE', `Magalu: Link oficial encurtado gerado: ${shortened}`);
-    return shortened;
+    try {
+      const parsed = new URL(finalUrl);
+      const magaluUrl = `https://www.magazinevoce.com.br/${cleanStore}${parsed.pathname}`;
+      logger.success('AFFILIATE', `Magalu: Link oficial gerado: ${magaluUrl}`);
+      return magaluUrl;
+    } catch {
+      return finalUrl;
+    }
   }
 
   /**
@@ -964,7 +960,6 @@ export class AffiliateService {
       decoded = decodeURIComponent(finalUrl);
     } catch {}
 
-    let aliUrl = finalUrl;
     const itemMatch = decoded.match(/\/item\/(\d+)/i) || decoded.match(/item_id=(\d+)/i) || decoded.match(/productId=(\d+)/i);
     if (itemMatch) {
       const cleanItemUrl = `https://pt.aliexpress.com/item/${itemMatch[1]}.html`;
@@ -974,21 +969,21 @@ export class AffiliateService {
         logger.success('AFFILIATE', `AliExpress: Link curto oficial gerado via API para item #${itemMatch[1]}: ${itemShort}`);
         return itemShort;
       }
-      aliUrl = `${cleanItemUrl}?aff_fcid=${tag}&tt=CPS_NORMAL`;
-    } else {
-      try {
-        const parsed = new URL(finalUrl);
-        parsed.searchParams.set('aff_fcid', tag);
-        parsed.searchParams.set('tt', 'CPS_NORMAL');
-        aliUrl = parsed.toString();
-      } catch {
-        aliUrl = finalUrl;
-      }
+      const aliUrl = `${cleanItemUrl}?aff_fcid=${tag}&tt=CPS_NORMAL`;
+      logger.success('AFFILIATE', `AliExpress: Link oficial direto gerado: ${aliUrl}`);
+      return aliUrl;
     }
 
-    const shortened = await urlShortenerService.shorten(aliUrl);
-    logger.success('AFFILIATE', `AliExpress: Link oficial encurtado gerado: ${shortened}`);
-    return shortened;
+    try {
+      const parsed = new URL(finalUrl);
+      parsed.searchParams.set('aff_fcid', tag);
+      parsed.searchParams.set('tt', 'CPS_NORMAL');
+      const aliUrl = parsed.toString();
+      logger.success('AFFILIATE', `AliExpress: Link oficial direto gerado: ${aliUrl}`);
+      return aliUrl;
+    } catch {
+      return finalUrl;
+    }
   }
 
   /**
