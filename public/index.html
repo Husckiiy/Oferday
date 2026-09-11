@@ -1146,6 +1146,96 @@
     </div>
   </div>
 
+  <!-- MODAL: DIVULGADOR & OFERTAS (5 LOJAS OFICIAIS) -->
+  <div class="modal-overlay" id="modal-promoter">
+    <div class="modal-dialog modal-xl" style="max-width: 1100px; max-height: 92vh;">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-badge-icon" style="background: linear-gradient(135deg, #f97316, #ef4444); color: white;">
+            <i data-lucide="megaphone"></i>
+          </div>
+          <div>
+            <h3>Divulgador de Ofertas & Achadinhos</h3>
+            <p>Selecione e envie promoções reais das 5 lojas com 1 clique usando seus links de afiliado</p>
+          </div>
+        </div>
+        <button class="btn-close-modal" data-close>&times;</button>
+      </div>
+
+      <div class="modal-body" style="padding: 1.25rem 1.5rem;">
+        
+        <!-- Controls Bar: Search & Store Filters -->
+        <div class="divulgador-controls-wrap">
+          <!-- Search Bar -->
+          <div class="divulgador-search-box">
+            <i data-lucide="search" class="search-icon"></i>
+            <input type="text" id="inputDivulgadorSearch" placeholder="Filtre as ofertas por título, loja ou cupom..." autocomplete="off">
+            <button type="button" id="btnClearDivulgadorSearch" class="btn-clear-search hidden">&times;</button>
+          </div>
+
+          <!-- Store Tabs (5 Official Stores) -->
+          <div class="divulgador-store-tabs" id="divulgadorStoreTabs">
+            <button type="button" class="store-tab-btn active" data-store="ALL">
+              <span>🌐 Todas as Lojas</span>
+            </button>
+            <button type="button" class="store-tab-btn tab-amazon" data-store="AMAZON">
+              <span>📦 Amazon</span>
+            </button>
+            <button type="button" class="store-tab-btn tab-meli" data-store="MERCADO_LIVRE">
+              <span>🟡 Mercado Livre</span>
+            </button>
+            <button type="button" class="store-tab-btn tab-shopee" data-store="SHOPEE">
+              <span>🟠 Shopee</span>
+            </button>
+            <button type="button" class="store-tab-btn tab-magalu" data-store="MAGALU">
+              <span>🔵 Magalu</span>
+            </button>
+            <button type="button" class="store-tab-btn tab-ali" data-store="ALIEXPRESS">
+              <span>🔴 AliExpress</span>
+            </button>
+          </div>
+
+          <!-- Category Filter Pills -->
+          <div class="divulgador-category-pills" id="divulgadorCategoryPills">
+            <button type="button" class="cat-pill active" data-cat="ALL">Todos os Nichos</button>
+            <button type="button" class="cat-pill" data-cat="Tech">⚡ Tech & Games</button>
+            <button type="button" class="cat-pill" data-cat="Casa">🏠 Casa & Cozinha</button>
+            <button type="button" class="cat-pill" data-cat="Achadinhos">✨ Achadinhos Virais</button>
+            <button type="button" class="cat-pill" data-cat="Beleza">💄 Beleza & Saúde</button>
+            <button type="button" class="cat-pill" data-cat="Moda">👟 Moda & Calçados</button>
+          </div>
+        </div>
+
+        <!-- Offers Grid Container -->
+        <div class="divulgador-grid-container">
+          <div id="divulgadorGrid" class="divulgador-grid">
+            <!-- Dynamic Cards Loaded via JavaScript -->
+          </div>
+
+          <!-- Empty State -->
+          <div id="divulgadorEmptyState" class="divulgador-empty-state hidden">
+            <i data-lucide="package-search" class="empty-icon"></i>
+            <h4>Nenhuma oferta encontrada</h4>
+            <p>Tente ajustar os filtros ou o termo de busca acima.</p>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="modal-footer" style="justify-content: space-between; align-items: center;">
+        <div class="divulgador-footer-info">
+          <span id="divulgadorCountText">Carregando promoções...</span>
+        </div>
+        <div class="modal-footer-actions">
+          <button type="button" class="btn btn-secondary" id="btnRefreshDivulgador">
+            <i data-lucide="refresh-cw"></i> Atualizar Ofertas
+          </button>
+          <button type="button" class="btn btn-primary" data-close>Concluído</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL: DIVULGADOR / ACHADINHOS / FILAS / PRODUTOS -->
   <div class="modal-overlay" id="modal-generic-info">
     <div class="modal-dialog">

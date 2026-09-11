@@ -29,6 +29,9 @@ function openModal(modalId) {
       loadFiltersConfig();
       loadBannerPreviews();
     }
+    if (modalId === 'modal-promoter') {
+      loadDivulgadorOffers();
+    }
     if (window.lucide) lucide.createIcons();
   }
 }
@@ -1535,5 +1538,258 @@ window.addEventListener('DOMContentLoaded', () => {
   loadBannerPreviews();
   loadMeliTokenStatus();
   setupSSE();
+  initDivulgadorEvents();
 });
+
+// ==========================================================================
+// DIVULGADOR & OFERTAS (5 LOJAS OFICIAIS) CONTROLLER
+// ==========================================================================
+const divulgadorState = {
+  store: 'ALL',
+  category: 'ALL',
+  search: '',
+  offers: [],
+  isLoading: false
+};
+
+const storeConfigsUI = {
+  'AMAZON': { name: 'Amazon', emoji: '📦', color: '#ff9900', badgeClass: 'tab-amazon' },
+  'MERCADO_LIVRE': { name: 'Mercado Livre', emoji: '🟡', color: '#ffe600', badgeClass: 'tab-meli' },
+  'SHOPEE': { name: 'Shopee', emoji: '🟠', color: '#ee4d2d', badgeClass: 'tab-shopee' },
+  'MAGALU': { name: 'Magalu', emoji: '🔵', color: '#0086ff', badgeClass: 'tab-magalu' },
+  'ALIEXPRESS': { name: 'AliExpress', emoji: '🔴', color: '#e62e04', badgeClass: 'tab-ali' }
+};
+
+function formatCurrencyBRL(val) {
+  if (typeof val !== 'number') return '0,00';
+  return val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function timeAgo(dateString) {
+  try {
+    const diff = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
+    if (diff < 60) return 'agora';
+    if (diff < 3600) return `há ${Math.floor(diff / 60)} min`;
+    if (diff < 86400) return `há ${Math.floor(diff / 3600)}h`;
+    return `há ${Math.floor(diff / 86400)}d`;
+  } catch {
+    return 'recente';
+  }
+}
+
+async function loadDivulgadorOffers() {
+  const grid = document.getElementById('divulgadorGrid');
+  const emptyState = document.getElementById('divulgadorEmptyState');
+  const countText = document.getElementById('divulgadorCountText');
+
+  divulgadorState.isLoading = true;
+  if (countText) countText.textContent = 'Buscando promoções ativas...';
+
+  try {
+    const params = new URLSearchParams();
+    if (divulgadorState.store !== 'ALL') params.append('store', divulgadorState.store);
+    if (divulgadorState.category !== 'ALL') params.append('category', divulgadorState.category);
+    if (divulgadorState.search.trim().length > 0) params.append('search', divulgadorState.search.trim());
+
+    const res = await fetch(`/api/divulgador/offers?${params.toString()}`);
+    const data = await res.json();
+
+    if (data && data.success) {
+      divulgadorState.offers = data.offers || [];
+      renderDivulgadorGrid(divulgadorState.offers);
+      if (countText) {
+        countText.textContent = `${divulgadorState.offers.length} oferta(s) disponível(is) para disparo`;
+      }
+    } else {
+      if (grid) grid.innerHTML = '';
+      if (emptyState) emptyState.classList.remove('hidden');
+      if (countText) countText.textContent = 'Erro ao carregar ofertas.';
+    }
+  } catch (err) {
+    console.error('Erro ao buscar ofertas do divulgador:', err);
+    if (grid) grid.innerHTML = '';
+    if (emptyState) emptyState.classList.remove('hidden');
+    if (countText) countText.textContent = 'Falha na conexão com o servidor.';
+  } finally {
+    divulgadorState.isLoading = false;
+  }
+}
+
+function renderDivulgadorGrid(offers) {
+  const grid = document.getElementById('divulgadorGrid');
+  const emptyState = document.getElementById('divulgadorEmptyState');
+  if (!grid) return;
+
+  grid.innerHTML = '';
+
+  if (!offers || offers.length === 0) {
+    if (emptyState) emptyState.classList.remove('hidden');
+    return;
+  }
+
+  if (emptyState) emptyState.classList.add('hidden');
+
+  offers.forEach((offer) => {
+    const storeInfo = storeConfigsUI[offer.store] || { name: offer.store, emoji: '🛍️', color: '#f97316' };
+    const card = document.createElement('div');
+    card.className = 'offer-card';
+
+    const discountHtml = offer.discountPercent
+      ? `<span class="offer-discount-badge">-${offer.discountPercent}%</span>`
+      : '';
+
+    const couponHtml = offer.coupon
+      ? `<span class="offer-coupon-badge">🎟️ ${offer.coupon}</span>`
+      : '';
+
+    const oldPriceHtml = offer.originalPrice && offer.originalPrice > offer.promoPrice
+      ? `<div class="offer-price-old">R$ ${formatCurrencyBRL(offer.originalPrice)}</div>`
+      : '';
+
+    card.innerHTML = `
+      <div class="offer-card-top">
+        <span class="offer-store-tag" style="color: ${storeInfo.color};">
+          <span>${storeInfo.emoji}</span> ${storeInfo.name}
+        </span>
+        <span class="offer-time-tag">${timeAgo(offer.postedAt)}</span>
+      </div>
+
+      <div class="offer-img-wrap">
+        ${discountHtml}
+        <img src="${offer.imageUrl}" alt="${offer.title}" class="offer-product-img" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=400&q=80'">
+      </div>
+
+      <div class="offer-card-body">
+        <div class="offer-badges-row">
+          <span class="offer-category-badge">${offer.category || 'Geral'}</span>
+          ${couponHtml}
+        </div>
+
+        <h4 class="offer-title" title="${offer.title}">${offer.title}</h4>
+
+        <div class="offer-price-box">
+          ${oldPriceHtml}
+          <div class="offer-price-current">R$ ${formatCurrencyBRL(offer.promoPrice)}</div>
+        </div>
+
+        <div class="offer-card-footer">
+          <a href="${offer.productUrl}" target="_blank" rel="noopener noreferrer" class="btn-offer-view" title="Ver produto na loja">
+            <i data-lucide="external-link" style="width: 16px; height: 16px;"></i>
+          </a>
+          <button type="button" class="btn-offer-dispatch" data-dispatch-id="${offer.id}">
+            <i data-lucide="send" style="width: 15px; height: 15px;"></i>
+            <span>Disparar Agora</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    // Bind dispatch button
+    const btnDispatch = card.querySelector('.btn-offer-dispatch');
+    btnDispatch?.addEventListener('click', () => {
+      dispatchDivulgadorOffer(offer, btnDispatch);
+    });
+
+    grid.appendChild(card);
+  });
+
+  if (window.lucide) lucide.createIcons();
+}
+
+async function dispatchDivulgadorOffer(offer, btnElement) {
+  if (btnElement.classList.contains('loading')) return;
+
+  const originalContent = btnElement.innerHTML;
+  btnElement.classList.add('loading');
+  btnElement.innerHTML = `<span>Disparando...</span>`;
+
+  try {
+    const res = await fetch('/api/divulgador/dispatch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ offerId: offer.id, offerData: offer })
+    });
+
+    const data = await res.json();
+
+    if (data && data.success) {
+      btnElement.classList.remove('loading');
+      btnElement.classList.add('dispatched');
+      btnElement.innerHTML = `<span>✓ Enviado!</span>`;
+      showToast(`⚡ Oferta "${offer.title.slice(0, 30)}..." enviada com seu link de afiliado!`);
+
+      setTimeout(() => {
+        btnElement.classList.remove('dispatched');
+        btnElement.innerHTML = originalContent;
+        if (window.lucide) lucide.createIcons();
+      }, 3500);
+    } else {
+      btnElement.classList.remove('loading');
+      btnElement.innerHTML = originalContent;
+      showToast(`❌ Erro no disparo: ${data.error || 'Falha desconhecida'}`);
+    }
+  } catch (err) {
+    btnElement.classList.remove('loading');
+    btnElement.innerHTML = originalContent;
+    showToast(`❌ Erro de conexão ao disparar: ${err.message}`);
+  }
+}
+
+function initDivulgadorEvents() {
+  // Store Tabs Filter
+  const storeTabs = document.querySelectorAll('#divulgadorStoreTabs .store-tab-btn');
+  storeTabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      storeTabs.forEach((t) => t.classList.remove('active'));
+      tab.classList.add('active');
+      divulgadorState.store = tab.getAttribute('data-store') || 'ALL';
+      loadDivulgadorOffers();
+    });
+  });
+
+  // Category Pills Filter
+  const catPills = document.querySelectorAll('#divulgadorCategoryPills .cat-pill');
+  catPills.forEach((pill) => {
+    pill.addEventListener('click', () => {
+      catPills.forEach((p) => p.classList.remove('active'));
+      pill.classList.add('active');
+      divulgadorState.category = pill.getAttribute('data-cat') || 'ALL';
+      loadDivulgadorOffers();
+    });
+  });
+
+  // Search Input with Debounce
+  const searchInput = document.getElementById('inputDivulgadorSearch');
+  const btnClearSearch = document.getElementById('btnClearDivulgadorSearch');
+  let searchTimeout = null;
+
+  searchInput?.addEventListener('input', (e) => {
+    const val = e.target.value;
+    if (btnClearSearch) {
+      if (val.length > 0) btnClearSearch.classList.remove('hidden');
+      else btnClearSearch.classList.add('hidden');
+    }
+
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      divulgadorState.search = val;
+      loadDivulgadorOffers();
+    }, 300);
+  });
+
+  btnClearSearch?.addEventListener('click', () => {
+    if (searchInput) searchInput.value = '';
+    btnClearSearch.classList.add('hidden');
+    divulgadorState.search = '';
+    loadDivulgadorOffers();
+  });
+
+  // Refresh Button
+  const btnRefresh = document.getElementById('btnRefreshDivulgador');
+  btnRefresh?.addEventListener('click', () => {
+    loadDivulgadorOffers();
+    showToast('🔄 Lista de ofertas atualizada!');
+  });
+}
+
 

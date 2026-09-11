@@ -9,6 +9,7 @@ import { imageService } from '../services/image.service.js';
 import { forwarderService } from '../services/forwarder.service.js';
 import { affiliateService } from '../services/affiliate.service.js';
 import { meliAuthService } from '../services/meli-auth.service.js';
+import { divulgadorService } from '../services/divulgador.service.js';
 
 export const apiRouter = Router();
 
@@ -436,4 +437,42 @@ apiRouter.post('/banners/upload', async (req: Request, res: Response) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// Divulgador & Ofertas (5 Lojas Suportadas)
+apiRouter.get('/divulgador/offers', (req: Request, res: Response) => {
+  try {
+    const { store, category, search } = req.query;
+    const offers = divulgadorService.getOffers({
+      store: store ? String(store) : undefined,
+      category: category ? String(category) : undefined,
+      search: search ? String(search) : undefined
+    });
+    res.json({ success: true, count: offers.length, offers });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+apiRouter.post('/divulgador/dispatch', async (req: Request, res: Response) => {
+  try {
+    const { offerId, offerData } = req.body;
+    if (!offerId && !offerData) {
+      return res.status(400).json({ success: false, error: 'offerId ou offerData é obrigatório.' });
+    }
+    const result = await divulgadorService.dispatchOffer(offerId || offerData);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+apiRouter.post('/divulgador/add', (req: Request, res: Response) => {
+  try {
+    const newOffer = divulgadorService.addOffer(req.body);
+    res.json({ success: true, message: 'Oferta adicionada ao Divulgador!', offer: newOffer });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 
