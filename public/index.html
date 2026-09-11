@@ -1222,15 +1222,27 @@
 
       </div>
 
-      <div class="modal-footer" style="justify-content: space-between; align-items: center;">
+      <div class="modal-footer" style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
         <div class="divulgador-footer-info">
-          <span id="divulgadorCountText">Carregando promoções...</span>
+          <strong id="divulgadorCountText" style="color: var(--text-heading); font-size: 0.88rem;">Carregando promoções...</strong>
         </div>
-        <div class="modal-footer-actions">
-          <button type="button" class="btn btn-secondary" id="btnRefreshDivulgador">
-            <i data-lucide="refresh-cw"></i> Atualizar Ofertas
+
+        <!-- Pagination Controls -->
+        <div class="divulgador-pagination" id="divulgadorPagination">
+          <button type="button" class="btn btn-secondary btn-sm" id="btnDivPrev" disabled>
+            <i data-lucide="chevron-left"></i> Anterior
           </button>
-          <button type="button" class="btn btn-primary" data-close>Concluído</button>
+          <span id="divulgadorPageInfo" style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); padding: 0 0.4rem;">Página 1</span>
+          <button type="button" class="btn btn-secondary btn-sm" id="btnDivNext" disabled>
+            Próxima <i data-lucide="chevron-right"></i>
+          </button>
+        </div>
+
+        <div class="modal-footer-actions">
+          <button type="button" class="btn btn-secondary btn-sm" id="btnHarvestDivulgador" title="Buscar novas promoções nas 5 lojas agora">
+            <i data-lucide="sparkles"></i> <span>Garimpar Ofertas</span>
+          </button>
+          <button type="button" class="btn btn-primary btn-sm" data-close>Concluído</button>
         </div>
       </div>
     </div>

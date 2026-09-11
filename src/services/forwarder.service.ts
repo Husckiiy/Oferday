@@ -7,6 +7,7 @@ import { ForwardedMessageItem } from '../types/index.js';
 
 import { affiliateService } from './affiliate.service.js';
 import { imageService } from './image.service.js';
+import { divulgadorService } from './divulgador.service.js';
 
 import crypto from 'crypto';
 
@@ -283,6 +284,11 @@ class ForwarderService extends EventEmitter {
     };
 
     this.addFeedItem(item);
+    
+    // Ingerir no catálogo de ofertas do Divulgador
+    try {
+      divulgadorService.ingestFromTelegramMessage(data.text, finalMediaBuffer);
+    } catch {}
 
     // If duplicate detected, block forwarding
     if (duplicateReason && prevSentRecord) {

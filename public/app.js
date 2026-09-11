@@ -1548,6 +1548,10 @@ const divulgadorState = {
   store: 'ALL',
   category: 'ALL',
   search: '',
+  page: 1,
+  limit: 12,
+  totalPages: 1,
+  total: 0,
   offers: [],
   isLoading: false
 };
@@ -1581,25 +1585,40 @@ async function loadDivulgadorOffers() {
   const grid = document.getElementById('divulgadorGrid');
   const emptyState = document.getElementById('divulgadorEmptyState');
   const countText = document.getElementById('divulgadorCountText');
+  const pageInfo = document.getElementById('divulgadorPageInfo');
+  const btnPrev = document.getElementById('btnDivPrev');
+  const btnNext = document.getElementById('btnDivNext');
 
   divulgadorState.isLoading = true;
-  if (countText) countText.textContent = 'Buscando promoções ativas...';
+  if (countText) countText.textContent = 'Buscando promoções em tempo real...';
 
   try {
     const params = new URLSearchParams();
     if (divulgadorState.store !== 'ALL') params.append('store', divulgadorState.store);
     if (divulgadorState.category !== 'ALL') params.append('category', divulgadorState.category);
     if (divulgadorState.search.trim().length > 0) params.append('search', divulgadorState.search.trim());
+    params.append('page', String(divulgadorState.page));
+    params.append('limit', String(divulgadorState.limit));
 
     const res = await fetch(`/api/divulgador/offers?${params.toString()}`);
     const data = await res.json();
 
     if (data && data.success) {
       divulgadorState.offers = data.offers || [];
+      divulgadorState.total = data.total || 0;
+      divulgadorState.totalPages = data.totalPages || 1;
+      divulgadorState.page = data.page || 1;
+
       renderDivulgadorGrid(divulgadorState.offers);
+
       if (countText) {
-        countText.textContent = `${divulgadorState.offers.length} oferta(s) disponível(is) para disparo`;
+        countText.textContent = `${divulgadorState.total} promoções encontradas`;
       }
+      if (pageInfo) {
+        pageInfo.textContent = `Página ${divulgadorState.page} de ${divulgadorState.totalPages}`;
+      }
+      if (btnPrev) btnPrev.disabled = divulgadorState.page <= 1;
+      if (btnNext) btnNext.disabled = divulgadorState.page >= divulgadorState.totalPages;
     } else {
       if (grid) grid.innerHTML = '';
       if (emptyState) emptyState.classList.remove('hidden');
@@ -1646,6 +1665,9 @@ function renderDivulgadorGrid(offers) {
       ? `<div class="offer-price-old">R$ ${formatCurrencyBRL(offer.originalPrice)}</div>`
       : '';
 
+    // URL com proxy de fallback seguro
+    const safeProxyUrl = `/api/proxy-image?url=${encodeURIComponent(offer.imageUrl)}`;
+
     card.innerHTML = `
       <div class="offer-card-top">
         <span class="offer-store-tag" style="color: ${storeInfo.color};">
@@ -1656,7 +1678,12 @@ function renderDivulgadorGrid(offers) {
 
       <div class="offer-img-wrap">
         ${discountHtml}
-        <img src="${offer.imageUrl}" alt="${offer.title}" class="offer-product-img" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=400&q=80'">
+        <img src="${offer.imageUrl}" 
+             alt="${offer.title}" 
+             class="offer-product-img" 
+             loading="lazy" 
+             referrerpolicy="no-referrer"
+             onerror="if(!this.dataset.retry){this.dataset.retry=1;this.src='${safeProxyUrl}';}else{this.src='https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=400&q=80';}">
       </div>
 
       <div class="offer-card-body">
@@ -1743,6 +1770,7 @@ function initDivulgadorEvents() {
       storeTabs.forEach((t) => t.classList.remove('active'));
       tab.classList.add('active');
       divulgadorState.store = tab.getAttribute('data-store') || 'ALL';
+      divulgadorState.page = 1;
       loadDivulgadorOffers();
     });
   });
@@ -1754,6 +1782,7 @@ function initDivulgadorEvents() {
       catPills.forEach((p) => p.classList.remove('active'));
       pill.classList.add('active');
       divulgadorState.category = pill.getAttribute('data-cat') || 'ALL';
+      divulgadorState.page = 1;
       loadDivulgadorOffers();
     });
   });
@@ -1773,6 +1802,7 @@ function initDivulgadorEvents() {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
       divulgadorState.search = val;
+      divulgadorState.page = 1;
       loadDivulgadorOffers();
     }, 300);
   });
@@ -1781,6 +1811,7 @@ function initDivulgadorEvents() {
     if (searchInput) searchInput.value = '';
     btnClearSearch.classList.add('hidden');
     divulgadorState.search = '';
+    divulgadorState.page = 1;
     loadDivulgadorOffers();
   });
 
@@ -1790,6 +1821,49 @@ function initDivulgadorEvents() {
     loadDivulgadorOffers();
     showToast('🔄 Lista de ofertas atualizada!');
   });
+
+  // Harvest Button (Garimpar Novas Ofertas)
+  const btnHarvest = document.getElementById('btnHarvestDivulgador');
+  btnHarvest?.addEventListener('click', async () => {
+    const originalText = btnHarvest.innerHTML;
+    btnHarvest.disabled = true;
+    btnHarvest.innerHTML = `<span>Garimpando...</span>`;
+    showToast('🔎 Buscando novas promoções nas 5 lojas...');
+
+    try {
+      const res = await fetch('/api/divulgador/harvest', { method: 'POST' });
+      const data = await res.json();
+      if (data && data.success) {
+        showToast('🎉 Novas ofertas garimpadas com sucesso!');
+        loadDivulgadorOffers();
+      }
+    } catch (e) {
+      showToast('⚠️ Garimpagem em segundo plano.');
+    } finally {
+      btnHarvest.disabled = false;
+      btnHarvest.innerHTML = originalText;
+      if (window.lucide) lucide.createIcons();
+    }
+  });
+
+  // Pagination Buttons
+  const btnPrev = document.getElementById('btnDivPrev');
+  const btnNext = document.getElementById('btnDivNext');
+
+  btnPrev?.addEventListener('click', () => {
+    if (divulgadorState.page > 1) {
+      divulgadorState.page--;
+      loadDivulgadorOffers();
+    }
+  });
+
+  btnNext?.addEventListener('click', () => {
+    if (divulgadorState.page < divulgadorState.totalPages) {
+      divulgadorState.page++;
+      loadDivulgadorOffers();
+    }
+  });
 }
+
 
 

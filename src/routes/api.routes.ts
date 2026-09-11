@@ -441,13 +441,24 @@ apiRouter.post('/banners/upload', async (req: Request, res: Response) => {
 // Divulgador & Ofertas (5 Lojas Suportadas)
 apiRouter.get('/divulgador/offers', (req: Request, res: Response) => {
   try {
-    const { store, category, search } = req.query;
-    const offers = divulgadorService.getOffers({
+    const { store, category, search, page, limit } = req.query;
+    const result = divulgadorService.getOffers({
       store: store ? String(store) : undefined,
       category: category ? String(category) : undefined,
-      search: search ? String(search) : undefined
+      search: search ? String(search) : undefined,
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 12
     });
-    res.json({ success: true, count: offers.length, offers });
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+apiRouter.post('/divulgador/harvest', async (req: Request, res: Response) => {
+  try {
+    const count = await divulgadorService.harvestAll();
+    res.json({ success: true, message: `Garimpagem concluída com sucesso!`, count });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -474,5 +485,37 @@ apiRouter.post('/divulgador/add', (req: Request, res: Response) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// Proxy de Imagens (evita bloqueio de hotlink por CDNs)
+apiRouter.get('/proxy-image', async (req: Request, res: Response) => {
+  const imageUrl = req.query.url as string;
+  if (!imageUrl || !imageUrl.startsWith('http')) {
+    return res.status(400).send('URL de imagem inválida');
+  }
+
+  try {
+    const response = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        'Referer': 'https://www.google.com/'
+      },
+      signal: AbortSignal.timeout(8000)
+    });
+
+    if (!response.ok) {
+      return res.redirect(imageUrl);
+    }
+
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+
+    const arrayBuffer = await response.arrayBuffer();
+    res.send(Buffer.from(arrayBuffer));
+  } catch (err) {
+    res.redirect(imageUrl);
+  }
+});
+
 
 
