@@ -36,13 +36,25 @@ class DivulgadorService {
   private isHarvesting: boolean = false;
   private harvestTimer: NodeJS.Timeout | null = null;
 
+  // Lista dos maiores canais públicos de garimpo de ofertas do Brasil
+  private promoChannels = [
+    'Promos_tech1',
+    'EconomizandocomJP',
+    'jptechofertasgerais',
+    'PortalDOSsachadinhos',
+    'achadoshopeeoficial',
+    'gatry',
+    'promosdashopee',
+    'canaldescontos'
+  ];
+
   constructor() {
     this.loadOffers();
-    // Iniciar garimpagem automática a cada 30 minutos
+    // Executar garimpo inicial e agendar a cada 15 minutos
     this.harvestAll().catch(() => {});
     this.harvestTimer = setInterval(() => {
       this.harvestAll().catch(() => {});
-    }, 30 * 60 * 1000);
+    }, 15 * 60 * 1000);
   }
 
   private loadOffers(): void {
@@ -52,12 +64,11 @@ class DivulgadorService {
         this.offers = JSON.parse(raw);
       }
       if (!this.offers || this.offers.length === 0) {
-        this.offers = this.getDefaultCuratedOffers();
-        this.saveOffers();
+        this.offers = [];
       }
     } catch (err: any) {
       logger.error('SYSTEM', `[Divulgador] Erro ao carregar ofertas: ${err.message}`);
-      this.offers = this.getDefaultCuratedOffers();
+      this.offers = [];
     }
   }
 
@@ -119,372 +130,252 @@ class DivulgadorService {
     return this.offers.find(o => o.id === id);
   }
 
-  public addOffer(offerData: Partial<DivulgadorOffer>): DivulgadorOffer {
-    // Evitar duplicidade por URL
-    if (offerData.productUrl) {
-      const cleanUrl = offerData.productUrl.split('?')[0];
-      const existing = this.offers.find(o => o.productUrl && o.productUrl.split('?')[0] === cleanUrl);
-      if (existing) {
-        return existing;
-      }
-    }
+  public addOffer(offerData: Partial<DivulgadorOffer>): DivulgadorOffer | null {
+    if (!offerData.title || !offerData.productUrl) return null;
 
+    // Evitar duplicidade por URL
+    const cleanUrl = offerData.productUrl.split('?')[0].toLowerCase();
+    const existingIndex = this.offers.findIndex(o => o.productUrl && o.productUrl.split('?')[0].toLowerCase() === cleanUrl);
+    
     const newOffer: DivulgadorOffer = {
       id: offerData.id || crypto.randomUUID().slice(0, 8),
       store: (offerData.store as any) || 'AMAZON',
-      title: (offerData.title || 'Oferta Especial').replace(/[\r\n]+/g, ' ').trim(),
+      title: offerData.title.replace(/[\r\n]+/g, ' ').replace(/\s{2,}/g, ' ').trim(),
       originalPrice: offerData.originalPrice,
       promoPrice: Number(offerData.promoPrice) || 0,
-      discountPercent: offerData.discountPercent || (offerData.originalPrice && offerData.promoPrice ? Math.round((1 - (offerData.promoPrice / offerData.originalPrice)) * 100) : undefined),
+      discountPercent: offerData.discountPercent || (offerData.originalPrice && offerData.promoPrice && offerData.originalPrice > offerData.promoPrice ? Math.round((1 - (offerData.promoPrice / offerData.originalPrice)) * 100) : undefined),
       coupon: offerData.coupon ? offerData.coupon.toUpperCase().trim() : undefined,
-      imageUrl: offerData.imageUrl || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&q=80',
-      productUrl: offerData.productUrl || 'https://www.amazon.com.br',
+      imageUrl: offerData.imageUrl || '',
+      productUrl: offerData.productUrl,
       category: offerData.category || 'Geral',
       postedAt: offerData.postedAt || new Date().toISOString(),
       tags: offerData.tags || []
     };
 
+    if (existingIndex !== -1) {
+      this.offers[existingIndex] = { ...this.offers[existingIndex], ...newOffer };
+      return this.offers[existingIndex];
+    }
+
     this.offers.unshift(newOffer);
-    if (this.offers.length > 3000) this.offers = this.offers.slice(0, 3000);
+    if (this.offers.length > 5000) this.offers = this.offers.slice(0, 5000);
     this.saveOffers();
     return newOffer;
   }
 
-  /**
-   * Ingestão automática a partir das mensagens repassadas do Telegram
-   */
   public ingestFromTelegramMessage(text: string, mediaBuffer?: Buffer | null): void {
-    if (!text) return;
-
+    if (!text || text.length < 15) return;
     try {
-      // 1. Identificar loja e URL
-      const urlMatch = text.match(/https?:\/\/[^\s"'<>]+/i);
-      if (!urlMatch) return;
-      const rawUrl = urlMatch[0];
+      const urlMatches = text.match(/https?:\/\/[^\s"'<>]+/gi) || [];
+      if (urlMatches.length === 0) return;
 
       let store: DivulgadorOffer['store'] | null = null;
-      if (rawUrl.includes('mercadolivre.com') || rawUrl.includes('meli.la') || rawUrl.includes('mercadolivre.com.br')) store = 'MERCADO_LIVRE';
-      else if (rawUrl.includes('amazon.com') || rawUrl.includes('amzn.to') || rawUrl.includes('a.co')) store = 'AMAZON';
-      else if (rawUrl.includes('shopee.com') || rawUrl.includes('s.shopee.com.br') || rawUrl.includes('shp.ee')) store = 'SHOPEE';
-      else if (rawUrl.includes('magazineluiza.com.br') || rawUrl.includes('magazinevoce.com.br') || rawUrl.includes('magalu')) store = 'MAGALU';
-      else if (rawUrl.includes('aliexpress.com') || rawUrl.includes('s.click.aliexpress.com')) store = 'ALIEXPRESS';
+      let targetUrl = '';
+      for (const link of urlMatches) {
+        const lower = link.toLowerCase();
+        if (lower.includes('mercadolivre.com') || lower.includes('meli.la')) { store = 'MERCADO_LIVRE'; targetUrl = link; break; }
+        else if (lower.includes('amazon.com') || lower.includes('amzn.to') || lower.includes('a.co')) { store = 'AMAZON'; targetUrl = link; break; }
+        else if (lower.includes('shopee.com') || lower.includes('s.shopee.com') || lower.includes('shp.ee')) { store = 'SHOPEE'; targetUrl = link; break; }
+        else if (lower.includes('magazineluiza.com') || lower.includes('magazinevoce.com') || lower.includes('magalu')) { store = 'MAGALU'; targetUrl = link; break; }
+        else if (lower.includes('aliexpress.com') || lower.includes('s.click.aliexpress.com')) { store = 'ALIEXPRESS'; targetUrl = link; break; }
+      }
 
-      if (!store) return;
+      if (!store || !targetUrl) return;
 
-      // 2. Extrair título (geralmente primeira linha ou linha com negrito)
-      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 5);
+      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 3);
       let title = lines[0] || 'Promoção Exclusiva';
-      for (const line of lines) {
-        if (!line.startsWith('http') && !line.includes('⚡') && !line.includes('🛒') && !line.includes('De:') && !line.includes('Por:')) {
-          title = line.replace(/[*_~`]/g, '').trim();
+      for (const l of lines) {
+        if (!l.startsWith('http') && !l.includes('⚡') && !l.includes('🛒') && !l.toLowerCase().includes('compre aqui')) {
+          title = l.replace(/[*_~`]/g, '').trim();
           break;
         }
       }
 
-      // 3. Extrair preços
       let promoPrice = 0;
       let originalPrice: number | undefined;
-
       const porMatch = text.match(/(?:por|apenas|sai por|agora)\s*:?\s*r?\$?\s*([0-9]+[.,][0-9]{2})/i);
-      if (porMatch) {
-        promoPrice = parseFloat(porMatch[1].replace('.', '').replace(',', '.'));
-      }
-
+      if (porMatch) promoPrice = parseFloat(porMatch[1].replace('.', '').replace(',', '.'));
       const deMatch = text.match(/(?:de|era|custava)\s*:?\s*r?\$?\s*([0-9]+[.,][0-9]{2})/i);
-      if (deMatch) {
-        originalPrice = parseFloat(deMatch[1].replace('.', '').replace(',', '.'));
-      }
-
-      // 4. Extrair cupom
-      let coupon: string | undefined;
-      const couponMatch = text.match(/(?:cupom|c[oó]digo|use)\s*[:：\-–—]?\s*([A-Za-z0-9_\-]{4,20})/i);
-      if (couponMatch) {
-        coupon = couponMatch[1].toUpperCase().trim();
-      }
-
-      // 5. Categoria inteligente
-      let category: DivulgadorOffer['category'] = 'Geral';
-      const lower = text.toLowerCase();
-      if (lower.includes('gamer') || lower.includes('ps5') || lower.includes('xbox') || lower.includes('headset') || lower.includes('teclado') || lower.includes('mouse')) category = 'Games';
-      else if (lower.includes('celular') || lower.includes('fone') || lower.includes('alexa') || lower.includes('smartwatch') || lower.includes('tv') || lower.includes('notebook') || lower.includes('monitor')) category = 'Tech';
-      else if (lower.includes('air fryer') || lower.includes('panela') || lower.includes('aspirador') || lower.includes('cafeteira') || lower.includes('liquidificador')) category = 'Casa';
-      else if (lower.includes('shampoo') || lower.includes('perfume') || lower.includes('creme') || lower.includes('protetor') || lower.includes('hidratante')) category = 'Beleza';
-      else if (lower.includes('tênis') || lower.includes('tenis') || lower.includes('camiseta') || lower.includes('chinelo') || lower.includes('jaqueta')) category = 'Moda';
-      else if (store === 'SHOPEE' || lower.includes('achadinho') || lower.includes('mini') || lower.includes('portatil')) category = 'Achadinhos';
+      if (deMatch) originalPrice = parseFloat(deMatch[1].replace('.', '').replace(',', '.'));
 
       this.addOffer({
         store,
         title: title.slice(0, 140),
         originalPrice,
         promoPrice: promoPrice || 49.90,
-        coupon,
-        category,
-        productUrl: rawUrl,
-        imageUrl: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&q=80',
+        productUrl: targetUrl,
+        category: 'Geral',
         postedAt: new Date().toISOString()
       });
-    } catch (err: any) {
-      logger.error('SYSTEM', `[Divulgador] Falha ao ingerir mensagem do Telegram: ${err.message}`);
-    }
+    } catch {}
   }
 
   /**
-   * Garimpador de Ofertas em Tempo Real das 5 Lojas Oficiais
+   * Garimpador em Tempo Real de Todos os Canais Públicos de Ofertas
    */
   public async harvestAll(): Promise<number> {
     if (this.isHarvesting) return 0;
     this.isHarvesting = true;
-    logger.info('SYSTEM', '[Divulgador] Iniciando garimpagem automática de ofertas das 5 lojas...');
+    logger.info('SYSTEM', `[Divulgador] Iniciando garimpagem em tempo real de ${this.promoChannels.length} fontes de promoções...`);
 
-    let count = 0;
-    try {
-      count += await this.harvestMercadoLivre();
-      count += await this.harvestAmazonDeals();
-      count += await this.harvestShopeeDeals();
-      count += await this.harvestMagaluDeals();
-      count += await this.harvestAliExpressDeals();
-      logger.success('SYSTEM', `[Divulgador] Garimpagem concluída! Total de ${this.offers.length} ofertas prontas no catálogo.`);
-    } catch (err: any) {
-      logger.error('SYSTEM', `[Divulgador] Erro na garimpagem: ${err.message}`);
-    } finally {
-      this.isHarvesting = false;
-    }
-    return count;
-  }
+    let totalHarvested = 0;
 
-  private async harvestMercadoLivre(): Promise<number> {
-    const categories = [
-      { query: 'ofertas tech', category: 'Tech' as const },
-      { query: 'ofertas gamer', category: 'Games' as const },
-      { query: 'ofertas casa cozinha', category: 'Casa' as const },
-      { query: 'ofertas beleza cosméticos', category: 'Beleza' as const },
-      { query: 'ofertas tenis calcados', category: 'Moda' as const }
-    ];
-
-    let totalAdded = 0;
-
-    for (const item of categories) {
+    for (const channel of this.promoChannels) {
       try {
-        const url = `https://api.mercadolibre.com/sites/MLB/search?q=${encodeURIComponent(item.query)}&limit=15&sort=relevance`;
-        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-        if (!res.ok) continue;
-
-        const data: any = await res.json();
-        const results = data.results || [];
-
-        for (const prod of results) {
-          if (!prod.title || !prod.price || !prod.permalink) continue;
-
-          // Converter thumbnail para imagem HD
-          let img = prod.thumbnail || '';
-          if (img.includes('-I.jpg')) img = img.replace('-I.jpg', '-O.webp');
-          else if (img.includes('-I.webp')) img = img.replace('-I.webp', '-O.webp');
-          img = img.replace('http://', 'https://');
-
-          const orig = prod.original_price && prod.original_price > prod.price ? prod.original_price : undefined;
-          const disc = orig ? Math.round((1 - (prod.price / orig)) * 100) : undefined;
-
-          this.addOffer({
-            store: 'MERCADO_LIVRE',
-            title: prod.title,
-            originalPrice: orig,
-            promoPrice: prod.price,
-            discountPercent: disc,
-            imageUrl: img,
-            productUrl: prod.permalink,
-            category: item.category,
-            postedAt: new Date(Date.now() - Math.floor(Math.random() * 60) * 60000).toISOString(),
-            tags: [item.category, 'Mercado Livre']
-          });
-          totalAdded++;
-        }
-      } catch (e) {}
+        const added = await this.harvestTelegramChannel(channel);
+        totalHarvested += added;
+      } catch (err: any) {
+        logger.warn('SYSTEM', `[Divulgador] Erro ao garimpar canal ${channel}: ${err.message}`);
+      }
     }
 
-    return totalAdded;
+    this.saveOffers();
+    logger.success('SYSTEM', `[Divulgador] Garimpagem concluída! ${totalHarvested} novas ofertas adicionadas. Catálogo total: ${this.offers.length} promoções ativas.`);
+    this.isHarvesting = false;
+    return totalHarvested;
   }
 
-  private async harvestAmazonDeals(): Promise<number> {
-    const deals = [
-      {
-        title: 'Echo Dot 5ª Geração Smart Speaker com Alexa Som Potente e Graves Profundos',
-        originalPrice: 429.00,
-        promoPrice: 269.10,
-        discountPercent: 37,
-        coupon: 'ALEXA10',
-        imageUrl: 'https://m.media-amazon.com/images/I/71C8z+8qJ+L._AC_SX679_.jpg',
-        productUrl: 'https://www.amazon.com.br/dp/B09B8V1LZ3',
-        category: 'Tech' as const
+  /**
+   * Extrai ofertas completas com foto HD, preços, cupons e links oficiais do feed público do Telegram
+   */
+  private async harvestTelegramChannel(channelName: string): Promise<number> {
+    const url = `https://t.me/s/${channelName}`;
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
       },
-      {
-        title: 'Fire TV Stick HD Streaming com Controle Remoto por Voz com Alexa',
-        originalPrice: 349.00,
-        promoPrice: 229.00,
-        discountPercent: 34,
-        coupon: 'FIRETV15',
-        imageUrl: 'https://m.media-amazon.com/images/I/51Da25+8YYL._AC_SX679_.jpg',
-        productUrl: 'https://www.amazon.com.br/dp/B08C1W5N87',
-        category: 'Tech' as const
-      },
-      {
-        title: 'Cafeteira Espresso Nespresso Essenza Mini 19 Bar Compacta',
-        originalPrice: 599.00,
-        promoPrice: 389.00,
-        discountPercent: 35,
-        imageUrl: 'https://m.media-amazon.com/images/I/61K0f-62xNL._AC_SX679_.jpg',
-        productUrl: 'https://www.amazon.com.br/dp/B0798VGBX9',
-        category: 'Casa' as const
-      },
-      {
-        title: 'Aspirador de Pó Robô WAP W100 Bivolt Automático Limpeza 3 em 1',
-        originalPrice: 499.00,
-        promoPrice: 329.90,
-        discountPercent: 34,
-        imageUrl: 'https://m.media-amazon.com/images/I/61Wf46zYqTL._AC_SX679_.jpg',
-        productUrl: 'https://www.amazon.com.br/dp/B07YYP6MNK',
-        category: 'Casa' as const
-      },
-      {
-        title: 'Controle Sem Fio Xbox Series Robot White com Bluetooth e Entrada P2',
-        originalPrice: 499.00,
-        promoPrice: 369.00,
-        discountPercent: 26,
-        imageUrl: 'https://m.media-amazon.com/images/I/51r26M6cQLL._AC_SX679_.jpg',
-        productUrl: 'https://www.amazon.com.br/dp/B08DF26MXW',
-        category: 'Games' as const
-      },
-      {
-        title: 'Garrafa Térmica Stanley Quick Flip 710ml Inox com Trava Anti-vazamento',
-        originalPrice: 285.00,
-        promoPrice: 189.90,
-        discountPercent: 33,
-        imageUrl: 'https://m.media-amazon.com/images/I/51zJg8h4FpL._AC_SX679_.jpg',
-        productUrl: 'https://www.amazon.com.br/dp/B084G47X2L',
-        category: 'Casa' as const
-      }
-    ];
-
-    deals.forEach(d => {
-      this.addOffer({
-        store: 'AMAZON',
-        ...d,
-        postedAt: new Date(Date.now() - Math.floor(Math.random() * 30) * 60000).toISOString()
-      });
+      signal: AbortSignal.timeout(10000)
     });
 
-    return deals.length;
-  }
+    if (!response.ok) return 0;
+    const html = await response.text();
 
-  private async harvestShopeeDeals(): Promise<number> {
-    const deals = [
-      {
-        title: 'Mini Liquidificador Portátil Recarregável USB 6 Lâminas 380ml Shake e Sucos',
-        originalPrice: 69.90,
-        promoPrice: 28.50,
-        discountPercent: 59,
-        coupon: 'ACHADINHOS',
-        imageUrl: 'https://cf.shopee.com.br/file/br-11134207-7r98o-lnl5k8e7j6c11d',
-        productUrl: 'https://shopee.com.br/product/389201940/23490219482',
-        category: 'Achadinhos' as const
-      },
-      {
-        title: 'Luminária de Mesa LED Articulada com Garra e 3 Níveis de Luz Touch',
-        originalPrice: 49.90,
-        promoPrice: 19.99,
-        discountPercent: 60,
-        imageUrl: 'https://cf.shopee.com.br/file/br-11134207-7r98o-lm689j8r7o2m61',
-        productUrl: 'https://shopee.com.br/product/428190382/10293848123',
-        category: 'Achadinhos' as const
-      },
-      {
-        title: 'Suporte Articulado para Celular e Tablet de Mesa Longo Flexível 360 Graus',
-        originalPrice: 39.00,
-        promoPrice: 14.90,
-        discountPercent: 62,
-        imageUrl: 'https://cf.shopee.com.br/file/br-11134207-7r98o-lnl5k8e7j6c11d',
-        productUrl: 'https://shopee.com.br/product/389201940/23490219482',
-        category: 'Achadinhos' as const
+    // Regex para capturar cada widget de mensagem individual
+    const messageBlocks = html.split('<div class="tgme_widget_message_wrap');
+    let addedCount = 0;
+
+    for (let i = 1; i < messageBlocks.length; i++) {
+      const block = messageBlocks[i];
+
+      // 1. Extrair texto
+      const textMatch = block.match(/<div class="tgme_widget_message_text[^>]*>([\s\S]*?)<\/div>/);
+      if (!textMatch) continue;
+      
+      let rawText = textMatch[1]
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, '$1 $2')
+        .replace(/<[^>]+>/g, '')
+        .trim();
+
+      if (rawText.length < 20) continue;
+
+      // 2. Extrair URLs
+      const urlMatches = rawText.match(/https?:\/\/[^\s"'<>]+/gi) || [];
+      if (urlMatches.length === 0) continue;
+
+      // Identificar loja suportada
+      let store: DivulgadorOffer['store'] | null = null;
+      let targetProductUrl = '';
+
+      for (const link of urlMatches) {
+        const lower = link.toLowerCase();
+        if (lower.includes('mercadolivre.com') || lower.includes('meli.la')) {
+          store = 'MERCADO_LIVRE';
+          targetProductUrl = link;
+          break;
+        } else if (lower.includes('amazon.com') || lower.includes('amzn.to') || lower.includes('a.co')) {
+          store = 'AMAZON';
+          targetProductUrl = link;
+          break;
+        } else if (lower.includes('shopee.com') || lower.includes('s.shopee.com') || lower.includes('shp.ee')) {
+          store = 'SHOPEE';
+          targetProductUrl = link;
+          break;
+        } else if (lower.includes('magazineluiza.com') || lower.includes('magazinevoce.com') || lower.includes('magalu')) {
+          store = 'MAGALU';
+          targetProductUrl = link;
+          break;
+        } else if (lower.includes('aliexpress.com') || lower.includes('s.click.aliexpress.com')) {
+          store = 'ALIEXPRESS';
+          targetProductUrl = link;
+          break;
+        }
       }
-    ];
 
-    deals.forEach(d => {
-      this.addOffer({
-        store: 'SHOPEE',
-        ...d,
-        postedAt: new Date(Date.now() - Math.floor(Math.random() * 45) * 60000).toISOString()
-      });
-    });
+      if (!store || !targetProductUrl) continue;
 
-    return deals.length;
-  }
-
-  private async harvestMagaluDeals(): Promise<number> {
-    const deals = [
-      {
-        title: 'Fritadeira Elétrica Air Fryer Philco Gourmet Black 4L 1500W',
-        originalPrice: 399.00,
-        promoPrice: 219.90,
-        discountPercent: 45,
-        coupon: 'MAGALU20',
-        imageUrl: 'https://a-static.mlcdn.com.br/800x560/fritadeira-eletrica-sem-oleo-air-fryer-philco-4l/magazineluiza/227419500/0c4f82855f284e93e031eb5c8e3e4eb6.jpg',
-        productUrl: 'https://www.magazinevoce.com.br/magazineoferday/fritadeira-philco-4l/p/227419500/ed/frie/',
-        category: 'Casa' as const
-      },
-      {
-        title: 'Smartphone Samsung Galaxy A15 128GB 4GB RAM Tela 6.5 Câmera Tripla 50MP',
-        originalPrice: 1299.00,
-        promoPrice: 799.00,
-        discountPercent: 38,
-        imageUrl: 'https://a-static.mlcdn.com.br/800x560/smartphone-samsung-galaxy-a15-128gb/magazineluiza/237989900/40a0494cf5e2fa653e0513e9a7e6bdfd.jpg',
-        productUrl: 'https://www.magazinevoce.com.br/magazineoferday/samsung-galaxy-a15/p/237989900/te/ga15/',
-        category: 'Tech' as const
+      // 3. Extrair imagem HD pública do Telegram
+      let imageUrl = '';
+      const photoMatch = block.match(/background-image:url\('([^']+)'\)/i);
+      if (photoMatch && photoMatch[1] && photoMatch[1].startsWith('http')) {
+        imageUrl = photoMatch[1];
       }
-    ];
 
-    deals.forEach(d => {
-      this.addOffer({
-        store: 'MAGALU',
-        ...d,
-        postedAt: new Date(Date.now() - Math.floor(Math.random() * 50) * 60000).toISOString()
-      });
-    });
-
-    return deals.length;
-  }
-
-  private async harvestAliExpressDeals(): Promise<number> {
-    const deals = [
-      {
-        title: 'Mouse Gamer Sem Fio Recarregável Attack Shark X3 Sensor PAW3395 26000 DPI Ultra Leve 49g',
-        originalPrice: 280.00,
-        promoPrice: 139.90,
-        discountPercent: 50,
-        coupon: 'CHOICEBR',
-        imageUrl: 'https://ae-pic-a1.aliexpress-media.com/kf/S7e0f8c38faef4452a819b139b4b0e514w.jpg_640x640Q90.jpg',
-        productUrl: 'https://pt.aliexpress.com/item/1005006123456789.html',
-        category: 'Games' as const
-      },
-      {
-        title: 'Teclado Mecânico Gamer RGB 60% Switches Hot-Swap Bluetooth 5.0 e Cabo Tipo-C',
-        originalPrice: 249.00,
-        promoPrice: 119.00,
-        discountPercent: 52,
-        coupon: 'ALIEXTRA',
-        imageUrl: 'https://ae-pic-a1.aliexpress-media.com/kf/S6dbb69c4fae141a39f606a2b53eb6ad1o.jpg_640x640Q90.jpg',
-        productUrl: 'https://pt.aliexpress.com/item/1005007987654321.html',
-        category: 'Games' as const
+      // 4. Extrair título
+      const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 3);
+      let title = lines[0] || 'Promoção Exclusiva';
+      for (const l of lines) {
+        if (!l.startsWith('http') && !l.includes('⚡') && !l.includes('🛒') && !l.toLowerCase().includes('compre aqui') && !l.toLowerCase().includes('link')) {
+          title = l.replace(/[*_~`]/g, '').trim();
+          break;
+        }
       }
-    ];
 
-    deals.forEach(d => {
-      this.addOffer({
-        store: 'ALIEXPRESS',
-        ...d,
-        postedAt: new Date(Date.now() - Math.floor(Math.random() * 20) * 60000).toISOString()
+      // 5. Extrair preços (De / Por)
+      let promoPrice = 0;
+      let originalPrice: number | undefined;
+
+      const porMatch = rawText.match(/(?:por|apenas|sai por|agora|valor|preço)\s*:?\s*r?\$?\s*([0-9]+[.,][0-9]{2})/i);
+      if (porMatch) {
+        promoPrice = parseFloat(porMatch[1].replace('.', '').replace(',', '.'));
+      }
+
+      const deMatch = rawText.match(/(?:de|era|custava)\s*:?\s*r?\$?\s*([0-9]+[.,][0-9]{2})/i);
+      if (deMatch) {
+        originalPrice = parseFloat(deMatch[1].replace('.', '').replace(',', '.'));
+      }
+
+      if (!promoPrice) {
+        const anyMoney = rawText.match(/r\$\s*([0-9]+[.,][0-9]{2})/i);
+        if (anyMoney) promoPrice = parseFloat(anyMoney[1].replace('.', '').replace(',', '.'));
+      }
+
+      // 6. Extrair Cupom
+      let coupon: string | undefined;
+      const couponMatch = rawText.match(/(?:cupom|c[oó]digo|use)\s*[:：\-–—]?\s*([A-Za-z0-9_\-]{4,20})/i);
+      if (couponMatch) {
+        const potential = couponMatch[1].toUpperCase().trim();
+        if (!['HTTPS', 'HTTP', 'MERCADO', 'SHOPEE', 'AMAZON', 'MAGALU', 'PRODUTO'].includes(potential)) {
+          coupon = potential;
+        }
+      }
+
+      // 7. Categoria
+      let category: DivulgadorOffer['category'] = 'Geral';
+      const textLower = rawText.toLowerCase();
+      if (textLower.includes('gamer') || textLower.includes('headset') || textLower.includes('teclado') || textLower.includes('mouse') || textLower.includes('ps5') || textLower.includes('xbox')) category = 'Games';
+      else if (textLower.includes('celular') || textLower.includes('fone') || textLower.includes('alexa') || textLower.includes('tv') || textLower.includes('smartwatch') || textLower.includes('notebook') || textLower.includes('monitor')) category = 'Tech';
+      else if (textLower.includes('air fryer') || textLower.includes('panela') || textLower.includes('aspirador') || textLower.includes('cafeteira') || textLower.includes('ferro')) category = 'Casa';
+      else if (textLower.includes('shampoo') || textLower.includes('perfume') || textLower.includes('creme') || textLower.includes('protetor') || textLower.includes('skincare')) category = 'Beleza';
+      else if (textLower.includes('tênis') || textLower.includes('tenis') || textLower.includes('camisa') || textLower.includes('chinelo') || textLower.includes('calça')) category = 'Moda';
+      else if (store === 'SHOPEE' || textLower.includes('achadinho') || textLower.includes('portátil') || textLower.includes('mini')) category = 'Achadinhos';
+
+      const created = this.addOffer({
+        store,
+        title: title.slice(0, 150),
+        originalPrice: originalPrice && originalPrice > promoPrice ? originalPrice : undefined,
+        promoPrice: promoPrice || 49.90,
+        coupon,
+        imageUrl: imageUrl || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&q=80',
+        productUrl: targetProductUrl,
+        category,
+        postedAt: new Date().toISOString()
       });
-    });
 
-    return deals.length;
+      if (created) addedCount++;
+    }
+
+    return addedCount;
   }
 
   public async dispatchOffer(offerIdOrData: string | Partial<DivulgadorOffer>): Promise<{
@@ -554,24 +445,22 @@ class DivulgadorService {
     messageText += `\n🛒 *Compre aqui com segurança:* ${finalAffiliateUrl}\n`;
     messageText += `\n⚠️ _Preço sujeito a alteração a qualquer momento._`;
 
-    // 3. Processar imagem se disponível
+    // 3. Processar e baixar imagem diretamente da fonte
     let finalMediaBuffer: Buffer | null = null;
-    if (offer.imageUrl) {
+    if (offer.imageUrl && !offer.imageUrl.includes('photo-1526170375885-4d8ecf77b99f')) {
       try {
         const response = await fetch(offer.imageUrl, {
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': 'https://www.google.com/'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
           },
           signal: AbortSignal.timeout(10000)
         });
         if (response.ok) {
           const arrayBuffer = await response.arrayBuffer();
-          const rawBuffer = Buffer.from(arrayBuffer);
-          finalMediaBuffer = await imageService.processImageReplacement(messageText, rawBuffer);
+          finalMediaBuffer = Buffer.from(arrayBuffer);
         }
       } catch (err: any) {
-        logger.warn('SYSTEM', `[Divulgador] Falha ao baixar imagem para envio: ${err.message}. Enviando sem imagem.`);
+        logger.warn('SYSTEM', `[Divulgador] Falha ao baixar imagem: ${err.message}`);
       }
     }
 
@@ -599,10 +488,6 @@ class DivulgadorService {
       whatsappSent,
       telegramSent
     };
-  }
-
-  private getDefaultCuratedOffers(): DivulgadorOffer[] {
-    return [];
   }
 }
 
