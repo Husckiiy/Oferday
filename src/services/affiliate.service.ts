@@ -687,8 +687,9 @@ export class AffiliateService {
 
     // 4c. Fallback de link canônico oficial do produto direto com a sua tag de afiliado
     const cleanedProductUrl = this.cleanAndTagMercadoLivreUrl(targetUrl, tag);
-    logger.success('AFFILIATE', `Mercado Livre: Link oficial de produto gerado: ${cleanedProductUrl}`);
-    return { affiliateUrl: cleanedProductUrl, canonicalProductUrl };
+    const shortenedProductUrl = await urlShortenerService.shorten(cleanedProductUrl);
+    logger.success('AFFILIATE', `Mercado Livre: Link oficial encurtado gerado: ${shortenedProductUrl}`);
+    return { affiliateUrl: shortenedProductUrl, canonicalProductUrl };
   }
 
   /**
@@ -737,25 +738,26 @@ export class AffiliateService {
       }
     }
 
-    // 2. Fallback de parâmetros oficiais
+    // 2. Fallback de parâmetros oficiais com encurtamento
     const cleanTag = appId.includes('an_') ? (appId.match(/(an_\d+)/)?.[1] || 'an_18378190901') : `an_${appId}`;
+    let shopeeUrl = finalUrl;
     const match = finalUrl.match(/i\.(\d+)\.(\d+)/);
     if (match) {
-      const shopeeUrl = `https://shopee.com.br/product/${match[1]}/${match[2]}?utm_source=${cleanTag}&mmp_pid=${cleanTag}`;
-      logger.success('AFFILIATE', `Shopee: Link oficial gerado: ${shopeeUrl}`);
-      return shopeeUrl;
+      shopeeUrl = `https://shopee.com.br/product/${match[1]}/${match[2]}?utm_source=${cleanTag}&mmp_pid=${cleanTag}`;
+    } else {
+      try {
+        const parsed = new URL(finalUrl);
+        parsed.searchParams.set('utm_source', cleanTag);
+        parsed.searchParams.set('mmp_pid', cleanTag);
+        shopeeUrl = parsed.toString();
+      } catch {
+        shopeeUrl = finalUrl;
+      }
     }
 
-    try {
-      const parsed = new URL(finalUrl);
-      parsed.searchParams.set('utm_source', cleanTag);
-      parsed.searchParams.set('mmp_pid', cleanTag);
-      const shopeeUrl = parsed.toString();
-      logger.success('AFFILIATE', `Shopee: Link oficial gerado: ${shopeeUrl}`);
-      return shopeeUrl;
-    } catch {
-      return finalUrl;
-    }
+    const shortened = await urlShortenerService.shorten(shopeeUrl);
+    logger.success('AFFILIATE', `Shopee: Link oficial encurtado gerado: ${shortened}`);
+    return shortened;
   }
 
   /**
@@ -847,8 +849,9 @@ export class AffiliateService {
       return officialShort;
     }
 
-    logger.success('AFFILIATE', `Amazon: Link oficial gerado: ${targetLongUrl}`);
-    return targetLongUrl;
+    const shortened = await urlShortenerService.shorten(targetLongUrl);
+    logger.success('AFFILIATE', `Amazon: Link oficial encurtado gerado: ${shortened}`);
+    return shortened;
   }
 
   /**
@@ -860,21 +863,22 @@ export class AffiliateService {
 
     const cleanStore = storeName.replace(/^https?:\/\//, '').replace(/magazinevoce\.com\.br\/?/, '').replace(/\//g, '') || 'magazineibanez01';
 
+    let magaluUrl = finalUrl;
     const prodMatch = finalUrl.match(/\/(?:p|produto)\/([a-zA-Z0-9]+)/i) || finalUrl.match(/sku=([a-zA-Z0-9]+)/i) || finalUrl.match(/codigo_produto=([a-zA-Z0-9]+)/i);
     if (prodMatch) {
-      const magaluUrl = `https://www.magazinevoce.com.br/${cleanStore}/p/${prodMatch[1]}/`;
-      logger.success('AFFILIATE', `Magalu: Link oficial gerado: ${magaluUrl}`);
-      return magaluUrl;
+      magaluUrl = `https://www.magazinevoce.com.br/${cleanStore}/p/${prodMatch[1]}/`;
+    } else {
+      try {
+        const parsed = new URL(finalUrl);
+        magaluUrl = `https://www.magazinevoce.com.br/${cleanStore}${parsed.pathname}`;
+      } catch {
+        magaluUrl = finalUrl;
+      }
     }
 
-    try {
-      const parsed = new URL(finalUrl);
-      const magaluUrl = `https://www.magazinevoce.com.br/${cleanStore}${parsed.pathname}`;
-      logger.success('AFFILIATE', `Magalu: Link oficial gerado: ${magaluUrl}`);
-      return magaluUrl;
-    } catch {
-      return finalUrl;
-    }
+    const shortened = await urlShortenerService.shorten(magaluUrl);
+    logger.success('AFFILIATE', `Magalu: Link oficial encurtado gerado: ${shortened}`);
+    return shortened;
   }
 
   /**
@@ -960,6 +964,7 @@ export class AffiliateService {
       decoded = decodeURIComponent(finalUrl);
     } catch {}
 
+    let aliUrl = finalUrl;
     const itemMatch = decoded.match(/\/item\/(\d+)/i) || decoded.match(/item_id=(\d+)/i) || decoded.match(/productId=(\d+)/i);
     if (itemMatch) {
       const cleanItemUrl = `https://pt.aliexpress.com/item/${itemMatch[1]}.html`;
@@ -969,21 +974,21 @@ export class AffiliateService {
         logger.success('AFFILIATE', `AliExpress: Link curto oficial gerado via API para item #${itemMatch[1]}: ${itemShort}`);
         return itemShort;
       }
-      const aliUrl = `${cleanItemUrl}?aff_fcid=${tag}&tt=CPS_NORMAL`;
-      logger.success('AFFILIATE', `AliExpress: Link oficial de produto gerado: ${aliUrl}`);
-      return aliUrl;
+      aliUrl = `${cleanItemUrl}?aff_fcid=${tag}&tt=CPS_NORMAL`;
+    } else {
+      try {
+        const parsed = new URL(finalUrl);
+        parsed.searchParams.set('aff_fcid', tag);
+        parsed.searchParams.set('tt', 'CPS_NORMAL');
+        aliUrl = parsed.toString();
+      } catch {
+        aliUrl = finalUrl;
+      }
     }
 
-    try {
-      const parsed = new URL(finalUrl);
-      parsed.searchParams.set('aff_fcid', tag);
-      parsed.searchParams.set('tt', 'CPS_NORMAL');
-      const aliUrl = parsed.toString();
-      logger.success('AFFILIATE', `AliExpress: Link oficial gerado: ${aliUrl}`);
-      return aliUrl;
-    } catch {
-      return finalUrl;
-    }
+    const shortened = await urlShortenerService.shorten(aliUrl);
+    logger.success('AFFILIATE', `AliExpress: Link oficial encurtado gerado: ${shortened}`);
+    return shortened;
   }
 
   /**

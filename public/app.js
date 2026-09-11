@@ -2234,11 +2234,26 @@ function updateManualQueueBadges() {
   if (btnCount) btnCount.textContent = count;
 }
 
-function addToManualDispatchQueue(offer, btnElement) {
+async function addToManualDispatchQueue(offer, btnElement) {
   if (!offer) return;
 
+  const queueItem = {
+    id: offer.id || String(Date.now()),
+    title: offer.title,
+    store: offer.store,
+    imageUrl: offer.imageUrl,
+    productUrl: offer.productUrl,
+    originalPrice: offer.originalPrice,
+    promoPrice: offer.promoPrice,
+    discountPercent: offer.discountPercent,
+    coupon: offer.coupon,
+    category: offer.category,
+    customMessageText: '',
+    addedAt: new Date().toISOString()
+  };
+
   // Gerar mensagem inicial usando o template padrão configurado
-  const defaultFormattedText = renderClientTemplate(templateState.currentTemplate || templateState.presets[0]?.template, {
+  queueItem.customMessageText = renderClientTemplate(templateState.currentTemplate || templateState.presets[0]?.template, {
     title: offer.title,
     store: offer.store,
     originalPrice: offer.originalPrice,
@@ -2253,24 +2268,39 @@ function addToManualDispatchQueue(offer, btnElement) {
   if (existingIdx !== -1) {
     showToast('ℹ️ Este produto já está na sua fila de Disparo Manual!');
   } else {
-    manualQueueState.queue.push({
-      id: offer.id || String(Date.now()),
-      title: offer.title,
-      store: offer.store,
-      imageUrl: offer.imageUrl,
-      productUrl: offer.productUrl,
-      originalPrice: offer.originalPrice,
-      promoPrice: offer.promoPrice,
-      discountPercent: offer.discountPercent,
-      coupon: offer.coupon,
-      category: offer.category,
-      customMessageText: defaultFormattedText,
-      addedAt: new Date().toISOString()
-    });
-
+    manualQueueState.queue.push(queueItem);
     saveManualQueueToStorage();
     renderManualQueueList();
     showToast('📋 Produto adicionado ao Disparo Manual! Você pode editar a mensagem antes de enviar.');
+
+    // Converte e encurta o link de afiliado oficial em segundo plano para preencher o editor
+    fetch('/api/affiliate/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: offer.productUrl })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.success && data.results && data.results[0]?.affiliateUrl) {
+          const affUrl = data.results[0].affiliateUrl;
+          const target = manualQueueState.queue.find(i => i.id === queueItem.id);
+          if (target) {
+            target.customMessageText = renderClientTemplate(templateState.currentTemplate || templateState.presets[0]?.template, {
+              title: offer.title,
+              store: offer.store,
+              originalPrice: offer.originalPrice,
+              promoPrice: offer.promoPrice,
+              discountPercent: offer.discountPercent,
+              coupon: offer.coupon,
+              affiliateUrl: affUrl,
+              category: offer.category
+            });
+            saveManualQueueToStorage();
+            renderManualQueueList();
+          }
+        }
+      })
+      .catch(() => {});
   }
 
   if (btnElement) {

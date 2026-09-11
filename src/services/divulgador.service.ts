@@ -516,11 +516,12 @@ class DivulgadorService {
     const finalAffiliateUrl = affiliateProcessed.text || offer.productUrl;
     const config = configService.getConfig();
 
-    // 2. Montar texto promocional (se tiver customMessageText vindo do Disparo Manual, usa ele diretamente)
+    // 2. Montar texto promocional (se tiver customMessageText vindo do Disparo Manual, processa e usa ele)
     let messageText = '';
     const customText = (offer as any)?.customMessageText || (offerIdOrData as any)?.customMessageText;
     if (customText && typeof customText === 'string' && customText.trim().length > 0) {
-      messageText = customText.trim();
+      const processed = await affiliateService.processMessageText(customText.trim());
+      messageText = processed.text;
     } else {
       messageText = templateService.render(config.template?.customTemplate, {
         title: offer.title,
