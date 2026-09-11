@@ -85,6 +85,10 @@
               <i data-lucide="shield-check" class="sub-icon"></i>
               <span class="sub-label">Anti-Marca d'Água</span>
             </a>
+            <a href="#" class="nav-sub-item" data-modal="modal-templates" id="sidebarTemplatesItem">
+              <i data-lucide="layout-template" class="sub-icon"></i>
+              <span class="sub-label">Template de Mensagens</span>
+            </a>
           </div>
         </div>
 
@@ -1245,6 +1249,156 @@
           <button type="button" class="btn btn-primary btn-sm" data-close>Concluído</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- MODAL: TEMPLATES DE MENSAGEM -->
+  <div class="modal-overlay" id="modal-templates">
+    <div class="modal-dialog modal-xl modal-dark-theme">
+      
+      <div class="modal-header modal-header-dark">
+        <div class="modal-title-wrap">
+          <i data-lucide="layout-template" class="modal-title-icon text-brand"></i>
+          <div>
+            <h3>Personalizar Template das Mensagens</h3>
+            <p>Edite o formato e as informações das mensagens que são disparadas no WhatsApp quando há ofertas</p>
+          </div>
+        </div>
+        <button class="btn-close-modal btn-close-dark" data-close>&times;</button>
+      </div>
+
+      <div class="modal-body modal-body-dark">
+        
+        <!-- Presets Selection Bar -->
+        <div class="template-presets-bar">
+          <span class="presets-label"><i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Modelos Prontos:</span>
+          <div class="preset-buttons" id="templatePresetButtons">
+            <button type="button" class="btn-preset active" data-preset="default">
+              <span>⚡ Padrão Alta Conversão</span>
+            </button>
+            <button type="button" class="btn-preset" data-preset="urgency">
+              <span>🚨 Urgência Relâmpago</span>
+            </button>
+            <button type="button" class="btn-preset" data-preset="minimal">
+              <span>✨ Minimalista & Direto</span>
+            </button>
+            <button type="button" class="btn-preset" data-preset="discount_focus">
+              <span>💰 Foco em Desconto</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Two Column Editor & Preview Layout -->
+        <div class="template-editor-grid">
+          
+          <!-- LEFT COLUMN: Editor & Variable Chips -->
+          <div class="template-editor-pane">
+            
+            <div class="template-pane-header">
+              <label class="form-label" style="margin: 0; font-weight: 700;">
+                <i data-lucide="code" style="width: 15px; height: 15px; color: var(--accent-orange);"></i>
+                Estrutura do Texto da Mensagem
+              </label>
+              <span class="template-hint">Clique nas variáveis para inserir no cursor</span>
+            </div>
+
+            <!-- Clickable Variable Chips -->
+            <div class="template-variable-chips" id="templateVariableChips">
+              <button type="button" class="var-chip" data-var="{TITULO}" title="Nome do produto">{TITULO}</button>
+              <button type="button" class="var-chip" data-var="{LOJA}" title="Nome da loja parceira">{LOJA}</button>
+              <button type="button" class="var-chip" data-var="{EMOJI_LOJA}" title="Emoji oficial da loja">{EMOJI_LOJA}</button>
+              <button type="button" class="var-chip" data-var="{PRECOS}" title="Bloco completo De/Por + % OFF">{PRECOS}</button>
+              <button type="button" class="var-chip" data-var="{PRECO_POR}" title="Preço promocional">{PRECO_POR}</button>
+              <button type="button" class="var-chip" data-var="{PRECO_DE}" title="Preço anterior riscado">{PRECO_DE}</button>
+              <button type="button" class="var-chip" data-var="{DESCONTO}" title="Ex: 50% OFF">{DESCONTO}</button>
+              <button type="button" class="var-chip" data-var="{CUPOM}" title="Linha com cupom">{CUPOM}</button>
+              <button type="button" class="var-chip" data-var="{LINK}" title="Link oficial de afiliado">{LINK}</button>
+              <button type="button" class="var-chip" data-var="{AVISO}" title="Texto de aviso legal">{AVISO}</button>
+              <button type="button" class="var-chip" data-var="{CATEGORIA}" title="Categoria">{CATEGORIA}</button>
+            </div>
+
+            <!-- Code/Text Area -->
+            <div class="template-textarea-wrap">
+              <textarea id="templateEditorTextarea" class="template-textarea" rows="12" spellcheck="false" placeholder="Digite seu modelo de mensagem aqui..."></textarea>
+            </div>
+
+            <!-- Custom Warning Field -->
+            <div class="form-group" style="margin-top: 1rem;">
+              <label class="form-label" for="templateWarningInput">
+                <i data-lucide="alert-circle" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+                Texto do Aviso no Rodapé ({AVISO})
+              </label>
+              <input type="text" id="templateWarningInput" class="form-control form-control-dark" placeholder="Preço sujeito a alteração a qualquer momento.">
+            </div>
+
+          </div>
+
+          <!-- RIGHT COLUMN: Live WhatsApp Chat Preview -->
+          <div class="template-preview-pane">
+            
+            <div class="template-pane-header" style="justify-content: space-between;">
+              <label class="form-label" style="margin: 0; font-weight: 700;">
+                <i data-lucide="smartphone" style="width: 15px; height: 15px; color: #22c55e;"></i>
+                Prévia em Tempo Real (WhatsApp)
+              </label>
+              
+              <!-- Sample Store Switcher -->
+              <div class="preview-store-switcher" id="previewStoreSwitcher">
+                <button type="button" class="store-mini-btn active" data-preview-store="MERCADO_LIVRE" title="Testar com Mercado Livre">🟡 ML</button>
+                <button type="button" class="store-mini-btn" data-preview-store="AMAZON" title="Testar com Amazon">📦 Amazon</button>
+                <button type="button" class="store-mini-btn" data-preview-store="SHOPEE" title="Testar com Shopee">🟠 Shopee</button>
+                <button type="button" class="store-mini-btn" data-preview-store="MAGALU" title="Testar com Magalu">🔵 Magalu</button>
+                <button type="button" class="store-mini-btn" data-preview-store="ALIEXPRESS" title="Testar com AliExpress">🔴 Ali</button>
+              </div>
+            </div>
+
+            <!-- Phone / WhatsApp Bubble Frame -->
+            <div class="wa-chat-canvas">
+              <div class="wa-chat-bubble">
+                
+                <!-- Mock Media / Image Header -->
+                <div class="wa-bubble-media" id="waPreviewMedia">
+                  <img id="waPreviewImg" src="https://http2.mlstatic.com/D_Q_NP_2X_767959-MLA112624684833_062026-AB.webp" alt="Preview Produto" referrerpolicy="no-referrer">
+                </div>
+
+                <!-- Formatted Message Body -->
+                <div class="wa-bubble-content" id="waPreviewContent">
+                  <!-- Live Rendered Markdown via JS -->
+                </div>
+
+                <!-- WhatsApp Message Meta / Read Receipt -->
+                <div class="wa-bubble-meta">
+                  <span id="waPreviewTime">12:30</span>
+                  <svg viewBox="0 0 16 11" class="wa-double-check" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M11.05 0.7L4.95 6.8L2.45 4.3L1.05 5.7L4.95 9.6L12.45 2.1L11.05 0.7Z" fill="#53bdeb"/>
+                    <path d="M14.55 0.7L8.45 6.8L7.9 6.25L6.5 7.65L8.45 9.6L15.95 2.1L14.55 0.7Z" fill="#53bdeb"/>
+                  </svg>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <div class="modal-footer modal-footer-dark" style="justify-content: space-between;">
+        <button type="button" class="btn btn-secondary btn-sm" id="btnResetTemplate">
+          <i data-lucide="rotate-ccw"></i> <span>Restaurar Padrão</span>
+        </button>
+
+        <div class="modal-footer-actions">
+          <button type="button" class="btn btn-secondary btn-sm" id="btnCopyTemplate">
+            <i data-lucide="copy"></i> <span>Copiar Modelo</span>
+          </button>
+          <button type="button" class="btn btn-primary btn-sm" id="btnSaveTemplate">
+            <i data-lucide="check"></i> <span>Salvar Template</span>
+          </button>
+        </div>
+      </div>
+
     </div>
   </div>
 

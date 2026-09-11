@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { affiliateService } from './affiliate.service.js';
 import { whatsappService } from './whatsapp.service.js';
 import { imageService } from './image.service.js';
+import { templateService } from './template.service.js';
 import { logger } from './logger.service.js';
 import { configService } from '../config/config.service.js';
 
@@ -513,47 +514,19 @@ class DivulgadorService {
     // 1. Converter link do produto para o Afiliado Oficial
     const affiliateProcessed = await affiliateService.processMessageText(offer.productUrl);
     const finalAffiliateUrl = affiliateProcessed.text || offer.productUrl;
-
-    // 2. Montar texto promocional de alta conversão
     const config = configService.getConfig();
-    let messageText = '';
 
-    const storeNames: Record<string, string> = {
-      'AMAZON': 'Amazon',
-      'MERCADO_LIVRE': 'Mercado Livre',
-      'SHOPEE': 'Shopee',
-      'MAGALU': 'Magalu',
-      'ALIEXPRESS': 'AliExpress'
-    };
-
-    const storeEmoji: Record<string, string> = {
-      'AMAZON': '📦',
-      'MERCADO_LIVRE': '🟡',
-      'SHOPEE': '🟠',
-      'MAGALU': '🔵',
-      'ALIEXPRESS': '🔴'
-    };
-
-    const storeLabel = storeNames[offer.store] || offer.store;
-    const emoji = storeEmoji[offer.store] || '🛍️';
-
-    messageText += `⚡ *OFERTA IMPERDÍVEL ${storeLabel.toUpperCase()}* ${emoji}\n\n`;
-    messageText += `🔥 *${offer.title}*\n\n`;
-
-    if (offer.originalPrice && offer.originalPrice > offer.promoPrice) {
-      const disc = offer.discountPercent ? ` (${offer.discountPercent}% OFF)` : '';
-      messageText += `❌ De: ~R$ ${offer.originalPrice.toFixed(2).replace('.', ',')}~\n`;
-      messageText += `✅ *Por apenas: R$ ${offer.promoPrice.toFixed(2).replace('.', ',')}*${disc}\n`;
-    } else if (offer.promoPrice > 0) {
-      messageText += `✅ *Por apenas: R$ ${offer.promoPrice.toFixed(2).replace('.', ',')}*\n`;
-    }
-
-    if (offer.coupon && offer.coupon.trim().length > 0) {
-      messageText += `🎟️ Use o cupom: *${offer.coupon.trim()}*\n`;
-    }
-
-    messageText += `\n🛒 *Compre aqui com segurança:* ${finalAffiliateUrl}\n`;
-    messageText += `\n⚠️ _Preço sujeito a alteração a qualquer momento._`;
+    // 2. Montar texto promocional usando o Template Service configurado
+    const messageText = templateService.render(config.template?.customTemplate, {
+      title: offer.title,
+      store: offer.store,
+      originalPrice: offer.originalPrice,
+      promoPrice: offer.promoPrice,
+      discountPercent: offer.discountPercent,
+      coupon: offer.coupon,
+      affiliateUrl: finalAffiliateUrl,
+      category: offer.category
+    });
 
     // 3. Processar e baixar imagem diretamente da fonte
     let finalMediaBuffer: Buffer | null = null;

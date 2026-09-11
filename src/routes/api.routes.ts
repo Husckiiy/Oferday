@@ -10,6 +10,7 @@ import { forwarderService } from '../services/forwarder.service.js';
 import { affiliateService } from '../services/affiliate.service.js';
 import { meliAuthService } from '../services/meli-auth.service.js';
 import { divulgadorService } from '../services/divulgador.service.js';
+import { templateService } from '../services/template.service.js';
 
 export const apiRouter = Router();
 
@@ -517,5 +518,62 @@ apiRouter.get('/proxy-image', async (req: Request, res: Response) => {
   }
 });
 
+// ==========================================
+// TEMPLATE DE MENSAGENS PERSONALIZADAS
+// ==========================================
+apiRouter.get('/template', (req: Request, res: Response) => {
+  try {
+    const config = configService.getConfig();
+    res.json({
+      success: true,
+      config: config.template || {
+        mode: 'default',
+        customTemplate: templateService.presets[0].template,
+        customWarning: 'Preço sujeito a alteração a qualquer momento.'
+      },
+      presets: templateService.presets
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
+apiRouter.post('/template', (req: Request, res: Response) => {
+  try {
+    const { mode, customTemplate, customWarning } = req.body;
+    const config = configService.getConfig();
 
+    const updated = configService.saveConfig({
+      ...config,
+      template: {
+        mode: mode || 'default',
+        customTemplate: customTemplate || templateService.presets[0].template,
+        customWarning: customWarning !== undefined ? customWarning : (config.template?.customWarning || 'Preço sujeito a alteração a qualquer momento.')
+      }
+    });
+
+    logger.success('SYSTEM', 'Template de mensagens atualizado com sucesso!');
+    res.json({ success: true, message: 'Template salvo com sucesso!', template: updated.template });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+apiRouter.post('/template/preview', (req: Request, res: Response) => {
+  try {
+    const { template, sampleData } = req.body;
+    const rendered = templateService.render(template, sampleData || {
+      title: 'Smart TV 50" 4K UHD LED Wi-Fi HDR Bluetooth Inteligente',
+      store: 'MERCADO_LIVRE',
+      originalPrice: 2499.00,
+      promoPrice: 1749.30,
+      discountPercent: 30,
+      coupon: 'PROMOTV10',
+      affiliateUrl: 'https://meli.la/exemplo-afiliado',
+      category: 'Tech'
+    });
+    res.json({ success: true, rendered });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});

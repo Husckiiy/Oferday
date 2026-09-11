@@ -1539,6 +1539,7 @@ window.addEventListener('DOMContentLoaded', () => {
   loadMeliTokenStatus();
   setupSSE();
   initDivulgadorEvents();
+  initTemplateEvents();
 });
 
 // ==========================================================================
@@ -1865,5 +1866,315 @@ function initDivulgadorEvents() {
   });
 }
 
+// ==========================================================================
+// TEMPLATE DE MENSAGENS PERSONALIZADAS (CONTROLLER)
+// ==========================================================================
+const templateState = {
+  presets: [],
+  currentTemplate: '',
+  currentWarning: 'Preço sujeito a alteração a qualquer momento.',
+  previewStore: 'MERCADO_LIVRE'
+};
 
+const sampleStoreData = {
+  'MERCADO_LIVRE': {
+    title: 'Smart TV 50" 4K UHD LED Wi-Fi HDR Bluetooth Inteligente',
+    store: 'Mercado Livre',
+    storeEmoji: '🟡',
+    originalPrice: 2499.00,
+    promoPrice: 1749.30,
+    discountPercent: 30,
+    coupon: 'PROMOTV10',
+    affiliateUrl: 'https://meli.la/2H1hvz6',
+    category: 'Tech',
+    image: 'https://http2.mlstatic.com/D_Q_NP_2X_767959-MLA112624684833_062026-AB.webp'
+  },
+  'AMAZON': {
+    title: 'Echo Dot 5ª Geração Smart Speaker com Alexa - Cor Preta',
+    store: 'Amazon',
+    storeEmoji: '📦',
+    originalPrice: 429.00,
+    promoPrice: 289.00,
+    discountPercent: 33,
+    coupon: '',
+    affiliateUrl: 'https://amzn.to/3sample',
+    category: 'Tech',
+    image: 'https://m.media-amazon.com/images/I/71C8A9m+5UL._AC_SL1000_.jpg'
+  },
+  'SHOPEE': {
+    title: 'Carregador Portátil Mini Power Bank 10000mAh Ultra Rápido',
+    store: 'Shopee',
+    storeEmoji: '🟠',
+    originalPrice: 59.90,
+    promoPrice: 31.99,
+    discountPercent: 45,
+    coupon: 'SHOPEE10',
+    affiliateUrl: 'https://s.shopee.com.br/9KhxHvsMqJ',
+    category: 'Achadinhos',
+    image: 'https://cf.shopee.com.br/file/sg-11134201-81zvk-mik9ovwbhszk62'
+  },
+  'MAGALU': {
+    title: 'Fritadeira Elétrica sem Óleo Air Fryer 4L Inox 1500W',
+    store: 'Magalu',
+    storeEmoji: '🔵',
+    originalPrice: 389.90,
+    promoPrice: 219.00,
+    discountPercent: 44,
+    coupon: 'MAGALU20',
+    affiliateUrl: 'https://www.magazinevoce.com.br/magazineibanez01/p/2345678/',
+    category: 'Casa',
+    image: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&q=80'
+  },
+  'ALIEXPRESS': {
+    title: 'Fone de Ouvido Bluetooth Sem Fio TWS com Cancelamento de Ruído',
+    store: 'AliExpress',
+    storeEmoji: '🔴',
+    originalPrice: 74.54,
+    promoPrice: 37.27,
+    discountPercent: 50,
+    coupon: '',
+    affiliateUrl: 'https://s.click.aliexpress.com/s/pyFri10M6ltAv61YZ',
+    category: 'Tech',
+    image: 'https://ae-pic-a1.aliexpress-media.com/kf/S2d5e275162c34d9ea5fd6387987e11ad6.png'
+  }
+};
 
+function formatWhatsAppMarkdown(text) {
+  if (!text) return '';
+  let html = escapeHtml(text);
+  // Bold *text* -> <strong>text</strong>
+  html = html.replace(/\*([^\*\n]+)\*/g, '<strong>$1</strong>');
+  // Strikethrough ~text~ -> <del>text</del>
+  html = html.replace(/~([^~\n]+)~/g, '<del>$1</del>');
+  // Italic _text_ -> <em>$1</em>
+  html = html.replace(/_([^_\n]+)_/g, '<em>$1</em>');
+  // URLs -> <a href="$1">$1</a>
+  html = html.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank">$1</a>');
+  return html;
+}
+
+function renderClientTemplate(templateText, sample, warningText) {
+  if (!templateText) return '';
+  const s = sample || sampleStoreData['MERCADO_LIVRE'];
+  const aviso = warningText || templateState.currentWarning;
+
+  let precosBloco = '';
+  if (s.originalPrice && s.originalPrice > s.promoPrice) {
+    const discStr = s.discountPercent ? ` (${s.discountPercent}% OFF)` : '';
+    precosBloco = `❌ De: ~R$ ${formatCurrencyBRL(s.originalPrice)}~\n✅ *Por apenas: R$ ${formatCurrencyBRL(s.promoPrice)}*${discStr}`;
+  } else if (s.promoPrice > 0) {
+    precosBloco = `✅ *Por apenas: R$ ${formatCurrencyBRL(s.promoPrice)}*`;
+  }
+
+  const cupomBloco = s.coupon ? `🎟️ Use o cupom: *${s.coupon}*\n` : '';
+  const precoDeStr = s.originalPrice ? `~R$ ${formatCurrencyBRL(s.originalPrice)}~` : '';
+  const precoPorStr = `*R$ ${formatCurrencyBRL(s.promoPrice)}*`;
+  const descontoStr = s.discountPercent ? `${s.discountPercent}% OFF` : '';
+
+  let out = templateText;
+  const map = [
+    [/\{TITULO\}/gi, s.title],
+    [/\{TITLE\}/gi, s.title],
+    [/\{LOJA\}/gi, s.store],
+    [/\{STORE\}/gi, s.store],
+    [/\{EMOJI_LOJA\}/gi, s.storeEmoji],
+    [/\{EMOJI\}/gi, s.storeEmoji],
+    [/\{PRECOS\}/gi, precosBloco],
+    [/\{PRECO_DE\}/gi, precoDeStr],
+    [/\{PRECO_ANTIGO\}/gi, precoDeStr],
+    [/\{PRECO_POR\}/gi, precoPorStr],
+    [/\{PRECO\}/gi, precoPorStr],
+    [/\{VALOR_NUMERICO\}/gi, formatCurrencyBRL(s.promoPrice)],
+    [/\{DESCONTO\}/gi, descontoStr],
+    [/\{CUPOM\}/gi, cupomBloco],
+    [/\{CODIGO_CUPOM\}/gi, s.coupon],
+    [/\{LINK\}/gi, s.affiliateUrl],
+    [/\{LINK_AFILIADO\}/gi, s.affiliateUrl],
+    [/\{AVISO\}/gi, aviso],
+    [/\{CATEGORIA\}/gi, s.category || 'Geral']
+  ];
+
+  for (const [re, val] of map) {
+    out = out.replace(re, val);
+  }
+
+  return out.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function updateLiveWhatsAppPreview() {
+  const textarea = document.getElementById('templateEditorTextarea');
+  const warningInput = document.getElementById('templateWarningInput');
+  const previewContent = document.getElementById('waPreviewContent');
+  const previewImg = document.getElementById('waPreviewImg');
+  const previewTime = document.getElementById('waPreviewTime');
+
+  if (!textarea || !previewContent) return;
+
+  const currentTpl = textarea.value;
+  const currentWarn = warningInput?.value || 'Preço sujeito a alteração a qualquer momento.';
+  const sample = sampleStoreData[templateState.previewStore] || sampleStoreData['MERCADO_LIVRE'];
+
+  if (previewImg && sample.image) {
+    previewImg.src = sample.image;
+  }
+
+  if (previewTime) {
+    const now = new Date();
+    previewTime.textContent = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  }
+
+  const renderedText = renderClientTemplate(currentTpl, sample, currentWarn);
+  previewContent.innerHTML = formatWhatsAppMarkdown(renderedText);
+}
+
+async function loadTemplateConfig() {
+  try {
+    const res = await fetch('/api/template');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data || !data.success) return;
+
+    templateState.presets = data.presets || [];
+    const cfg = data.config || {};
+    templateState.currentTemplate = cfg.customTemplate || templateState.presets[0]?.template || '';
+    templateState.currentWarning = cfg.customWarning || 'Preço sujeito a alteração a qualquer momento.';
+
+    const textarea = document.getElementById('templateEditorTextarea');
+    const warningInput = document.getElementById('templateWarningInput');
+    if (textarea) textarea.value = templateState.currentTemplate;
+    if (warningInput) warningInput.value = templateState.currentWarning;
+
+    updateLiveWhatsAppPreview();
+  } catch (err) {
+    console.error('Erro ao carregar template config:', err);
+  }
+}
+
+function insertVariableIntoTextarea(varTag) {
+  const textarea = document.getElementById('templateEditorTextarea');
+  if (!textarea) return;
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const text = textarea.value;
+
+  textarea.value = text.substring(0, start) + varTag + text.substring(end);
+  textarea.selectionStart = textarea.selectionEnd = start + varTag.length;
+  textarea.focus();
+  updateLiveWhatsAppPreview();
+}
+
+function initTemplateEvents() {
+  loadTemplateConfig();
+
+  const textarea = document.getElementById('templateEditorTextarea');
+  const warningInput = document.getElementById('templateWarningInput');
+  const btnSave = document.getElementById('btnSaveTemplate');
+  const btnReset = document.getElementById('btnResetTemplate');
+  const btnCopy = document.getElementById('btnCopyTemplate');
+
+  // Input live update
+  textarea?.addEventListener('input', updateLiveWhatsAppPreview);
+  warningInput?.addEventListener('input', updateLiveWhatsAppPreview);
+
+  // Preset Buttons
+  const presetBtns = document.querySelectorAll('#templatePresetButtons .btn-preset');
+  presetBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      presetBtns.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const presetId = btn.getAttribute('data-preset');
+      const found = templateState.presets.find((p) => p.id === presetId);
+      if (found && textarea) {
+        textarea.value = found.template;
+        updateLiveWhatsAppPreview();
+        showToast(`✨ Modelo "${found.name}" aplicado!`);
+      }
+    });
+  });
+
+  // Variable Chips Click to Insert
+  const varChips = document.querySelectorAll('#templateVariableChips .var-chip');
+  varChips.forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const varTag = chip.getAttribute('data-var');
+      if (varTag) {
+        insertVariableIntoTextarea(varTag);
+      }
+    });
+  });
+
+  // Store Switcher for Preview
+  const storeBtns = document.querySelectorAll('#previewStoreSwitcher .store-mini-btn');
+  storeBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      storeBtns.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      templateState.previewStore = btn.getAttribute('data-preview-store') || 'MERCADO_LIVRE';
+      updateLiveWhatsAppPreview();
+    });
+  });
+
+  // Save Template
+  btnSave?.addEventListener('click', async () => {
+    if (btnSave.disabled) return;
+    const originalText = btnSave.innerHTML;
+    btnSave.disabled = true;
+    btnSave.innerHTML = `<span>Salvando...</span>`;
+
+    const customTemplate = textarea?.value || '';
+    const customWarning = warningInput?.value || '';
+
+    try {
+      const res = await fetch('/api/template', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'custom',
+          customTemplate,
+          customWarning
+        })
+      });
+
+      const data = await res.json();
+      if (data && data.success) {
+        showToast('✅ Template de mensagens salvo com sucesso!');
+      } else {
+        showToast('⚠️ Erro ao salvar template.');
+      }
+    } catch (err) {
+      showToast('❌ Falha na conexão com o servidor.');
+    } finally {
+      btnSave.disabled = false;
+      btnSave.innerHTML = originalText;
+      if (window.lucide) lucide.createIcons();
+    }
+  });
+
+  // Reset Template
+  btnReset?.addEventListener('click', () => {
+    if (!templateState.presets || templateState.presets.length === 0) return;
+    const defaultPreset = templateState.presets[0];
+    if (textarea) textarea.value = defaultPreset.template;
+    if (warningInput) warningInput.value = 'Preço sujeito a alteração a qualquer momento.';
+
+    presetBtns.forEach((b, idx) => {
+      if (idx === 0) b.classList.add('active');
+      else b.classList.remove('active');
+    });
+
+    updateLiveWhatsAppPreview();
+    showToast('🔄 Template restaurado para o padrão.');
+  });
+
+  // Copy Template
+  btnCopy?.addEventListener('click', () => {
+    if (!textarea) return;
+    navigator.clipboard.writeText(textarea.value).then(() => {
+      showToast('📋 Modelo copiado para a área de transferência!');
+    }).catch(() => {
+      showToast('⚠️ Falha ao copiar.');
+    });
+  });
+}

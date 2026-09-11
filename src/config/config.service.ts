@@ -61,6 +61,11 @@ export const DEFAULT_CONFIG: AppConfig = {
     aliexpressAppKey: process.env.ALIEXPRESS_APP_KEY || '544386',
     aliexpressAppSecret: process.env.ALIEXPRESS_APP_SECRET || 'g7NPfxfXQIYYvCHFfTd7VTgRDKgBbYDz',
     aliexpressTrackingId: process.env.ALIEXPRESS_TRACKING_ID || process.env.ALIEXPRESS_AFFILIATE_TAG || 'ibanez'
+  },
+  template: {
+    mode: 'default',
+    customTemplate: '⚡ *OFERTA IMPERDÍVEL {LOJA}* {EMOJI_LOJA}\n\n🔥 *{TITULO}*\n\n{PRECOS}\n{CUPOM}\n🛒 *Compre aqui com segurança:* {LINK}\n\n⚠️ _{AVISO}_',
+    customWarning: 'Preço sujeito a alteração a qualquer momento.'
   }
 };
 
@@ -89,7 +94,8 @@ class ConfigService {
           whatsapp: { ...DEFAULT_CONFIG.whatsapp, ...parsed.whatsapp },
           forwarder: { ...DEFAULT_CONFIG.forwarder, ...parsed.forwarder },
           filters: { ...DEFAULT_CONFIG.filters, ...parsed.filters },
-          affiliate: { ...DEFAULT_CONFIG.affiliate, ...parsed.affiliate }
+          affiliate: { ...DEFAULT_CONFIG.affiliate, ...parsed.affiliate },
+          template: { ...DEFAULT_CONFIG.template, ...parsed.template }
         };
       } else {
         this.saveConfig(DEFAULT_CONFIG);

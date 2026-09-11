@@ -39,6 +39,11 @@ export interface AppConfig {
     aliexpressAppSecret?: string;
     aliexpressTrackingId?: string;
   };
+  template?: {
+    mode?: 'default' | 'custom';
+    customTemplate?: string;
+    customWarning?: string;
+  };
 }
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'waiting_code' | 'waiting_2fa' | 'connected' | 'error';
