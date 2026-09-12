@@ -41,19 +41,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error(err);
   }
 
+  // Clean status without KB text
   if (mlCookie && mlCookie.length > 50) {
-    mlBadge.textContent = 'Ativo (' + Math.round(mlCookie.length / 1024) + ' KB)';
+    mlBadge.innerHTML = '● Conectado';
     mlBadge.className = 'pill pill-active';
   } else {
-    mlBadge.textContent = 'Não Logado';
+    mlBadge.innerHTML = '○ Não Conectado';
     mlBadge.className = 'pill pill-inactive';
   }
 
   if (amzCookie && amzCookie.length > 50) {
-    amzBadge.textContent = 'Ativo (' + Math.round(amzCookie.length / 1024) + ' KB)';
+    amzBadge.innerHTML = '● Conectado';
     amzBadge.className = 'pill pill-active';
   } else {
-    amzBadge.textContent = 'Não Logado';
+    amzBadge.innerHTML = '○ Não Conectado';
     amzBadge.className = 'pill pill-inactive';
   }
 
@@ -66,13 +67,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   btnCopyML.addEventListener('click', () => {
     if (!mlCookie) return alert('Nenhum cookie do Mercado Livre encontrado. Faça login no mercadolivre.com.br primeiro.');
     navigator.clipboard.writeText(mlCookie);
-    showStatus('Cookie do Mercado Livre copiado para a área de transferência!', true);
+    showStatus('Cookie do Mercado Livre copiado!', true);
   });
 
   btnCopyAmz.addEventListener('click', () => {
     if (!amzCookie) return alert('Nenhum cookie da Amazon encontrado. Faça login no amazon.com.br primeiro.');
     navigator.clipboard.writeText(amzCookie);
-    showStatus('Cookie da Amazon copiado para a área de transferência!', true);
+    showStatus('Cookie da Amazon copiado!', true);
   });
 
   btnSync.addEventListener('click', async () => {
@@ -85,7 +86,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     chrome.storage.local.set({ oferdayServerUrl: rawUrl });
 
     if (!mlCookie && !amzCookie) {
-      showStatus('Nenhum cookie de sessão encontrado no navegador. Faça login no Mercado Livre ou Amazon.', false);
+      showStatus('Nenhum cookie encontrado. Faça login no Mercado Livre ou Amazon.', false);
       return;
     }
 
@@ -104,7 +105,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const data = await response.json();
       if (data.success) {
-        showStatus('✅ Cookies sincronizados com sucesso no Bot Oferday! Links oficiais meli.la e amzn.to estão ativos.', true);
+        showStatus('✅ Cookies sincronizados com sucesso no Bot Oferday!', true);
       } else {
         showStatus('❌ Falha ao sincronizar: ' + (data.error || 'Erro desconhecido'), false);
       }
@@ -112,7 +113,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       showStatus('❌ Erro de conexão com o servidor: ' + err.message, false);
     } finally {
       btnSync.disabled = false;
-      btnSync.textContent = '🔄 Sincronizar em 1 Clique com o Bot';
+      btnSync.textContent = '🔄 Sincronizar em 1 Clique';
     }
   });
 });

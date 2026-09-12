@@ -2872,3 +2872,11 @@ function initShopeeFinderEvents() {
   });
 }
 
+// Auto-run event initializers
+initTemplateEvents();
+initManualQueueEvents();
+initDivulgadorEvents();
+initShopeeFinderEvents();
+
+
+

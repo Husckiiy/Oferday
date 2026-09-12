@@ -5,12 +5,13 @@
   <title>Oferday Cookie Sync</title>
   <style>
     :root {
-      --bg: #0f172a;
-      --card: #1e293b;
-      --border: #334155;
+      --bg: #0b111e;
+      --card: #151f32;
+      --border: #22314a;
       --text: #f8fafc;
       --muted: #94a3b8;
-      --primary: #3b82f6;
+      --brand-red: #e11d48;
+      --brand-red-hover: #be123c;
       --success: #10b981;
       --warning: #f59e0b;
       --danger: #ef4444;
@@ -19,7 +20,7 @@
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body {
-      width: 360px;
+      width: 350px;
       background: var(--bg);
       color: var(--text);
       padding: 16px;
@@ -28,38 +29,43 @@
     .header {
       display: flex;
       align-items: center;
-      gap: 10px;
+      justify-content: space-between;
       margin-bottom: 14px;
       border-bottom: 1px solid var(--border);
-      padding-bottom: 10px;
+      padding-bottom: 12px;
     }
-    .header h1 {
-      font-size: 15px;
-      font-weight: 700;
-      color: #fff;
+    .logo-img {
+      height: 28px;
+      object-fit: contain;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
     }
     .badge-tag {
-      background: rgba(59, 130, 246, 0.2);
-      color: #60a5fa;
-      padding: 2px 6px;
-      border-radius: 4px;
+      background: rgba(225, 29, 72, 0.18);
+      color: #fb7185;
+      border: 1px solid rgba(225, 29, 72, 0.3);
+      padding: 3px 8px;
+      border-radius: 6px;
       font-size: 10px;
-      font-weight: bold;
+      font-weight: 700;
+      letter-spacing: 0.3px;
     }
     .section {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 10px;
       padding: 12px;
       margin-bottom: 12px;
     }
     .section-title {
       font-size: 11px;
-      font-weight: 600;
+      font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: var(--muted);
       margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
     }
     .input-group label {
       display: block;
@@ -69,16 +75,17 @@
     }
     .input-group input {
       width: 100%;
-      background: #090d16;
+      background: #090e18;
       border: 1px solid var(--border);
       color: #fff;
       padding: 8px 10px;
       border-radius: 6px;
       font-size: 12px;
+      transition: border-color 0.2s;
     }
     .input-group input:focus {
       outline: none;
-      border-color: var(--primary);
+      border-color: #3b82f6;
     }
     .cookie-status-item {
       display: flex;
@@ -94,18 +101,29 @@
     .store-label {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 7px;
       font-weight: 600;
+      font-size: 12px;
     }
     .pill {
-      font-size: 10px;
-      padding: 2px 6px;
-      border-radius: 12px;
-      font-weight: bold;
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
     }
-    .pill-active { background: rgba(16, 185, 129, 0.2); color: #34d399; }
-    .pill-inactive { background: rgba(239, 68, 68, 0.2); color: #f87171; }
-    
+    .pill-active {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .pill-inactive {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
     .btn {
       display: flex;
       align-items: center;
@@ -114,41 +132,56 @@
       width: 100%;
       padding: 10px;
       border: none;
-      border-radius: 6px;
+      border-radius: 8px;
       font-size: 13px;
-      font-weight: bold;
+      font-weight: 700;
       cursor: pointer;
       transition: all 0.2s;
     }
-    .btn-primary {
-      background: #2563eb;
+    .btn-sync {
+      background: linear-gradient(135deg, #e11d48, #be123c);
       color: white;
+      box-shadow: 0 3px 10px rgba(225, 29, 72, 0.35);
       margin-bottom: 8px;
     }
-    .btn-primary:hover {
-      background: #1d4ed8;
+    .btn-sync:hover {
+      background: linear-gradient(135deg, #be123c, #9f1239);
+      transform: translateY(-1px);
+      box-shadow: 0 5px 14px rgba(225, 29, 72, 0.45);
     }
     .btn-secondary {
-      background: #334155;
-      color: #e2e8f0;
+      background: #1e293b;
+      color: #cbd5e1;
       font-size: 11px;
+      font-weight: 600;
       padding: 7px;
+      border: 1px solid #334155;
     }
     .btn-secondary:hover {
-      background: #475569;
+      background: #334155;
+      color: #ffffff;
     }
     .status-box {
       margin-top: 10px;
-      padding: 8px 10px;
-      border-radius: 6px;
+      padding: 9px 12px;
+      border-radius: 8px;
       font-size: 11px;
       display: none;
       line-height: 1.4;
+      font-weight: 500;
     }
-    .status-success { background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #a7f3d0; }
-    .status-error { background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #fca5a5; }
+    .status-success {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid #10b981;
+      color: #a7f3d0;
+    }
+    .status-error {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid #ef4444;
+      color: #fca5a5;
+    }
     .tip {
-      font-size: 11px;
+      font-size: 10px;
       color: var(--muted);
       margin-top: 10px;
       line-height: 1.4;
@@ -158,22 +191,19 @@
 </head>
 <body>
   <div class="header">
-    <span style="font-size: 20px;">⚡</span>
-    <div>
-      <h1>Oferday Cookie Sync</h1>
-      <span class="badge-tag">Sincronizador Oficial</span>
-    </div>
+    <img src="icons/logo.png" alt="OferDay" class="logo-img">
+    <span class="badge-tag">Cookie Sync</span>
   </div>
 
   <div class="section">
-    <div class="section-title">Endereço do Bot Oferday</div>
+    <div class="section-title">🌐 Servidor do Bot</div>
     <div class="input-group">
-      <input type="text" id="serverUrl" placeholder="Ex: https://oferday-production.up.railway.app">
+      <input type="text" id="serverUrl" placeholder="https://oferday-production.up.railway.app">
     </div>
   </div>
 
   <div class="section">
-    <div class="section-title">Status dos Cookies no Navegador</div>
+    <div class="section-title">⚡ Sessões Detectadas</div>
     <div class="cookie-status-item">
       <div class="store-label">
         <span style="color: var(--yellow-ml)">🟡</span> Mercado Livre (meli.la)
@@ -188,8 +218,8 @@
     </div>
   </div>
 
-  <button id="btnSync" class="btn btn-primary">
-    🔄 Sincronizar em 1 Clique com o Bot
+  <button id="btnSync" class="btn btn-sync">
+    🔄 Sincronizar em 1 Clique
   </button>
 
   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
@@ -200,7 +230,7 @@
   <div id="statusBox" class="status-box"></div>
 
   <div class="tip">
-    💡 Certifique-se de estar logado no <b>mercadolivre.com.br</b> e <b>amazon.com.br</b> neste navegador.
+    💡 Certifique-se de estar logado no <b>mercadolivre.com.br</b> e <b>amazon.com.br</b>.
   </div>
 
   <script src="popup.js"></script>

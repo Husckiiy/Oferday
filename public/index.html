@@ -1317,27 +1317,27 @@
 
       </div>
 
-      <div class="modal-footer" style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+      <div class="divulgador-footer-bar">
         <div class="divulgador-footer-info">
-          <strong id="divulgadorCountText" style="color: var(--text-heading); font-size: 0.88rem;">Carregando promoções...</strong>
+          <span class="divulgador-count-badge" id="divulgadorCountText">Carregando promoções...</span>
         </div>
 
         <!-- Pagination Controls -->
         <div class="divulgador-pagination" id="divulgadorPagination">
-          <button type="button" class="btn btn-secondary btn-sm" id="btnDivPrev" disabled>
+          <button type="button" class="btn-pag-nav" id="btnDivPrev" disabled>
             <i data-lucide="chevron-left"></i> Anterior
           </button>
-          <span id="divulgadorPageInfo" style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); padding: 0 0.4rem;">Página 1</span>
-          <button type="button" class="btn btn-secondary btn-sm" id="btnDivNext" disabled>
+          <span class="pag-page-info" id="divulgadorPageInfo">Página 1</span>
+          <button type="button" class="btn-pag-nav" id="btnDivNext" disabled>
             Próxima <i data-lucide="chevron-right"></i>
           </button>
         </div>
 
         <div class="modal-footer-actions">
-          <button type="button" class="btn btn-secondary btn-sm" id="btnHarvestDivulgador" title="Buscar novas promoções nas 5 lojas agora">
+          <button type="button" class="btn-action-harvest" id="btnHarvestDivulgador" title="Buscar novas promoções nas 5 lojas agora">
             <i data-lucide="sparkles"></i> <span>Garimpar Ofertas</span>
           </button>
-          <button type="button" class="btn btn-primary btn-sm" data-close>Concluído</button>
+          <button type="button" class="btn-action-close" data-close>Concluído</button>
         </div>
       </div>
     </div>
@@ -1396,27 +1396,27 @@
 
       </div>
 
-      <div class="modal-footer modal-footer-dark" style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+      <div class="divulgador-footer-bar">
         <div class="divulgador-footer-info">
-          <strong id="shopeeCountText" style="color: #ffffff; font-size: 0.88rem;">Carregando achadinhos da Shopee...</strong>
+          <span class="divulgador-count-badge" id="shopeeCountText">Carregando achadinhos da Shopee...</span>
         </div>
 
         <!-- Pagination Controls -->
         <div class="divulgador-pagination" id="shopeePagination">
-          <button type="button" class="btn btn-secondary btn-sm" id="btnShopeePrev" disabled>
+          <button type="button" class="btn-pag-nav" id="btnShopeePrev" disabled>
             <i data-lucide="chevron-left"></i> Anterior
           </button>
-          <span id="shopeePageInfo" style="font-size: 0.82rem; font-weight: 600; color: var(--dark-text-muted); padding: 0 0.4rem;">Página 1</span>
-          <button type="button" class="btn btn-secondary btn-sm" id="btnShopeeNext" disabled>
+          <span class="pag-page-info" id="shopeePageInfo">Página 1</span>
+          <button type="button" class="btn-pag-nav" id="btnShopeeNext" disabled>
             Próxima <i data-lucide="chevron-right"></i>
           </button>
         </div>
 
         <div class="modal-footer-actions">
-          <button type="button" class="btn btn-secondary btn-sm" id="btnHarvestShopee" title="Sincronizar promoções com a API Oficial da Shopee">
+          <button type="button" class="btn-action-harvest" id="btnHarvestShopee" title="Sincronizar promoções com a API Oficial da Shopee">
             <i data-lucide="sparkles"></i> <span>Atualizar Shopee</span>
           </button>
-          <button type="button" class="btn btn-primary btn-sm" data-close>Concluído</button>
+          <button type="button" class="btn-action-close" data-close>Concluído</button>
         </div>
       </div>
 
