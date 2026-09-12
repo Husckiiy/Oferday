@@ -1785,14 +1785,14 @@ function renderDivulgadorGrid(offers) {
 
         <div class="offer-card-footer">
           <a href="${offer.productUrl}" target="_blank" rel="noopener noreferrer" class="btn-offer-view" title="Ver produto na loja">
-            <i data-lucide="external-link" style="width: 15px; height: 15px;"></i>
+            <i data-lucide="external-link" style="width: 14px; height: 14px;"></i>
           </a>
           <button type="button" class="btn-offer-manual" data-manual-id="${offer.id}" title="Adicionar à fila de Disparo Manual para personalizar a mensagem">
-            <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
-            <span>Disparo manual</span>
+            <i data-lucide="edit-3" style="width: 13px; height: 13px;"></i>
+            <span>Manual</span>
           </button>
           <button type="button" class="btn-offer-dispatch" data-dispatch-id="${offer.id}" title="Disparar direto para o WhatsApp">
-            <i data-lucide="send" style="width: 14px; height: 14px;"></i>
+            <i data-lucide="send" style="width: 13px; height: 13px;"></i>
             <span>Disparar</span>
           </button>
         </div>
@@ -2766,14 +2766,14 @@ function renderShopeeGrid(offers) {
 
         <div class="offer-card-footer">
           <a href="${offer.productUrl}" target="_blank" rel="noopener noreferrer" class="btn-offer-view" title="Ver produto na Shopee">
-            <i data-lucide="external-link" style="width: 15px; height: 15px;"></i>
+            <i data-lucide="external-link" style="width: 14px; height: 14px;"></i>
           </a>
           <button type="button" class="btn-offer-manual" data-manual-id="${offer.id}" title="Adicionar à fila de Disparo Manual para personalizar a mensagem">
-            <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
-            <span>Disparo manual</span>
+            <i data-lucide="edit-3" style="width: 13px; height: 13px;"></i>
+            <span>Manual</span>
           </button>
           <button type="button" class="btn-offer-dispatch" data-dispatch-id="${offer.id}" title="Disparar direto para o WhatsApp">
-            <i data-lucide="send" style="width: 14px; height: 14px;"></i>
+            <i data-lucide="send" style="width: 13px; height: 13px;"></i>
             <span>Disparar</span>
           </button>
         </div>
