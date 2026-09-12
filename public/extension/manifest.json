@@ -1,12 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "Oferday Cookie Sync (Mercado Livre & Amazon)",
+  "name": "Oferday Cookie Sync",
   "version": "1.0.0",
-  "description": "Sincroniza automaticamente os cookies de afiliados do Mercado Livre (meli.la) e Amazon SiteStripe (amzn.to) com o bot Oferday.",
+  "description": "Sincroniza com 1 clique os cookies de afiliados do Mercado Livre (meli.la) e Amazon (amzn.to) com o bot Oferday.",
   "permissions": [
     "cookies",
-    "storage",
-    "clipboardWrite"
+    "storage"
   ],
   "host_permissions": [
     "*://*.mercadolivre.com.br/*",
@@ -14,16 +13,20 @@
     "*://*.railway.app/*",
     "http://localhost/*",
     "http://127.0.0.1/*",
-    "https://*/*"
+    "<all_urls>"
   ],
   "action": {
     "default_popup": "popup.html",
     "default_title": "Oferday Cookie Sync",
     "default_icon": {
-      "128": "icons/logo.png"
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
     }
   },
   "icons": {
-    "128": "icons/logo.png"
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   }
 }
