@@ -626,12 +626,14 @@ function updateConfigUI(config) {
   const cfgMlListUrl = document.getElementById('cfgMlListUrl');
   const cfgMlAppId = document.getElementById('cfgMlAppId');
   const cfgMlSecretKey = document.getElementById('cfgMlSecretKey');
+  const cfgMeliCookie = document.getElementById('cfgMeliCookie');
   if (cfgMlTag && (config.affiliate?.mlAffiliateTag || config.affiliate?.meliAffiliateTag)) {
     cfgMlTag.value = config.affiliate.mlAffiliateTag || config.affiliate.meliAffiliateTag;
   }
   if (cfgMlListUrl && config.affiliate?.mlListShortUrl) cfgMlListUrl.value = config.affiliate.mlListShortUrl;
   if (cfgMlAppId && config.affiliate?.mlAppId) cfgMlAppId.value = config.affiliate.mlAppId;
   if (cfgMlSecretKey && config.affiliate?.mlSecretKey) cfgMlSecretKey.value = config.affiliate.mlSecretKey;
+  if (cfgMeliCookie && config.affiliate?.meliCookie) cfgMeliCookie.value = config.affiliate.meliCookie;
 
   // Amazon
   const cfgAmazonTag = document.getElementById('cfgAmazonTag');
@@ -848,7 +850,7 @@ btnTgVerifyCode?.addEventListener('click', async () => {
   }
 
   btnTgVerifyCode.disabled = true;
-  btnTgVerifyCode.textContent = 'Validando...';
+  btnTgVerifyCode.textContent = 'Verificando...';
 
   try {
     const res = await fetch('/api/telegram/auth/verify-code', {
@@ -859,6 +861,11 @@ btnTgVerifyCode?.addEventListener('click', async () => {
     const json = await res.json();
     if (json.success) {
       showToast('Telegram conectado com sucesso!', 'success');
+      loadStatus();
+    } else if (json.needs2FA) {
+      tgCodeStep?.classList.add('hidden');
+      tg2FaStep?.classList.remove('hidden');
+      showToast('Autenticação de 2 Fatores necessária.', 'info');
     } else {
       showToast(`Erro: ${json.error}`, 'error');
     }
@@ -937,26 +944,28 @@ btnWaDisconnect?.addEventListener('click', async () => {
   }
 });
 
-// --- Mercado Livre OAuth Refresh ---
+// --- Mercado Livre Linkbuilder / meli.la Status & Validation ---
 async function loadMeliTokenStatus() {
+  const badge = document.getElementById('meliTokenBadge');
+  const info = document.getElementById('meliTokenExpireInfo');
   try {
-    const res = await fetch('/api/meli/tokens');
+    const res = await fetch('/api/meli/status');
     const json = await res.json();
-    if (json.success && json.status) {
-      const st = json.status;
-      if (st.hasAccessToken && !st.isExpired) {
-        if (meliTokenBadge) {
-          meliTokenBadge.textContent = `OAuth Ativo (${Math.floor(st.expiresInMinutes / 60)}h ${st.expiresInMinutes % 60}m)`;
-          meliTokenBadge.className = 'badge badge-green';
-        }
-        if (meliTokenExpireInfo) {
-          meliTokenExpireInfo.textContent = `Expira em: ${st.expiresAtDate} (Renovação automática 24h ativa)`;
-        }
-      } else if (st.hasAccessToken && st.isExpired) {
-        if (meliTokenBadge) {
-          meliTokenBadge.textContent = 'Token Expirado (Renovável)';
-          meliTokenBadge.className = 'badge badge-yellow';
-        }
+    if (json.active) {
+      if (badge) {
+        badge.textContent = 'meli.la Ativo ✅';
+        badge.className = 'badge badge-green';
+      }
+      if (info) {
+        info.textContent = 'API Linkbuilder oficial conectada! Links meli.la gerados com sucesso.';
+      }
+    } else {
+      if (badge) {
+        badge.textContent = 'Sessão Expirada ⚠️';
+        badge.className = 'badge badge-yellow';
+      }
+      if (info) {
+        info.textContent = json.message || 'Sessão do Linkbuilder expirada. Atualize o Cookie de sessão abaixo e clique em Salvar.';
       }
     }
   } catch {
@@ -965,29 +974,30 @@ async function loadMeliTokenStatus() {
 }
 
 btnRefreshMeliToken?.addEventListener('click', async () => {
-  const clientId = document.getElementById('cfgMlAppId')?.value.trim() || '';
-  const clientSecret = document.getElementById('cfgMlSecretKey')?.value.trim() || '';
-
   btnRefreshMeliToken.disabled = true;
-  btnRefreshMeliToken.textContent = 'Renovando...';
+  btnRefreshMeliToken.textContent = 'Validando...';
   try {
-    const res = await fetch('/api/meli/refresh', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret })
-    });
-    const json = await res.json();
-    if (json.success) {
-      showToast('Token renovado com sucesso!', 'success');
-      loadMeliTokenStatus();
-    } else {
-      showToast(`Erro na renovação: ${json.error}`, 'error');
+    const cookie = document.getElementById('cfgMeliCookie')?.value.trim();
+    if (cookie) {
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ affiliate: { meliCookie: cookie } })
+      });
     }
+    const res = await fetch('/api/meli/status');
+    const json = await res.json();
+    if (json.active) {
+      showToast('🎉 Sucesso! API Linkbuilder conectada e gerando meli.la!', 'success');
+    } else {
+      showToast(`⚠️ ${json.message}`, 'warning');
+    }
+    loadMeliTokenStatus();
   } catch (err) {
-    showToast(`Erro ao renovar: ${err.message}`, 'error');
+    showToast(`Erro ao testar: ${err.message}`, 'error');
   } finally {
     btnRefreshMeliToken.disabled = false;
-    btnRefreshMeliToken.textContent = '🔄 Renovar Token Agora';
+    btnRefreshMeliToken.textContent = '🔄 Testar / Validar meli.la';
   }
 });
 
@@ -1004,6 +1014,7 @@ async function saveAllConfig(btn) {
   const mlListShortUrl = document.getElementById('cfgMlListUrl')?.value.trim() || '';
   const mlAppId = document.getElementById('cfgMlAppId')?.value.trim() || '';
   const mlSecretKey = document.getElementById('cfgMlSecretKey')?.value.trim() || '';
+  const meliCookie = document.getElementById('cfgMeliCookie')?.value.trim() || '';
   const amazonTag = document.getElementById('cfgAmazonTag')?.value.trim() || '';
   const magaluTag = document.getElementById('cfgMagaluTag')?.value.trim() || '';
   const aliexpressAppKey = document.getElementById('cfgAliAppKey')?.value.trim() || '';
@@ -1054,6 +1065,7 @@ async function saveAllConfig(btn) {
           mlListShortUrl,
           mlAppId,
           mlSecretKey,
+          meliCookie,
           amazonTag,
           magaluTag,
           aliexpressAppKey,
@@ -1066,6 +1078,7 @@ async function saveAllConfig(btn) {
     if (json.success) {
       showToast('Configurações salvas com sucesso!', 'success');
       updateDestinationDisplayName(destinationName);
+      loadMeliTokenStatus();
       closeAllModals();
     } else {
       showToast(`Erro ao salvar: ${json.error}`, 'error');
@@ -1119,6 +1132,10 @@ function showStoreDetail(storeKey) {
 
   if (storeDetailTitle) storeDetailTitle.textContent = storeInfo.title;
   if (storeDetailSubtitle) storeDetailSubtitle.textContent = storeInfo.subtitle;
+
+  if (storeKey === 'meli') {
+    loadMeliTokenStatus();
+  }
 
   if (window.lucide) lucide.createIcons();
 }

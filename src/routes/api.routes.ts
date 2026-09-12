@@ -260,7 +260,31 @@ apiRouter.post('/affiliate/test', async (req: Request, res: Response) => {
   }
 });
 
-// Mercado Livre OAuth Token Endpoints
+// Mercado Livre Status & Token Endpoints
+apiRouter.get('/meli/status', async (req: Request, res: Response) => {
+  try {
+    const config = configService.getConfig();
+    const tag = config.affiliate?.mlAffiliateTag || 'G20260107233651';
+    const testUrl = 'https://www.mercadolivre.com.br/p/MLB24650892';
+    const shortUrl = await affiliateService.generateOfficialMeliShortLink(testUrl, tag);
+    if (shortUrl && shortUrl.includes('meli.la')) {
+      return res.json({
+        success: true,
+        active: true,
+        shortUrl,
+        message: 'API Linkbuilder oficial do Mercado Livre conectada e gerando meli.la!'
+      });
+    }
+    return res.json({
+      success: false,
+      active: false,
+      message: 'Sessão do Linkbuilder expirada. Atualize o Cookie de sessão ou faça login no Linkbuilder.'
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, active: false, error: err.message });
+  }
+});
+
 apiRouter.get('/meli/tokens', (req: Request, res: Response) => {
   const status = meliAuthService.getTokenStatus();
   const tokens = meliAuthService.getTokens();

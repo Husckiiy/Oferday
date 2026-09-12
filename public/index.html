@@ -559,19 +559,19 @@
                 <input type="text" id="cfgMlListUrl" value="https://meli.la/2H1hvz6" placeholder="https://meli.la/2H1hvz6">
               </div>
             </div>
-            <div class="form-row-2">
-              <div class="form-group">
-                <label>App ID (Client ID)</label>
-                <input type="text" id="cfgMlAppId" value="6282693331910478" placeholder="Client ID">
-              </div>
-              <div class="form-group">
-                <label>Client Secret Key</label>
-                <input type="password" id="cfgMlSecretKey" value="gV7EDEKygMX4uEP8J9lh0gLIj6wx42Ya" placeholder="Secret Key">
-              </div>
+            <div class="form-group mt-3">
+              <label style="display: flex; justify-content: space-between; align-items: center;">
+                <span>Cookie de Sessão do Linkbuilder (meli.la)</span>
+                <a href="https://www.mercadolivre.com.br/afiliados/linkbuilder" target="_blank" rel="noopener noreferrer" style="font-size: 0.72rem; color: #3b82f6; text-decoration: underline;">Abrir Linkbuilder Oficial ↗</a>
+              </label>
+              <textarea id="cfgMeliCookie" rows="3" style="font-family: monospace; font-size: 0.75rem; background: rgba(0,0,0,0.3); color: #e2e8f0; border: 1px solid var(--border-color); border-radius: 6px; width: 100%; padding: 0.5rem;" placeholder="Cole aqui o cookie da sua conta logada no Linkbuilder para geração contínua de links meli.la"></textarea>
+              <small class="text-muted" style="font-size: 0.72rem; display: block; margin-top: 0.25rem;">
+                💡 <b>Como obter:</b> Entre no Linkbuilder do Mercado Livre logado, pressione <code>F12</code> -> aba <b>Rede (Network)</b> -> clique em qualquer requisição e copie o valor de <b>Cookie</b>.
+              </small>
             </div>
-            <div class="token-banner">
-              <span id="meliTokenExpireInfo">Encurtamento meli.la oficial ativo via API Linkbuilder nativa.</span>
-              <button class="btn btn-secondary btn-sm" id="btnRefreshMeliToken">🔄 Renovar Token Agora</button>
+            <div class="token-banner mt-3">
+              <span id="meliTokenExpireInfo">Verificando status da conexão com a API do Mercado Livre...</span>
+              <button type="button" class="btn btn-secondary btn-sm" id="btnRefreshMeliToken">🔄 Testar / Validar meli.la</button>
             </div>
           </div>
 
