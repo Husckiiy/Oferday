@@ -2194,6 +2194,33 @@ function initTemplateEvents() {
     });
   });
 
+  // Emoji Chips Click to Insert
+  const emojiChips = document.querySelectorAll('#templateEmojiBar .emoji-chip');
+  emojiChips.forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const emoji = chip.getAttribute('data-emoji');
+      if (emoji) {
+        insertVariableIntoTextarea(emoji + ' ');
+      }
+    });
+  });
+
+  // Expand / Collapse Textarea Button
+  const btnExpandTextarea = document.getElementById('btnExpandTextarea');
+  btnExpandTextarea?.addEventListener('click', () => {
+    if (!textarea) return;
+    textarea.classList.toggle('expanded');
+    const isExp = textarea.classList.contains('expanded');
+    const labelSpan = document.getElementById('btnExpandText');
+    if (labelSpan) {
+      labelSpan.textContent = isExp ? 'Reduzir Caixa' : 'Expandir Caixa';
+    }
+    btnExpandTextarea.innerHTML = isExp 
+      ? `<i data-lucide="minimize-2" style="width: 13px; height: 13px;"></i> <span id="btnExpandText">Reduzir Caixa</span>`
+      : `<i data-lucide="maximize-2" style="width: 13px; height: 13px;"></i> <span id="btnExpandText">Expandir Caixa</span>`;
+    if (window.lucide) lucide.createIcons();
+  });
+
   // Variable Chips Click to Insert
   const varChips = document.querySelectorAll('#templateVariableChips .var-chip');
   varChips.forEach((chip) => {

@@ -2891,12 +2891,83 @@ body.theme-dark .store-tab-btn:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.65rem;
 }
 
-.template-hint {
+.template-pane-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-textarea-expand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--dark-border);
+  border-radius: var(--radius-sm);
+  color: var(--dark-text);
   font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-textarea-expand:hover {
+  background: rgba(249, 115, 22, 0.2);
+  border-color: var(--accent-orange);
+  color: #ffffff;
+}
+
+/* Quick Emoji Bar */
+.template-emoji-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md);
+  flex-wrap: wrap;
+}
+
+.emoji-bar-label {
+  font-size: 0.72rem;
+  font-weight: 700;
   color: var(--dark-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.emoji-bar-list {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.emoji-chip {
+  padding: 0.2rem 0.4rem;
+  font-size: 0.95rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1;
+  transition: all 0.15s;
+}
+
+.emoji-chip:hover {
+  background: rgba(249, 115, 22, 0.3);
+  border-color: var(--accent-orange);
+  transform: scale(1.15);
+}
+
+.emoji-chip:active {
+  transform: scale(0.95);
 }
 
 /* Variable Chips */
@@ -2904,7 +2975,7 @@ body.theme-dark .store-tab-btn:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
-  margin-bottom: 0.85rem;
+  margin-bottom: 0.75rem;
   padding: 0.5rem;
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid var(--dark-border);
@@ -2922,6 +2993,18 @@ body.theme-dark .store-tab-btn:hover {
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
+}
+
+.var-chip.highlight-var {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.var-chip.highlight-var:hover {
+  background: #10b981;
+  color: #ffffff;
+  border-color: #10b981;
 }
 
 .var-chip:hover {
@@ -2944,18 +3027,25 @@ body.theme-dark .store-tab-btn:hover {
 
 .template-textarea {
   width: 100%;
-  background: rgba(10, 14, 23, 0.85);
+  min-height: 280px;
+  height: 320px;
+  background: rgba(10, 14, 23, 0.9);
   border: 1px solid var(--dark-border);
   border-radius: var(--radius-md);
   padding: 0.85rem 1rem;
   color: #f8fafc;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.82rem;
-  line-height: 1.55;
+  font-size: 0.85rem;
+  line-height: 1.6;
   resize: vertical;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, height 0.2s ease;
   box-sizing: border-box;
+}
+
+.template-textarea.expanded {
+  height: 480px;
+  min-height: 460px;
 }
 
 .template-textarea:focus {

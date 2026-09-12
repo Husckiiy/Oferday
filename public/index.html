@@ -1447,7 +1447,7 @@
               <span>⚡ Padrão Alta Conversão</span>
             </button>
             <button type="button" class="btn-preset" data-preset="single_price">
-              <span>🏷️ Preço Único (Sem "De")</span>
+              <span>🏷️ Preço Único</span>
             </button>
             <button type="button" class="btn-preset" data-preset="urgency">
               <span>🚨 Urgência Relâmpago</span>
@@ -1472,7 +1472,34 @@
                 <i data-lucide="code" style="width: 15px; height: 15px; color: var(--accent-orange);"></i>
                 Estrutura do Texto da Mensagem
               </label>
-              <span class="template-hint">Clique nas variáveis para inserir no cursor</span>
+              <div class="template-pane-actions">
+                <button type="button" class="btn-textarea-expand" id="btnExpandTextarea" title="Aumentar / Reduzir altura da caixa de texto">
+                  <i data-lucide="maximize-2" style="width: 13px; height: 13px;"></i>
+                  <span id="btnExpandText">Expandir Caixa</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Quick Emoji Inserter Bar -->
+            <div class="template-emoji-bar" id="templateEmojiBar">
+              <span class="emoji-bar-label">Emojis rápidos:</span>
+              <div class="emoji-bar-list">
+                <button type="button" class="emoji-chip" data-emoji="✅" title="Check verde">✅</button>
+                <button type="button" class="emoji-chip" data-emoji="❌" title="X vermelho">❌</button>
+                <button type="button" class="emoji-chip" data-emoji="🔥" title="Fogo">🔥</button>
+                <button type="button" class="emoji-chip" data-emoji="⚡" title="Raio">⚡</button>
+                <button type="button" class="emoji-chip" data-emoji="💰" title="Dinheiro">💰</button>
+                <button type="button" class="emoji-chip" data-emoji="🏷️" title="Etiqueta">🏷️</button>
+                <button type="button" class="emoji-chip" data-emoji="🛒" title="Carrinho">🛒</button>
+                <button type="button" class="emoji-chip" data-emoji="📦" title="Pacote">📦</button>
+                <button type="button" class="emoji-chip" data-emoji="🎟️" title="Cupom">🎟️</button>
+                <button type="button" class="emoji-chip" data-emoji="🚨" title="Alerta">🚨</button>
+                <button type="button" class="emoji-chip" data-emoji="👉" title="Apontar">👉</button>
+                <button type="button" class="emoji-chip" data-emoji="👇" title="Para baixo">👇</button>
+                <button type="button" class="emoji-chip" data-emoji="✨" title="Brilho">✨</button>
+                <button type="button" class="emoji-chip" data-emoji="💥" title="Explosão">💥</button>
+                <button type="button" class="emoji-chip" data-emoji="⚠️" title="Aviso">⚠️</button>
+              </div>
             </div>
 
             <!-- Clickable Variable Chips -->
@@ -1480,11 +1507,12 @@
               <button type="button" class="var-chip" data-var="{TITULO}" title="Nome do produto">{TITULO}</button>
               <button type="button" class="var-chip" data-var="{LOJA}" title="Nome da loja parceira">{LOJA}</button>
               <button type="button" class="var-chip" data-var="{EMOJI_LOJA}" title="Emoji oficial da loja">{EMOJI_LOJA}</button>
-              <button type="button" class="var-chip" data-var="{PRECOS}" title="Preço De/Por completo com desconto">{PRECOS} (De/Por)</button>
-              <button type="button" class="var-chip" data-var="{PRECO_UNICO}" title="Apenas o preço atual do produto (sem 'De:')">{PRECO_UNICO}</button>
-              <button type="button" class="var-chip" data-var="{PRECO_POR}" title="Preço promocional formatado">{PRECO_POR}</button>
-              <button type="button" class="var-chip" data-var="{PRECO_DE}" title="Preço anterior riscado">{PRECO_DE}</button>
+              <button type="button" class="var-chip highlight-var" data-var="{VALOR}" title="Apenas o valor atual (Ex: R$ 89,90) - Totalmente customizável">{VALOR}</button>
+              <button type="button" class="var-chip" data-var="{PRECO_POR}" title="Preço atual em negrito (Ex: *R$ 89,90*)">{PRECO_POR}</button>
+              <button type="button" class="var-chip" data-var="{PRECO_DE}" title="Preço anterior riscado (Ex: ~R$ 129,90~)">{PRECO_DE}</button>
               <button type="button" class="var-chip" data-var="{DESCONTO}" title="Ex: 50% OFF">{DESCONTO}</button>
+              <button type="button" class="var-chip" data-var="{PRECO_UNICO}" title="Bloco padrão com check: ✅ *Por apenas: R$ 89,90*">{PRECO_UNICO}</button>
+              <button type="button" class="var-chip" data-var="{PRECOS}" title="Bloco completo De/Por com desconto">{PRECOS}</button>
               <button type="button" class="var-chip" data-var="{CUPOM}" title="Linha com cupom">{CUPOM}</button>
               <button type="button" class="var-chip" data-var="{LINK}" title="Link oficial de afiliado">{LINK}</button>
               <button type="button" class="var-chip" data-var="{AVISO}" title="Texto de aviso legal">{AVISO}</button>
@@ -1493,7 +1521,7 @@
 
             <!-- Code/Text Area -->
             <div class="template-textarea-wrap">
-              <textarea id="templateEditorTextarea" class="template-textarea" rows="13" spellcheck="false" placeholder="Digite seu modelo de mensagem aqui..."></textarea>
+              <textarea id="templateEditorTextarea" class="template-textarea" spellcheck="false" placeholder="Digite seu modelo de mensagem aqui..."></textarea>
             </div>
 
             <!-- Custom Warning Field -->

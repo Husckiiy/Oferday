@@ -53,10 +53,10 @@ export class TemplateService {
     },
     {
       id: 'single_price',
-      name: 'Preço Único (Sem "De")',
-      description: 'Exibe apenas o preço atual do produto, sem o preço anterior riscado.',
+      name: 'Preço Único',
+      description: 'Exibe apenas o preço atual do produto com emoji e texto 100% customizáveis.',
       icon: 'tag',
-      template: `⚡ *OFERTA IMPERDÍVEL {LOJA}* {EMOJI_LOJA}\n\n🔥 *{TITULO}*\n\n{PRECO_UNICO}\n{CUPOM}\n🛒 *Compre aqui com segurança:* {LINK}\n\n⚠️ _{AVISO}_`
+      template: `⚡ *OFERTA IMPERDÍVEL {LOJA}* {EMOJI_LOJA}\n\n🔥 *{TITULO}*\n\n✅ *Por apenas:* {VALOR}\n{CUPOM}\n🛒 *Compre aqui com segurança:* {LINK}\n\n⚠️ _{AVISO}_`
     }
   ];
 
