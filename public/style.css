@@ -1133,6 +1133,25 @@ input:checked + .toggle-slider:before {
 .modal-body {
   padding: 1.5rem;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+
+.modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.7);
 }
 
 .modal-footer {
@@ -2309,9 +2328,8 @@ select:focus {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 1.1rem;
-  max-height: 520px;
-  overflow-y: auto;
-  padding: 0.25rem;
+  padding: 0.25rem 0;
+  overflow: visible;
 }
 
 .offer-card {
