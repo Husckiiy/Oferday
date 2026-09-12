@@ -285,6 +285,69 @@ apiRouter.get('/meli/status', async (req: Request, res: Response) => {
   }
 });
 
+// Amazon SiteStripe Status Endpoint
+apiRouter.get('/amazon/status', async (req: Request, res: Response) => {
+  try {
+    const config = configService.getConfig();
+    const tag = config.affiliate?.amazonTag || 'ibanez08-20';
+    const testUrl = `https://www.amazon.com.br/dp/B07Y3WXDTN?tag=${tag}&linkCode=sl2`;
+    const shortUrl = await affiliateService.generateOfficialAmazonShortLink(testUrl, tag);
+    if (shortUrl && (shortUrl.includes('amzn.to') || shortUrl.includes('amazon'))) {
+      return res.json({
+        success: true,
+        active: true,
+        shortUrl,
+        message: 'Amazon SiteStripe conectado e gerando links amzn.to com sucesso!'
+      });
+    }
+    return res.json({
+      success: false,
+      active: false,
+      message: 'Sessão do Amazon SiteStripe expirada ou cookie ausente. Atualize o Cookie da Amazon.'
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, active: false, error: err.message });
+  }
+});
+
+// Extension 1-Click Cookie Sync Endpoint
+apiRouter.post('/extension/sync-cookies', (req: Request, res: Response) => {
+  try {
+    const { meliCookie, amazonCookie } = req.body || {};
+    const currentConfig = configService.getConfig();
+    const updatedAffiliate = { ...currentConfig.affiliate };
+    let changed = false;
+
+    if (meliCookie && typeof meliCookie === 'string' && meliCookie.trim().length > 10) {
+      updatedAffiliate.meliCookie = meliCookie.trim();
+      changed = true;
+      logger.success('AFFILIATE', 'Extensão: Cookie do Mercado Livre sincronizado com sucesso via 1-Clique!');
+    }
+
+    if (amazonCookie && typeof amazonCookie === 'string' && amazonCookie.trim().length > 10) {
+      updatedAffiliate.amazonCookie = amazonCookie.trim();
+      changed = true;
+      logger.success('AFFILIATE', 'Extensão: Cookie da Amazon SiteStripe sincronizado com sucesso via 1-Clique!');
+    }
+
+    if (changed) {
+      configService.saveConfig({ affiliate: updatedAffiliate });
+      return res.json({
+        success: true,
+        message: 'Cookies do Mercado Livre e/ou Amazon sincronizados com sucesso no bot!',
+        synced: {
+          meli: !!meliCookie,
+          amazon: !!amazonCookie
+        }
+      });
+    }
+
+    return res.status(400).json({ success: false, error: 'Nenhum cookie válido fornecido.' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 apiRouter.get('/meli/tokens', (req: Request, res: Response) => {
   const status = meliAuthService.getTokenStatus();
   const tokens = meliAuthService.getTokens();

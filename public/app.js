@@ -637,7 +637,9 @@ function updateConfigUI(config) {
 
   // Amazon
   const cfgAmazonTag = document.getElementById('cfgAmazonTag');
+  const cfgAmazonCookie = document.getElementById('cfgAmazonCookie');
   if (cfgAmazonTag && config.affiliate?.amazonTag) cfgAmazonTag.value = config.affiliate.amazonTag;
+  if (cfgAmazonCookie && config.affiliate?.amazonCookie) cfgAmazonCookie.value = config.affiliate.amazonCookie;
 
   // Magalu
   const cfgMagaluTag = document.getElementById('cfgMagaluTag');
@@ -1001,6 +1003,63 @@ btnRefreshMeliToken?.addEventListener('click', async () => {
   }
 });
 
+// --- Amazon SiteStripe / amzn.to Status & Validation ---
+async function loadAmazonTokenStatus() {
+  const badge = document.getElementById('amazonTokenBadge');
+  const info = document.getElementById('amazonTokenExpireInfo');
+  try {
+    const res = await fetch('/api/amazon/status');
+    const json = await res.json();
+    if (json.active) {
+      if (badge) {
+        badge.textContent = 'amzn.to Ativo ✅';
+        badge.className = 'badge badge-green';
+      }
+      if (info) {
+        info.textContent = 'Amazon SiteStripe oficial conectado! Links amzn.to gerados com sucesso.';
+      }
+    } else {
+      if (badge) {
+        badge.textContent = 'Sessão Expirada ⚠️';
+        badge.className = 'badge badge-yellow';
+      }
+      if (info) {
+        info.textContent = json.message || 'Sessão do Amazon SiteStripe expirada. Atualize o Cookie de sessão abaixo e clique em Salvar.';
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
+btnRefreshAmazonToken?.addEventListener('click', async () => {
+  btnRefreshAmazonToken.disabled = true;
+  btnRefreshAmazonToken.textContent = 'Validando...';
+  try {
+    const cookie = document.getElementById('cfgAmazonCookie')?.value.trim();
+    if (cookie) {
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ affiliate: { amazonCookie: cookie } })
+      });
+    }
+    const res = await fetch('/api/amazon/status');
+    const json = await res.json();
+    if (json.active) {
+      showToast('🎉 Sucesso! Amazon SiteStripe conectado e gerando amzn.to!', 'success');
+    } else {
+      showToast(`⚠️ ${json.message}`, 'warning');
+    }
+    loadAmazonTokenStatus();
+  } catch (err) {
+    showToast(`Erro ao testar: ${err.message}`, 'error');
+  } finally {
+    btnRefreshAmazonToken.disabled = false;
+    btnRefreshAmazonToken.textContent = '🔄 Testar / Validar amzn.to';
+  }
+});
+
 // --- Save Configurations ---
 async function saveAllConfig(btn) {
   const sourceChannel = appState.sourceChannels.map((c) => c.url || c.name).join(', ');
@@ -1016,6 +1075,7 @@ async function saveAllConfig(btn) {
   const mlSecretKey = document.getElementById('cfgMlSecretKey')?.value.trim() || '';
   const meliCookie = document.getElementById('cfgMeliCookie')?.value.trim() || '';
   const amazonTag = document.getElementById('cfgAmazonTag')?.value.trim() || '';
+  const amazonCookie = document.getElementById('cfgAmazonCookie')?.value.trim() || '';
   const magaluTag = document.getElementById('cfgMagaluTag')?.value.trim() || '';
   const aliexpressAppKey = document.getElementById('cfgAliAppKey')?.value.trim() || '';
   const aliexpressAppSecret = document.getElementById('cfgAliAppSecret')?.value.trim() || '';
@@ -1067,6 +1127,7 @@ async function saveAllConfig(btn) {
           mlSecretKey,
           meliCookie,
           amazonTag,
+          amazonCookie,
           magaluTag,
           aliexpressAppKey,
           aliexpressAppSecret,
@@ -1079,6 +1140,7 @@ async function saveAllConfig(btn) {
       showToast('Configurações salvas com sucesso!', 'success');
       updateDestinationDisplayName(destinationName);
       loadMeliTokenStatus();
+      loadAmazonTokenStatus();
       closeAllModals();
     } else {
       showToast(`Erro ao salvar: ${json.error}`, 'error');
@@ -1135,6 +1197,8 @@ function showStoreDetail(storeKey) {
 
   if (storeKey === 'meli') {
     loadMeliTokenStatus();
+  } else if (storeKey === 'amazon') {
+    loadAmazonTokenStatus();
   }
 
   if (window.lucide) lucide.createIcons();

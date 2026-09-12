@@ -514,9 +514,11 @@
           </div>
         </div>
 
-        <div class="modal-footer modal-footer-dark">
-          <div class="stores-summary-note">
-            <span>✅ 5 lojas suportadas e ativas no conversor automático</span>
+          <div class="stores-summary-note" style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px;">
+            <span>✅ 5 lojas suportadas e ativas no conversor oficial</span>
+            <a href="/extension/oferday-cookie-sync.zip" download class="btn btn-sm btn-primary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 5px; font-size: 0.8rem; padding: 5px 12px; border-radius: 6px; background: #2563eb; color: #fff;">
+              ⚡ Baixar Extensão Cookie Sync (.zip)
+            </a>
           </div>
           <button class="btn btn-secondary btn-dark-theme" data-close>Fechar</button>
         </div>
@@ -582,12 +584,28 @@
                 <span class="store-tag-badge bg-amazon">📦 Amazon Brasil</span>
                 <h4>SiteStripe API Oficial (amzn.to / link.amazon)</h4>
               </div>
-              <span class="badge badge-green">SiteStripe Ativo</span>
+              <span class="badge badge-green" id="amazonTokenBadge">SiteStripe Ativo</span>
             </div>
 
             <div class="form-group mt-4">
               <label>Tag de Associado Amazon (Tracking ID)</label>
               <input type="text" id="cfgAmazonTag" value="ibanez08-20" placeholder="Ex: seunome-20">
+            </div>
+
+            <div class="form-group mt-3">
+              <label style="display: flex; justify-content: space-between; align-items: center;">
+                <span>Cookie de Sessão do Amazon SiteStripe (amzn.to)</span>
+                <a href="https://associados.amazon.com.br/" target="_blank" rel="noopener noreferrer" style="font-size: 0.72rem; color: #3b82f6; text-decoration: underline;">Abrir Amazon Associados ↗</a>
+              </label>
+              <textarea id="cfgAmazonCookie" rows="3" style="font-family: monospace; font-size: 0.75rem; background: rgba(0,0,0,0.3); color: #e2e8f0; border: 1px solid var(--border-color); border-radius: 6px; width: 100%; padding: 0.5rem;" placeholder="Cole aqui o cookie da sua conta logada na Amazon para geração automática de links amzn.to"></textarea>
+              <small class="text-muted" style="font-size: 0.72rem; display: block; margin-top: 0.25rem;">
+                💡 <b>Como obter:</b> Acesse amazon.com.br logado na sua conta com a barra SiteStripe, pressione <code>F12</code> -> aba <b>Rede (Network)</b> -> clique em qualquer requisição e copie o valor de <b>Cookie</b> (ou use a extensão Oferday Cookie Sync).
+              </small>
+            </div>
+
+            <div class="token-banner mt-3">
+              <span id="amazonTokenExpireInfo">Verificando status do encurtamento amzn.to com a Amazon...</span>
+              <button type="button" class="btn btn-secondary btn-sm" id="btnRefreshAmazonToken">🔄 Testar / Validar amzn.to</button>
             </div>
           </div>
 

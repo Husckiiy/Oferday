@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Oferday Cookie Sync (Mercado Livre & Amazon)",
+  "version": "1.0.0",
+  "description": "Captura com 1 clique os cookies de afiliados do Mercado Livre (meli.la) e Amazon SiteStripe (amzn.to) e sincroniza diretamente com seu bot Oferday.",
+  "permissions": [
+    "cookies",
+    "storage",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "*://*.mercadolivre.com.br/*",
+    "*://*.amazon.com.br/*",
+    "*://*.railway.app/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://*/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Oferday Cookie Sync"
+  }
+}
