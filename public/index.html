@@ -1424,7 +1424,7 @@
 
   <!-- MODAL: TEMPLATES DE MENSAGEM -->
   <div class="modal-overlay" id="modal-templates">
-    <div class="modal-dialog modal-xl modal-dark-theme">
+    <div class="modal-dialog modal-xl modal-dark-theme" style="max-width: 1100px; max-height: 92vh;">
       
       <div class="modal-header modal-header-dark">
         <div class="modal-title-wrap">
@@ -1445,6 +1445,9 @@
           <div class="preset-buttons" id="templatePresetButtons">
             <button type="button" class="btn-preset active" data-preset="default">
               <span>⚡ Padrão Alta Conversão</span>
+            </button>
+            <button type="button" class="btn-preset" data-preset="single_price">
+              <span>🏷️ Preço Único (Sem "De")</span>
             </button>
             <button type="button" class="btn-preset" data-preset="urgency">
               <span>🚨 Urgência Relâmpago</span>
@@ -1477,8 +1480,9 @@
               <button type="button" class="var-chip" data-var="{TITULO}" title="Nome do produto">{TITULO}</button>
               <button type="button" class="var-chip" data-var="{LOJA}" title="Nome da loja parceira">{LOJA}</button>
               <button type="button" class="var-chip" data-var="{EMOJI_LOJA}" title="Emoji oficial da loja">{EMOJI_LOJA}</button>
-              <button type="button" class="var-chip" data-var="{PRECOS}" title="Bloco completo De/Por + % OFF">{PRECOS}</button>
-              <button type="button" class="var-chip" data-var="{PRECO_POR}" title="Preço promocional">{PRECO_POR}</button>
+              <button type="button" class="var-chip" data-var="{PRECOS}" title="Preço De/Por completo com desconto">{PRECOS} (De/Por)</button>
+              <button type="button" class="var-chip" data-var="{PRECO_UNICO}" title="Apenas o preço atual do produto (sem 'De:')">{PRECO_UNICO}</button>
+              <button type="button" class="var-chip" data-var="{PRECO_POR}" title="Preço promocional formatado">{PRECO_POR}</button>
               <button type="button" class="var-chip" data-var="{PRECO_DE}" title="Preço anterior riscado">{PRECO_DE}</button>
               <button type="button" class="var-chip" data-var="{DESCONTO}" title="Ex: 50% OFF">{DESCONTO}</button>
               <button type="button" class="var-chip" data-var="{CUPOM}" title="Linha com cupom">{CUPOM}</button>
@@ -1489,7 +1493,7 @@
 
             <!-- Code/Text Area -->
             <div class="template-textarea-wrap">
-              <textarea id="templateEditorTextarea" class="template-textarea" rows="12" spellcheck="false" placeholder="Digite seu modelo de mensagem aqui..."></textarea>
+              <textarea id="templateEditorTextarea" class="template-textarea" rows="13" spellcheck="false" placeholder="Digite seu modelo de mensagem aqui..."></textarea>
             </div>
 
             <!-- Custom Warning Field -->

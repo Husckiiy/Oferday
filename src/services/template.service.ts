@@ -46,10 +46,17 @@ export class TemplateService {
     },
     {
       id: 'discount_focus',
-      name: 'Foco em Desconto & Economia',
+      name: 'Foco em Desconto',
       description: 'Destaque especial para a economia e o menor preço da internet.',
       icon: 'badge-percent',
       template: `🎉 *SUPER DESCONTO NA {LOJA}* {EMOJI_LOJA}\n\n✨ *{TITULO}*\n\n{PRECOS}\n{CUPOM}\n💰 *Aproveite o menor preço:* {LINK}\n\n⚠️ _{AVISO}_`
+    },
+    {
+      id: 'single_price',
+      name: 'Preço Único (Sem "De")',
+      description: 'Exibe apenas o preço atual do produto, sem o preço anterior riscado.',
+      icon: 'tag',
+      template: `⚡ *OFERTA IMPERDÍVEL {LOJA}* {EMOJI_LOJA}\n\n🔥 *{TITULO}*\n\n{PRECO_UNICO}\n{CUPOM}\n🛒 *Compre aqui com segurança:* {LINK}\n\n⚠️ _{AVISO}_`
     }
   ];
 
@@ -92,7 +99,7 @@ export class TemplateService {
     const aviso = data?.customWarning || config.template?.customWarning || 'Preço sujeito a alteração a qualquer momento.';
     const category = data?.category || 'Geral';
 
-    // Formatar bloco de preços
+    // 1. Formatar bloco completo De/Por com desconto
     let precosBloco = '';
     if (originalPrice && originalPrice > promoPrice) {
       const discStr = discount ? ` (${discount}% OFF)` : '';
@@ -101,7 +108,10 @@ export class TemplateService {
       precosBloco = `✅ *Por apenas: R$ ${this.formatCurrencyBRL(promoPrice)}*`;
     }
 
-    // Formatar bloco de cupom
+    // 2. Formatar bloco de Preço Único (somente o preço atual do produto, sem "De")
+    const precoUnicoBloco = `✅ *Por apenas: R$ ${this.formatCurrencyBRL(promoPrice)}*`;
+
+    // Formatar blocos individuais
     const cupomBloco = coupon ? `🎟️ Use o cupom: *${coupon}*\n` : '';
     const precoDeStr = originalPrice ? `~R$ ${this.formatCurrencyBRL(originalPrice)}~` : '';
     const precoPorStr = `*R$ ${this.formatCurrencyBRL(promoPrice)}*`;
@@ -118,11 +128,14 @@ export class TemplateService {
       [/\{EMOJI_LOJA\}/gi, storeEmoji],
       [/\{EMOJI\}/gi, storeEmoji],
       [/\{PRECOS\}/gi, precosBloco],
+      [/\{PRECO_UNICO\}/gi, precoUnicoBloco],
+      [/\{PRECO_APENAS\}/gi, precoUnicoBloco],
       [/\{PRECO_DE\}/gi, precoDeStr],
       [/\{PRECO_ANTIGO\}/gi, precoDeStr],
       [/\{PRECO_POR\}/gi, precoPorStr],
       [/\{PRECO\}/gi, precoPorStr],
       [/\{VALOR_NUMERICO\}/gi, this.formatCurrencyBRL(promoPrice)],
+      [/\{VALOR\}/gi, `R$ ${this.formatCurrencyBRL(promoPrice)}`],
       [/\{DESCONTO\}/gi, descontoStr],
       [/\{CUPOM\}/gi, cupomBloco],
       [/\{CODIGO_CUPOM\}/gi, coupon],

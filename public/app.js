@@ -2051,6 +2051,7 @@ function renderClientTemplate(templateText, sample, warningText) {
   const s = sample || sampleStoreData['MERCADO_LIVRE'];
   const aviso = warningText || templateState.currentWarning;
 
+  // 1. Formatar bloco completo De/Por com desconto
   let precosBloco = '';
   if (s.originalPrice && s.originalPrice > s.promoPrice) {
     const discStr = s.discountPercent ? ` (${s.discountPercent}% OFF)` : '';
@@ -2058,6 +2059,9 @@ function renderClientTemplate(templateText, sample, warningText) {
   } else if (s.promoPrice > 0) {
     precosBloco = `✅ *Por apenas: R$ ${formatCurrencyBRL(s.promoPrice)}*`;
   }
+
+  // 2. Formatar bloco de Preço Único (somente o preço atual do produto, sem "De")
+  const precoUnicoBloco = `✅ *Por apenas: R$ ${formatCurrencyBRL(s.promoPrice)}*`;
 
   const cupomBloco = s.coupon ? `🎟️ Use o cupom: *${s.coupon}*\n` : '';
   const precoDeStr = s.originalPrice ? `~R$ ${formatCurrencyBRL(s.originalPrice)}~` : '';
@@ -2073,11 +2077,14 @@ function renderClientTemplate(templateText, sample, warningText) {
     [/\{EMOJI_LOJA\}/gi, s.storeEmoji],
     [/\{EMOJI\}/gi, s.storeEmoji],
     [/\{PRECOS\}/gi, precosBloco],
+    [/\{PRECO_UNICO\}/gi, precoUnicoBloco],
+    [/\{PRECO_APENAS\}/gi, precoUnicoBloco],
     [/\{PRECO_DE\}/gi, precoDeStr],
     [/\{PRECO_ANTIGO\}/gi, precoDeStr],
     [/\{PRECO_POR\}/gi, precoPorStr],
     [/\{PRECO\}/gi, precoPorStr],
     [/\{VALOR_NUMERICO\}/gi, formatCurrencyBRL(s.promoPrice)],
+    [/\{VALOR\}/gi, `R$ ${formatCurrencyBRL(s.promoPrice)}`],
     [/\{DESCONTO\}/gi, descontoStr],
     [/\{CUPOM\}/gi, cupomBloco],
     [/\{CODIGO_CUPOM\}/gi, s.coupon],
