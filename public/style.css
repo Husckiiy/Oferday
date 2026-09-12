@@ -2202,16 +2202,24 @@ select:focus {
 
 .divulgador-store-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
-  overflow-x: auto;
-  padding-bottom: 4px;
+  overflow: visible;
+  padding-bottom: 2px;
+}
+
+.divulgador-store-tabs::-webkit-scrollbar,
+.divulgador-category-pills::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .store-tab-btn {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.55rem 0.95rem;
+  padding: 0.5rem 0.9rem;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-color);
   background: var(--bg-card);
@@ -2266,14 +2274,16 @@ select:focus {
 
 .divulgador-category-pills {
   display: flex;
-  gap: 0.4rem;
-  overflow-x: auto;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  overflow: visible;
+  padding: 2px 0;
 }
 
 .cat-pill {
-  padding: 0.35rem 0.75rem;
+  padding: 0.35rem 0.8rem;
   border-radius: var(--radius-pill);
-  border: 1px solid transparent;
+  border: 1px solid var(--border-color);
   background: var(--bg-card-hover);
   color: var(--text-muted);
   font-size: 0.78rem;
@@ -2285,12 +2295,13 @@ select:focus {
 
 .cat-pill:hover {
   color: var(--text-main);
+  background: #e2e8f0;
 }
 
 .cat-pill.active {
   background: var(--accent-orange-light);
   color: var(--accent-orange-text);
-  border-color: rgba(249, 115, 22, 0.3);
+  border-color: rgba(249, 115, 22, 0.4);
   font-weight: 600;
 }
 
@@ -2727,6 +2738,32 @@ body.theme-dark .btn-action-harvest:hover {
   background: #334155;
   color: #ffffff;
   border-color: #475569;
+}
+
+.modal-dark-theme .cat-pill,
+body.theme-dark .cat-pill {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+.modal-dark-theme .cat-pill:hover,
+body.theme-dark .cat-pill:hover {
+  background: #334155;
+  color: #ffffff;
+}
+
+.modal-dark-theme .store-tab-btn,
+body.theme-dark .store-tab-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+.modal-dark-theme .store-tab-btn:hover,
+body.theme-dark .store-tab-btn:hover {
+  background: #334155;
+  color: #ffffff;
 }
 
 .modal-dark-theme .token-banner {
