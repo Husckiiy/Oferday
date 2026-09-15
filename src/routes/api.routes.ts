@@ -290,20 +290,38 @@ apiRouter.get('/amazon/status', async (req: Request, res: Response) => {
   try {
     const config = configService.getConfig();
     const tag = config.affiliate?.amazonTag || 'ibanez08-20';
-    const testUrl = `https://www.amazon.com.br/dp/B07Y3WXDTN?tag=${tag}&linkCode=sl2`;
+    const hasTag = !!tag && tag.trim().length > 0;
+    const testUrl = `https://www.amazon.com.br/dp/B07Y3WXDTN?tag=${encodeURIComponent(tag)}&linkCode=sl2`;
+    
     const shortUrl = await affiliateService.generateOfficialAmazonShortLink(testUrl, tag);
     if (shortUrl && (shortUrl.includes('amzn.to') || shortUrl.includes('amazon'))) {
       return res.json({
         success: true,
         active: true,
+        hasShortener: true,
+        isTagActive: true,
+        tag,
         shortUrl,
-        message: 'Amazon SiteStripe conectado e gerando links amzn.to com sucesso!'
+        message: 'Amazon SiteStripe conectado! Links amzn.to gerados com sucesso.'
       });
     }
+
+    if (hasTag) {
+      return res.json({
+        success: true,
+        active: true,
+        hasShortener: false,
+        isTagActive: true,
+        tag,
+        message: `Tag de Associado (${tag}) ativa! Links comissionados oficiais da Amazon sendo gerados normalmente. (Para encurtar em amzn.to, atualize o Cookie do SiteStripe).`
+      });
+    }
+
     return res.json({
       success: false,
       active: false,
-      message: 'Sessão do Amazon SiteStripe expirada ou cookie ausente. Atualize o Cookie da Amazon.'
+      hasShortener: false,
+      message: 'Tag de Associado da Amazon não configurada.'
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, active: false, error: err.message });

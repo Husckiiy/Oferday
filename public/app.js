@@ -1038,14 +1038,14 @@ async function loadAmazonTokenStatus() {
     const res = await fetch('/api/amazon/status');
     const json = await res.json();
     if (json.active) {
-      setStoreCleanStatus(badge, icon, gridBadge, true, 'SiteStripe Ativo', 'Sessão Expirada');
-      if (info) info.textContent = 'Amazon SiteStripe oficial conectado! Links amzn.to gerados com sucesso.';
+      const label = json.hasShortener ? 'amzn.to Ativo' : 'Tag Ativa';
+      setStoreCleanStatus(badge, icon, gridBadge, true, label, 'Não Configurado');
+      if (info) info.textContent = json.message || 'Amazon oficial conectada com sucesso!';
       if (alertBanner) alertBanner.classList.add('hidden');
       if (sidebarAlert) sidebarAlert.classList.add('hidden');
     } else {
-      setStoreCleanStatus(badge, icon, gridBadge, false, 'SiteStripe Ativo', 'Sessão Expirada');
-      if (info) info.textContent = json.message || 'Sessão do Amazon SiteStripe expirada. Atualize o Cookie de sessão abaixo e clique em Salvar.';
-      // Show alerts on Dashboard & Sidebar so user is immediately notified
+      setStoreCleanStatus(badge, icon, gridBadge, false, 'Tag Ativa', 'Não Configurado');
+      if (info) info.textContent = json.message || 'Tag ou cookie da Amazon não configurados.';
       if (alertBanner) alertBanner.classList.remove('hidden');
       if (sidebarAlert) sidebarAlert.classList.remove('hidden');
     }

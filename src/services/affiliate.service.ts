@@ -784,40 +784,44 @@ export class AffiliateService {
       return null;
     }
 
+    // Clean old captcha tokens from cookie
+    const cleanCookie = cookie.replace(/x-amz-captcha-[12]=[^;]+;?\s*/gi, '').trim();
+
     try {
-      const apiUrl = `https://www.amazon.com.br/associates/sitestripe/getShortUrl?longUrl=${encodeURIComponent(longUrl)}&marketplaceId=526970&storeId=${tag}`;
+      const marketplaceIds = ['A2Q3Y263D00KWC', '526970'];
 
-      const res = await fetch(apiUrl, {
-        headers: {
-          'User-Agent': this.userAgent,
-          'Accept': 'application/json, text/javascript, */*; q=0.01',
-          'Referer': longUrl,
-          'X-Requested-With': 'XMLHttpRequest',
-          'Cookie': cookie
-        },
-        signal: AbortSignal.timeout(8000)
-      });
+      for (const mId of marketplaceIds) {
+        const apiUrl = `https://www.amazon.com.br/associates/sitestripe/getShortUrl?longUrl=${encodeURIComponent(longUrl)}&marketplaceId=${mId}&storeId=${encodeURIComponent(tag)}`;
 
-      if (res.ok) {
-        const getSetCookie = (res.headers as any).getSetCookie;
-        if (typeof getSetCookie === 'function') {
-          const newCookies = getSetCookie.call(res.headers);
-          if (Array.isArray(newCookies) && newCookies.length > 0) {
-            const merged = this.mergeCookies(cookie, newCookies);
-            if (merged !== cookie) {
-              configService.saveConfig({
-                affiliate: {
-                  ...config.affiliate,
-                  amazonCookie: merged
-                }
-              });
+        const res = await fetch(apiUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/javascript, */*; q=0.01',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Referer': longUrl,
+            'X-Requested-With': 'XMLHttpRequest',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
+            'Cookie': cleanCookie
+          },
+          signal: AbortSignal.timeout(8000)
+        });
+
+        if (res.ok) {
+          const contentType = res.headers.get('content-type') || '';
+          if (contentType.includes('json') || contentType.includes('javascript') || contentType.includes('text')) {
+            const rawText = await res.text();
+            try {
+              const data = JSON.parse(rawText);
+              const shortUrl = data.shortUrl || data.url;
+              if (shortUrl && (shortUrl.includes('amazon') || shortUrl.includes('amzn.to'))) {
+                return shortUrl;
+              }
+            } catch {
+              // response might not be JSON (e.g. WAF html challenge)
             }
           }
-        }
-        const data: any = await res.json();
-        const shortUrl = data.shortUrl || data.url;
-        if (shortUrl && (shortUrl.includes('amazon') || shortUrl.includes('amzn.to'))) {
-          return shortUrl;
         }
       }
     } catch (err: any) {
