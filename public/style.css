@@ -1808,7 +1808,7 @@ select:focus {
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
 }
 
-.modal-dark-theme textarea {
+.store-detail-form textarea {
   min-height: 70px;
   max-height: 110px;
   word-break: break-all;
@@ -3275,8 +3275,9 @@ body.theme-dark .store-tab-btn:hover {
 
 .template-textarea {
   width: 100%;
-  min-height: 400px;
+  min-height: 360px;
   height: 420px;
+  max-height: none !important;
   background: rgba(10, 14, 23, 0.9);
   border: 1px solid var(--dark-border);
   border-radius: var(--radius-md);
@@ -3285,7 +3286,7 @@ body.theme-dark .store-tab-btn:hover {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.86rem;
   line-height: 1.6;
-  resize: vertical;
+  resize: vertical !important;
   outline: none;
   transition: border-color 0.2s;
   box-sizing: border-box;
@@ -3626,9 +3627,16 @@ body.theme-dark .store-tab-btn:hover {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.82rem;
   line-height: 1.55;
-  resize: vertical;
+  resize: vertical !important;
   min-height: 130px;
+  max-height: none !important;
   box-sizing: border-box;
+}
+
+#simText {
+  resize: vertical !important;
+  min-height: 130px;
+  max-height: none !important;
 }
 
 .queue-item-textarea:focus {
