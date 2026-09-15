@@ -43,6 +43,7 @@
         <a href="#" class="nav-item" data-modal="modal-stores">
           <i data-lucide="store" class="nav-icon"></i>
           <span class="nav-label">Configurar Lojas</span>
+          <span class="status-pill-badge badge-yellow hidden" id="sidebarStoreAlert" style="font-size: 0.65rem; margin-left: auto; padding: 0.15rem 0.45rem;">⚠️ Alerta</span>
         </a>
 
         <!-- Connections Dropdown -->
@@ -175,6 +176,23 @@
         </div>
         <button class="mobile-menu-btn" id="btnToggleMobileMenu">
           <i data-lucide="menu"></i>
+        </button>
+      </div>
+
+      <!-- Top Alert Banner for Expired Amazon / Store Session -->
+      <div class="global-alert-banner alert-warning-banner hidden" id="amazonExpiredBanner">
+        <div class="alert-banner-content">
+          <div class="alert-banner-icon-box">
+            <i data-lucide="alert-triangle"></i>
+          </div>
+          <div class="alert-banner-text">
+            <h4>⚠️ Atenção: Sessão da Amazon SiteStripe Expirada!</h4>
+            <p>O cookie de acesso da sua conta Amazon expirou. Clique ao lado para atualizar seu Cookie e garantir a conversão automática dos links amzn.to.</p>
+          </div>
+        </div>
+        <button type="button" class="btn btn-warning-action" id="btnBannerFixAmazon" data-modal="modal-stores">
+          <span>Renovar Cookie Agora</span>
+          <i data-lucide="arrow-right"></i>
         </button>
       </div>
 
@@ -431,6 +449,7 @@
             <!-- 1. MERCADO LIVRE -->
             <div class="store-shop-card" data-store-card="meli">
               <div class="store-shop-banner banner-meli">
+                <span class="store-card-badge status-active" id="gridStatusMeli"><i data-lucide="check-circle-2"></i> Ativo</span>
                 <svg viewBox="0 0 170 54" class="store-banner-logo" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <!-- Shaking Hands Oval Badge -->
                   <ellipse cx="28" cy="27" rx="22" ry="18" fill="#FFE600"/>
@@ -450,6 +469,7 @@
             <!-- 2. AMAZON -->
             <div class="store-shop-card" data-store-card="amazon">
               <div class="store-shop-banner banner-amazon">
+                <span class="store-card-badge status-active" id="gridStatusAmazon"><i data-lucide="check-circle-2"></i> Ativo</span>
                 <svg viewBox="0 0 180 58" class="store-banner-logo" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <text x="14" y="34" font-family="'Plus Jakarta Sans', -apple-system, sans-serif" font-weight="800" font-size="32" fill="#FFFFFF" letter-spacing="-1">amazon</text>
                   <!-- Amazon Smile Arrow -->
@@ -466,6 +486,7 @@
             <!-- 3. SHOPEE -->
             <div class="store-shop-card" data-store-card="shopee">
               <div class="store-shop-banner banner-shopee">
+                <span class="store-card-badge status-active" id="gridStatusShopee"><i data-lucide="check-circle-2"></i> Ativo</span>
                 <div class="shopee-logo-flex">
                   <svg viewBox="0 0 44 50" class="shopee-bag-icon" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M15 13V9C15 5.5 18 3 22 3C26 3 29 5.5 29 9V13" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round"/>
@@ -484,6 +505,7 @@
             <!-- 4. MAGALU -->
             <div class="store-shop-card" data-store-card="magalu">
               <div class="store-shop-banner banner-magalu">
+                <span class="store-card-badge status-active" id="gridStatusMagalu"><i data-lucide="check-circle-2"></i> Ativo</span>
                 <div class="magalu-wrap">
                   <span class="magalu-text-logo">magalu</span>
                   <div class="magalu-gradient-bar"></div>
@@ -498,6 +520,7 @@
             <!-- 5. ALIEXPRESS -->
             <div class="store-shop-card" data-store-card="aliexpress">
               <div class="store-shop-banner banner-ali">
+                <span class="store-card-badge status-active" id="gridStatusAli"><i data-lucide="check-circle-2"></i> Ativo</span>
                 <div class="ali-wrap">
                   <svg viewBox="0 0 54 34" class="ali-bag-icon" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M12 7C12 21 42 21 42 7" stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round"/>
@@ -514,6 +537,7 @@
             <!-- 6. AWIN -->
             <div class="store-shop-card" data-store-card="awin">
               <div class="store-shop-banner banner-awin">
+                <span class="store-card-badge status-active" id="gridStatusAwin"><i data-lucide="check-circle-2"></i> Ativo</span>
                 <div class="awin-wrap">
                   <svg viewBox="0 0 160 50" class="awin-logo-svg" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <polygon points="12,38 24,12 36,38" fill="#00D2C6"/>
@@ -563,7 +587,12 @@
                 <span class="store-tag-badge bg-meli">🟡 Mercado Livre (meli.la)</span>
                 <h4>API Oficial Linkbuilder & OAuth 2.0</h4>
               </div>
-              <span class="badge badge-green" id="meliTokenBadge">Ativo (meli.la)</span>
+              <div class="store-status-clean-box">
+                <span class="store-status-clean-text text-green" id="meliTokenBadge">meli.la Ativo</span>
+                <div class="store-status-clean-icon" id="meliStatusIcon">
+                  <i data-lucide="check-circle-2" class="icon-green"></i>
+                </div>
+              </div>
             </div>
             
             <div class="form-row-2 mt-4">
@@ -599,7 +628,12 @@
                 <span class="store-tag-badge bg-amazon">📦 Amazon Brasil</span>
                 <h4>SiteStripe API Oficial (amzn.to / link.amazon)</h4>
               </div>
-              <span class="badge badge-green" id="amazonTokenBadge">SiteStripe Ativo</span>
+              <div class="store-status-clean-box">
+                <span class="store-status-clean-text text-green" id="amazonTokenBadge">SiteStripe Ativo</span>
+                <div class="store-status-clean-icon" id="amazonStatusIcon">
+                  <i data-lucide="check-circle-2" class="icon-green"></i>
+                </div>
+              </div>
             </div>
 
             <div class="form-group mt-4">
@@ -631,7 +665,12 @@
                 <span class="store-tag-badge bg-shopee">🟠 Shopee Brasil</span>
                 <h4>GraphQL API Oficial (s.shopee.com.br)</h4>
               </div>
-              <span class="badge badge-green">API Ativa</span>
+              <div class="store-status-clean-box">
+                <span class="store-status-clean-text text-green" id="shopeeTokenBadge">API Ativa</span>
+                <div class="store-status-clean-icon" id="shopeeStatusIcon">
+                  <i data-lucide="check-circle-2" class="icon-green"></i>
+                </div>
+              </div>
             </div>
 
             <div class="form-row-2 mt-4">
@@ -653,7 +692,12 @@
                 <span class="store-tag-badge bg-magalu">🔵 Magazine Luiza</span>
                 <h4>Parceiro Magalu / Magazine Você</h4>
               </div>
-              <span class="badge badge-green">Loja Ativa</span>
+              <div class="store-status-clean-box">
+                <span class="store-status-clean-text text-green" id="magaluTokenBadge">Loja Ativa</span>
+                <div class="store-status-clean-icon" id="magaluStatusIcon">
+                  <i data-lucide="check-circle-2" class="icon-green"></i>
+                </div>
+              </div>
             </div>
 
             <div class="form-group mt-4">
@@ -669,7 +713,12 @@
                 <span class="store-tag-badge bg-ali">🔴 AliExpress</span>
                 <h4>Open Platform API (s.click.aliexpress.com)</h4>
               </div>
-              <span class="badge badge-green">API Ativa</span>
+              <div class="store-status-clean-box">
+                <span class="store-status-clean-text text-green" id="aliTokenBadge">API Ativa</span>
+                <div class="store-status-clean-icon" id="aliStatusIcon">
+                  <i data-lucide="check-circle-2" class="icon-green"></i>
+                </div>
+              </div>
             </div>
 
             <div class="form-row-3 mt-4">
@@ -695,7 +744,12 @@
                 <span class="store-tag-badge bg-awin">🟣 Awin Network (awin1.com)</span>
                 <h4>OAuth2 API & Linkbuilder Oficial</h4>
               </div>
-              <span class="badge badge-green" id="awinTokenBadge">Awin Ativa</span>
+              <div class="store-status-clean-box">
+                <span class="store-status-clean-text text-green" id="awinTokenBadge">Awin Ativa</span>
+                <div class="store-status-clean-icon" id="awinStatusIcon">
+                  <i data-lucide="check-circle-2" class="icon-green"></i>
+                </div>
+              </div>
             </div>
 
             <div class="form-row-2 mt-4">

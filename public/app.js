@@ -667,6 +667,9 @@ function updateConfigUI(config) {
   if (forwarderStatusLabel) {
     forwarderStatusLabel.textContent = config.forwarder?.active ? 'Repasse: Ativo' : 'Repasse: Pausado';
   }
+
+  // Update status badges for all stores
+  updateOtherStoreStatuses(config);
 }
 
 // --- Telegram Status UI ---
@@ -953,29 +956,41 @@ btnWaDisconnect?.addEventListener('click', async () => {
   }
 });
 
+// --- Store Status Helpers (Clean Text + Icon Underneath) ---
+function setStoreCleanStatus(badgeEl, iconEl, gridBadgeEl, status, activeLabel, inactiveLabel) {
+  if (badgeEl) {
+    badgeEl.textContent = status ? activeLabel : inactiveLabel;
+    badgeEl.className = `store-status-clean-text ${status ? 'text-green' : 'text-yellow'}`;
+  }
+  if (iconEl) {
+    iconEl.innerHTML = status 
+      ? '<i data-lucide="check-circle-2" class="icon-green"></i>'
+      : '<i data-lucide="alert-triangle" class="icon-yellow"></i>';
+  }
+  if (gridBadgeEl) {
+    gridBadgeEl.className = `store-card-badge ${status ? 'status-active' : 'status-warning'}`;
+    gridBadgeEl.innerHTML = status
+      ? '<i data-lucide="check-circle-2"></i> Ativo'
+      : '<i data-lucide="alert-triangle"></i> Expirado';
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
 // --- Mercado Livre Linkbuilder / meli.la Status & Validation ---
 async function loadMeliTokenStatus() {
   const badge = document.getElementById('meliTokenBadge');
+  const icon = document.getElementById('meliStatusIcon');
+  const gridBadge = document.getElementById('gridStatusMeli');
   const info = document.getElementById('meliTokenExpireInfo');
   try {
     const res = await fetch('/api/meli/status');
     const json = await res.json();
     if (json.active) {
-      if (badge) {
-        badge.textContent = 'meli.la Ativo ✅';
-        badge.className = 'badge badge-green';
-      }
-      if (info) {
-        info.textContent = 'API Linkbuilder oficial conectada! Links meli.la gerados com sucesso.';
-      }
+      setStoreCleanStatus(badge, icon, gridBadge, true, 'meli.la Ativo', 'Sessão Expirada');
+      if (info) info.textContent = 'API Linkbuilder oficial conectada! Links meli.la gerados com sucesso.';
     } else {
-      if (badge) {
-        badge.textContent = 'Sessão Expirada ⚠️';
-        badge.className = 'badge badge-yellow';
-      }
-      if (info) {
-        info.textContent = json.message || 'Sessão do Linkbuilder expirada. Atualize o Cookie de sessão abaixo e clique em Salvar.';
-      }
+      setStoreCleanStatus(badge, icon, gridBadge, false, 'meli.la Ativo', 'Sessão Expirada');
+      if (info) info.textContent = json.message || 'Sessão do Linkbuilder expirada. Atualize o Cookie de sessão abaixo e clique em Salvar.';
     }
   } catch {
     // ignore
@@ -1013,26 +1028,26 @@ btnRefreshMeliToken?.addEventListener('click', async () => {
 // --- Amazon SiteStripe / amzn.to Status & Validation ---
 async function loadAmazonTokenStatus() {
   const badge = document.getElementById('amazonTokenBadge');
+  const icon = document.getElementById('amazonStatusIcon');
+  const gridBadge = document.getElementById('gridStatusAmazon');
   const info = document.getElementById('amazonTokenExpireInfo');
+  const alertBanner = document.getElementById('amazonExpiredBanner');
+  const sidebarAlert = document.getElementById('sidebarStoreAlert');
+
   try {
     const res = await fetch('/api/amazon/status');
     const json = await res.json();
     if (json.active) {
-      if (badge) {
-        badge.textContent = 'amzn.to Ativo ✅';
-        badge.className = 'badge badge-green';
-      }
-      if (info) {
-        info.textContent = 'Amazon SiteStripe oficial conectado! Links amzn.to gerados com sucesso.';
-      }
+      setStoreCleanStatus(badge, icon, gridBadge, true, 'SiteStripe Ativo', 'Sessão Expirada');
+      if (info) info.textContent = 'Amazon SiteStripe oficial conectado! Links amzn.to gerados com sucesso.';
+      if (alertBanner) alertBanner.classList.add('hidden');
+      if (sidebarAlert) sidebarAlert.classList.add('hidden');
     } else {
-      if (badge) {
-        badge.textContent = 'Sessão Expirada ⚠️';
-        badge.className = 'badge badge-yellow';
-      }
-      if (info) {
-        info.textContent = json.message || 'Sessão do Amazon SiteStripe expirada. Atualize o Cookie de sessão abaixo e clique em Salvar.';
-      }
+      setStoreCleanStatus(badge, icon, gridBadge, false, 'SiteStripe Ativo', 'Sessão Expirada');
+      if (info) info.textContent = json.message || 'Sessão do Amazon SiteStripe expirada. Atualize o Cookie de sessão abaixo e clique em Salvar.';
+      // Show alerts on Dashboard & Sidebar so user is immediately notified
+      if (alertBanner) alertBanner.classList.remove('hidden');
+      if (sidebarAlert) sidebarAlert.classList.remove('hidden');
     }
   } catch {
     // ignore
@@ -1067,34 +1082,65 @@ btnRefreshAmazonToken?.addEventListener('click', async () => {
   }
 });
 
+// Click action on Amazon Expired Banner button
+const btnBannerFixAmazon = document.getElementById('btnBannerFixAmazon');
+btnBannerFixAmazon?.addEventListener('click', () => {
+  showStoreDetail('amazon');
+});
+
 // --- Awin Network Status & Validation ---
 const btnRefreshAwinToken = document.getElementById('btnRefreshAwinToken');
 async function loadAwinTokenStatus() {
   const badge = document.getElementById('awinTokenBadge');
+  const icon = document.getElementById('awinStatusIcon');
+  const gridBadge = document.getElementById('gridStatusAwin');
   const info = document.getElementById('awinTokenExpireInfo');
   try {
     const res = await fetch('/api/awin/status');
     const json = await res.json();
     if (json.active) {
-      if (badge) {
-        badge.textContent = 'Awin Ativa ✅';
-        badge.className = 'badge badge-green';
-      }
-      if (info) {
-        info.textContent = json.message || 'Rede de afiliados Awin configurada e pronta para converter links!';
-      }
+      setStoreCleanStatus(badge, icon, gridBadge, true, 'Awin Ativa', 'Não Configurado');
+      if (info) info.textContent = json.message || 'Rede de afiliados Awin configurada e pronta para converter links!';
     } else {
-      if (badge) {
-        badge.textContent = 'Não configurado ⚠️';
-        badge.className = 'badge badge-yellow';
-      }
-      if (info) {
-        info.textContent = json.message || 'Informe seu Publisher ID (Usuário) e OAuth2 Token (Senha) da Awin e clique em Salvar.';
-      }
+      setStoreCleanStatus(badge, icon, gridBadge, false, 'Awin Ativa', 'Não Configurado');
+      if (info) info.textContent = json.message || 'Informe seu Publisher ID (Usuário) e OAuth2 Token (Senha) da Awin e clique em Salvar.';
     }
   } catch {
     // ignore
   }
+}
+
+// Update other static store statuses (Shopee, Magalu, Ali)
+function updateOtherStoreStatuses(config) {
+  const hasShopee = !!(config?.affiliate?.shopeeAppId && config?.affiliate?.shopeeAppSecret);
+  setStoreCleanStatus(
+    document.getElementById('shopeeTokenBadge'),
+    document.getElementById('shopeeStatusIcon'),
+    document.getElementById('gridStatusShopee'),
+    hasShopee,
+    'API Ativa',
+    'Não Configurado'
+  );
+
+  const hasMagalu = !!(config?.affiliate?.magaluTag);
+  setStoreCleanStatus(
+    document.getElementById('magaluTokenBadge'),
+    document.getElementById('magaluStatusIcon'),
+    document.getElementById('gridStatusMagalu'),
+    hasMagalu,
+    'Loja Ativa',
+    'Não Configurado'
+  );
+
+  const hasAli = !!(config?.affiliate?.aliexpressAppKey && config?.affiliate?.aliexpressAppSecret);
+  setStoreCleanStatus(
+    document.getElementById('aliTokenBadge'),
+    document.getElementById('aliStatusIcon'),
+    document.getElementById('gridStatusAli'),
+    hasAli,
+    'API Ativa',
+    'Não Configurado'
+  );
 }
 
 btnRefreshAwinToken?.addEventListener('click', async () => {
@@ -1697,11 +1743,20 @@ window.addEventListener('DOMContentLoaded', () => {
   loadFiltersConfig();
   loadBannerPreviews();
   loadMeliTokenStatus();
+  loadAmazonTokenStatus();
+  loadAwinTokenStatus();
   setupSSE();
   initDivulgadorEvents();
   initTemplateEvents();
   initManualQueueEvents();
   initShopeeFinderEvents();
+
+  // Periodic check for store tokens / Amazon session
+  setInterval(() => {
+    loadAmazonTokenStatus();
+    loadMeliTokenStatus();
+    loadAwinTokenStatus();
+  }, 60000);
 });
 
 // ==========================================================================
