@@ -118,9 +118,23 @@ export class AffiliateService {
     },
     {
       store: 'AWIN' as SupportedStore,
-      pattern: /https?:\/\/(?:www\.)?(?:awin1\.com|zanox\.com|click\.awin1\.com|ad\.zanox\.com)\/[^\s<>"')]+/gi
+      pattern: /https?:\/\/(?:www\.)?(?:awin1\.com|zanox\.com|click\.awin1\.com|ad\.zanox\.com|kabum\.com\.br|casasbahia\.com\.br|pontofrio\.com\.br|ponto\.com\.br|extra\.com\.br|fastshop\.com\.br|carrefour\.com\.br|dafiti\.com\.br|netshoes\.com\.br|zattini\.com\.br|centauro\.com\.br|aoferta\.net|tidd\.ly|oferta\.vc)\/[^\s<>"')]+/gi
     }
   ];
+
+  public readonly AWIN_MERCHANT_MAP: Record<string, string> = {
+    'kabum.com.br': '17729',
+    'casasbahia.com.br': '17621',
+    'pontofrio.com.br': '17622',
+    'ponto.com.br': '17622',
+    'extra.com.br': '17623',
+    'fastshop.com.br': '22115',
+    'carrefour.com.br': '17671',
+    'dafiti.com.br': '17725',
+    'netshoes.com.br': '17730',
+    'zattini.com.br': '17731',
+    'centauro.com.br': '22155'
+  };
 
   /**
    * Identifies which store a given URL belongs to.
@@ -154,13 +168,6 @@ export class AffiliateService {
       return 'AMAZON';
     }
     if (
-      lower.includes('awin1.com') ||
-      lower.includes('zanox.com') ||
-      lower.includes('awin.com')
-    ) {
-      return 'AWIN';
-    }
-    if (
       lower.includes('magazineluiza.com.br') ||
       lower.includes('magazineluiza.com') ||
       lower.includes('magazinevoce.com.br') ||
@@ -179,6 +186,33 @@ export class AffiliateService {
       lower.includes('a.aliexpress.com')
     ) {
       return 'ALIEXPRESS';
+    }
+    if (
+      lower.includes('awin1.com') ||
+      lower.includes('zanox.com') ||
+      lower.includes('awin.com') ||
+      lower.includes('kabum.com.br') ||
+      lower.includes('casasbahia.com.br') ||
+      lower.includes('pontofrio.com.br') ||
+      lower.includes('ponto.com.br') ||
+      lower.includes('extra.com.br') ||
+      lower.includes('fastshop.com.br') ||
+      lower.includes('carrefour.com.br') ||
+      lower.includes('dafiti.com.br') ||
+      lower.includes('netshoes.com.br') ||
+      lower.includes('zattini.com.br') ||
+      lower.includes('centauro.com.br') ||
+      lower.includes('utm_source=awin') ||
+      lower.includes('utm_source=awin1') ||
+      lower.includes('awc=') ||
+      lower.includes('aw_affid') ||
+      lower.includes('sv_campaign_id') ||
+      lower.includes('awinmid') ||
+      lower.includes('aoferta.net') ||
+      lower.includes('tidd.ly') ||
+      lower.includes('oferta.vc')
+    ) {
+      return 'AWIN';
     }
     return 'UNKNOWN';
   }
@@ -1002,48 +1036,82 @@ export class AffiliateService {
   }
 
   /**
-   * Official Awin Affiliate Link Converter (awin1.com / zanox).
+   * Official Awin Affiliate Link Converter (KaBuM, Casas Bahia, cread.php, awin1.com, etc.).
    */
   public async gerarAfiliadoAwin(finalUrl: string): Promise<string> {
     const config = configService.getConfig();
     const publisherId = config.affiliate?.awinPublisherId || process.env.AWIN_PUBLISHER_ID || '';
 
-    if (!publisherId) {
+    if (!publisherId || publisherId.trim().length === 0) {
+      logger.warn('AFFILIATE', `⚠️ Awin: Link de loja parceira da Awin detectado, mas seu Publisher ID não está preenchido em "Configurar Lojas -> Awin".`);
       return finalUrl;
     }
 
     try {
+      const cleanPubId = publisherId.trim();
       const parsed = new URL(finalUrl);
 
-      // If it's already an awin1.com or zanox link, replace awinaffid / affid with user's publisherId
-      if (parsed.hostname.includes('awin1.com') || parsed.hostname.includes('zanox.com')) {
-        if (parsed.searchParams.has('awinaffid')) {
-          parsed.searchParams.set('awinaffid', publisherId);
-          logger.success('AFFILIATE', `Awin: Link awin1.com atualizado com seu Publisher ID (${publisherId}): ${parsed.toString()}`);
-          return parsed.toString();
+      // 1. Detect merchant ID (awinmid / mid / awc / merchant map)
+      let mid = parsed.searchParams.get('awinmid') || parsed.searchParams.get('mid');
+
+      // If URL has awc=17729_..., the first part is the awinmid
+      if (!mid && parsed.searchParams.has('awc')) {
+        const awc = parsed.searchParams.get('awc') || '';
+        const parts = awc.split('_');
+        if (parts[0] && /^\d+$/.test(parts[0])) {
+          mid = parts[0];
         }
-        if (parsed.searchParams.has('affid')) {
-          parsed.searchParams.set('affid', publisherId);
-          logger.success('AFFILIATE', `Awin: Link zanox.com atualizado com seu Publisher ID (${publisherId}): ${parsed.toString()}`);
-          return parsed.toString();
-        }
-        parsed.searchParams.set('awinaffid', publisherId);
-        logger.success('AFFILIATE', `Awin: Tag awinaffid inserida no link: ${parsed.toString()}`);
-        return parsed.toString();
       }
 
-      // If it has merchant tracking parameter (awinmid or mid)
-      const mid = parsed.searchParams.get('awinmid') || parsed.searchParams.get('mid');
+      // Check domain map for known merchants (e.g. kabum.com.br -> 17729)
+      if (!mid) {
+        const hostname = parsed.hostname.toLowerCase();
+        for (const [domain, dMid] of Object.entries(this.AWIN_MERCHANT_MAP)) {
+          if (hostname.includes(domain)) {
+            mid = dMid;
+            break;
+          }
+        }
+      }
+
+      // 2. Extract and clean the target product URL (ued)
+      let targetUrl = finalUrl;
+      if ((parsed.hostname.includes('awin1.com') || parsed.hostname.includes('zanox.com')) && parsed.searchParams.has('ued')) {
+        try {
+          targetUrl = decodeURIComponent(parsed.searchParams.get('ued') || '');
+        } catch {
+          targetUrl = parsed.searchParams.get('ued') || '';
+        }
+      }
+
+      // Clean competitor affiliate & tracking query parameters from targetUrl
+      let cleanProductUrl = targetUrl;
+      try {
+        const targetParsed = new URL(targetUrl);
+        const competitorParams = [
+          'aw_affid', 'sv1', 'sv_campaign_id', 'awc', 'awinmid', 'awinaffid',
+          'utm_source', 'utm_medium', 'utm_content', 'utm_term', 'utm_campaign',
+          'clickref', 'tag', 'aff_id', 'zanpid', 'origin', 'gclid', 'fbclid'
+        ];
+        competitorParams.forEach(p => targetParsed.searchParams.delete(p));
+        cleanProductUrl = targetParsed.toString();
+      } catch {}
+
+      // 3. Build official Awin tracking URL via cread.php
       if (mid) {
-        parsed.searchParams.delete('awinmid');
-        parsed.searchParams.delete('mid');
-        parsed.searchParams.delete('awinaffid');
-        const awinLink = `https://www.awin1.com/cread.php?awinmid=${mid}&awinaffid=${publisherId}&ued=${encodeURIComponent(parsed.toString())}`;
-        logger.success('AFFILIATE', `Awin: Link oficial gerado via cread.php: ${awinLink}`);
+        const awinLink = `https://www.awin1.com/cread.php?awinmid=${mid}&awinaffid=${cleanPubId}&ued=${encodeURIComponent(cleanProductUrl)}`;
+        logger.success('AFFILIATE', `Awin: Link oficial gerado via cread.php (MID ${mid}, Publisher ${cleanPubId}): ${awinLink}`);
         return awinLink;
       }
 
-      return finalUrl;
+      // 4. Fallback for generic awin1.com / zanox links
+      if (parsed.hostname.includes('awin1.com') || parsed.hostname.includes('zanox.com')) {
+        parsed.searchParams.set('awinaffid', cleanPubId);
+        parsed.searchParams.delete('clickref');
+        return parsed.toString();
+      }
+
+      return cleanProductUrl;
     } catch {
       return finalUrl;
     }
@@ -1309,6 +1377,14 @@ export class AffiliateService {
       const aliMatch = url.match(/\/(?:item|i)\/(\d+)\.html/i) || url.match(/itemId=(\d+)/i);
       if (aliMatch) {
         return `ali_${aliMatch[1]}`;
+      }
+    }
+
+    // KaBuM! / Awin (/produto/697000/)
+    if (lower.includes('kabum.com.br')) {
+      const kabumMatch = url.match(/\/produto\/(\d+)/i);
+      if (kabumMatch) {
+        return `kabum_${kabumMatch[1]}`;
       }
     }
 
