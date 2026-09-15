@@ -33,7 +33,7 @@
     "enabled": true
   },
   "whatsapp": {
-    "destinationJid": "120363409015820792@newsletter",
+    "destinationJid": "123@newsletter",
     "destinationName": "Teste <3",
     "enabled": true
   },
@@ -72,6 +72,14 @@
     "magaluTag": "magazineibanez01",
     "aliexpressAppKey": "544386",
     "aliexpressAppSecret": "g7NPfxfXQIYYvCHFfTd7VTgRDKgBbYDz",
-    "aliexpressTrackingId": "ibanez"
+    "aliexpressTrackingId": "ibanez",
+    "awinPublisherId": "",
+    "awinApiToken": "",
+    "awinApiKey": ""
+  },
+  "template": {
+    "mode": "default",
+    "customTemplate": "⚡ *OFERTA IMPERDÍVEL {LOJA}* {EMOJI_LOJA}\n\n🔥 *{TITULO}*\n\n{PRECOS}\n{CUPOM}\n🛒 *Compre aqui com segurança:* {LINK}\n\n⚠️ _{AVISO}_",
+    "customWarning": "Preço sujeito a alteração a qualquer momento."
   }
 }

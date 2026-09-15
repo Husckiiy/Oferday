@@ -2183,7 +2183,13 @@ function formatWhatsAppMarkdown(text) {
 function renderClientTemplate(templateText, sample, warningText) {
   if (!templateText) return '';
   const s = sample || sampleStoreData['MERCADO_LIVRE'];
-  const aviso = warningText || templateState.currentWarning;
+  const aviso = warningText !== undefined ? warningText : (templateState.currentWarning || 'Preço sujeito a alteração a qualquer momento.');
+
+  const rawStore = s.store || 'MERCADO_LIVRE';
+  const storeKey = rawStore.toUpperCase();
+  const storeInfo = (typeof storeConfigsUI !== 'undefined' && storeConfigsUI[storeKey]) || { name: rawStore, emoji: s.storeEmoji || '🛍️' };
+  const storeName = s.store && s.store !== storeKey ? s.store : (storeInfo.name || 'Loja Parceira');
+  const storeEmoji = s.storeEmoji || storeInfo.emoji || '🛍️';
 
   // 1. Formatar bloco completo De/Por com desconto
   let precosBloco = '';
@@ -2204,12 +2210,12 @@ function renderClientTemplate(templateText, sample, warningText) {
 
   let out = templateText;
   const map = [
-    [/\{TITULO\}/gi, s.title],
-    [/\{TITLE\}/gi, s.title],
-    [/\{LOJA\}/gi, s.store],
-    [/\{STORE\}/gi, s.store],
-    [/\{EMOJI_LOJA\}/gi, s.storeEmoji],
-    [/\{EMOJI\}/gi, s.storeEmoji],
+    [/\{TITULO\}/gi, s.title || ''],
+    [/\{TITLE\}/gi, s.title || ''],
+    [/\{LOJA\}/gi, storeName],
+    [/\{STORE\}/gi, storeName],
+    [/\{EMOJI_LOJA\}/gi, storeEmoji],
+    [/\{EMOJI\}/gi, storeEmoji],
     [/\{PRECOS\}/gi, precosBloco],
     [/\{PRECO_UNICO\}/gi, precoUnicoBloco],
     [/\{PRECO_APENAS\}/gi, precoUnicoBloco],
@@ -2221,15 +2227,15 @@ function renderClientTemplate(templateText, sample, warningText) {
     [/\{VALOR\}/gi, `R$ ${formatCurrencyBRL(s.promoPrice)}`],
     [/\{DESCONTO\}/gi, descontoStr],
     [/\{CUPOM\}/gi, cupomBloco],
-    [/\{CODIGO_CUPOM\}/gi, s.coupon],
-    [/\{LINK\}/gi, s.affiliateUrl],
-    [/\{LINK_AFILIADO\}/gi, s.affiliateUrl],
+    [/\{CODIGO_CUPOM\}/gi, s.coupon || ''],
+    [/\{LINK\}/gi, s.affiliateUrl || ''],
+    [/\{LINK_AFILIADO\}/gi, s.affiliateUrl || ''],
     [/\{AVISO\}/gi, aviso],
     [/\{CATEGORIA\}/gi, s.category || 'Geral']
   ];
 
   for (const [re, val] of map) {
-    out = out.replace(re, val);
+    out = out.replace(re, val !== undefined ? val : '');
   }
 
   return out.replace(/\n{3,}/g, '\n\n').trim();
@@ -2384,6 +2390,8 @@ function initTemplateEvents() {
 
       const data = await res.json();
       if (data && data.success) {
+        templateState.currentTemplate = customTemplate;
+        templateState.currentWarning = customWarning;
         showToast('✅ Template de mensagens salvo com sucesso!');
       } else {
         showToast('⚠️ Erro ao salvar template.');
@@ -2470,6 +2478,13 @@ function updateManualQueueBadges() {
 async function addToManualDispatchQueue(offer, btnElement) {
   if (!offer) return;
 
+  if (!templateState.currentTemplate) {
+    await loadTemplateConfig();
+  }
+
+  const activeTpl = templateState.currentTemplate || (templateState.presets && templateState.presets[0]?.template) || '';
+  const activeWarn = templateState.currentWarning || 'Preço sujeito a alteração a qualquer momento.';
+
   const queueItem = {
     id: offer.id || String(Date.now()),
     title: offer.title,
@@ -2485,8 +2500,8 @@ async function addToManualDispatchQueue(offer, btnElement) {
     addedAt: new Date().toISOString()
   };
 
-  // Gerar mensagem inicial usando o template padrão configurado
-  queueItem.customMessageText = renderClientTemplate(templateState.currentTemplate || templateState.presets[0]?.template, {
+  // Gerar mensagem inicial usando o template configurado pelo usuário
+  queueItem.customMessageText = renderClientTemplate(activeTpl, {
     title: offer.title,
     store: offer.store,
     originalPrice: offer.originalPrice,
@@ -2495,7 +2510,7 @@ async function addToManualDispatchQueue(offer, btnElement) {
     coupon: offer.coupon,
     affiliateUrl: offer.productUrl,
     category: offer.category
-  });
+  }, activeWarn);
 
   const existingIdx = manualQueueState.queue.findIndex(item => item.id === offer.id);
   if (existingIdx !== -1) {
@@ -2518,7 +2533,9 @@ async function addToManualDispatchQueue(offer, btnElement) {
           const affUrl = data.results[0].affiliateUrl;
           const target = manualQueueState.queue.find(i => i.id === queueItem.id);
           if (target) {
-            target.customMessageText = renderClientTemplate(templateState.currentTemplate || templateState.presets[0]?.template, {
+            const currentActiveTpl = templateState.currentTemplate || (templateState.presets && templateState.presets[0]?.template) || '';
+            const currentActiveWarn = templateState.currentWarning || 'Preço sujeito a alteração a qualquer momento.';
+            target.customMessageText = renderClientTemplate(currentActiveTpl, {
               title: offer.title,
               store: offer.store,
               originalPrice: offer.originalPrice,
@@ -2527,7 +2544,7 @@ async function addToManualDispatchQueue(offer, btnElement) {
               coupon: offer.coupon,
               affiliateUrl: affUrl,
               category: offer.category
-            });
+            }, currentActiveWarn);
             saveManualQueueToStorage();
             renderManualQueueList();
           }
@@ -2766,10 +2783,60 @@ function initManualQueueEvents() {
     }
   });
 
+  // Reapply template to all queue items
+  const btnReapplyTpl = document.getElementById('btnReapplyTemplateManualQueue');
+  btnReapplyTpl?.addEventListener('click', async () => {
+    if (manualQueueState.queue.length === 0) {
+      showToast('ℹ️ A fila de disparo manual está vazia.');
+      return;
+    }
+
+    const origHtml = btnReapplyTpl.innerHTML;
+    btnReapplyTpl.disabled = true;
+    btnReapplyTpl.innerHTML = `<span>Atualizando...</span>`;
+
+    try {
+      await loadTemplateConfig();
+      const activeTpl = templateState.currentTemplate || (templateState.presets && templateState.presets[0]?.template) || '';
+      const activeWarn = templateState.currentWarning || 'Preço sujeito a alteração a qualquer momento.';
+
+      manualQueueState.queue.forEach((item) => {
+        item.customMessageText = renderClientTemplate(activeTpl, {
+          title: item.title,
+          store: item.store,
+          originalPrice: item.originalPrice,
+          promoPrice: item.promoPrice,
+          discountPercent: item.discountPercent,
+          coupon: item.coupon,
+          affiliateUrl: item.productUrl,
+          category: item.category
+        }, activeWarn);
+      });
+
+      saveManualQueueToStorage();
+      renderManualQueueList();
+      showToast('✨ Template atual reaplicado com sucesso a todos os itens da fila!');
+    } catch {
+      showToast('⚠️ Erro ao reaplicar template.');
+    } finally {
+      btnReapplyTpl.disabled = false;
+      btnReapplyTpl.innerHTML = origHtml;
+      if (window.lucide) lucide.createIcons();
+    }
+  });
+
   // Dispatch All
   const btnDispatchAll = document.getElementById('btnDispatchAllManual');
   btnDispatchAll?.addEventListener('click', () => {
     dispatchAllManualQueue(btnDispatchAll);
+  });
+
+  // Reload template config when opening modal
+  document.querySelectorAll('[data-modal="modal-simulation"]').forEach((el) => {
+    el.addEventListener('click', () => {
+      loadTemplateConfig();
+      renderManualQueueList();
+    });
   });
 }
 
@@ -3023,12 +3090,3 @@ function initShopeeFinderEvents() {
     });
   });
 }
-
-// Auto-run event initializers
-initTemplateEvents();
-initManualQueueEvents();
-initDivulgadorEvents();
-initShopeeFinderEvents();
-
-
-

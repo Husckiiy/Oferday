@@ -159,8 +159,20 @@ class ConfigService {
       aliexpressAppKey: incomingAff.aliexpressAppKey || currentAff.aliexpressAppKey || DEFAULT_CONFIG.affiliate.aliexpressAppKey,
       aliexpressAppSecret: incomingAff.aliexpressAppSecret || currentAff.aliexpressAppSecret || DEFAULT_CONFIG.affiliate.aliexpressAppSecret,
       aliexpressTrackingId: incomingAff.aliexpressTrackingId || currentAff.aliexpressTrackingId || DEFAULT_CONFIG.affiliate.aliexpressTrackingId,
+      awinPublisherId: incomingAff.awinPublisherId !== undefined ? incomingAff.awinPublisherId : (currentAff.awinPublisherId || DEFAULT_CONFIG.affiliate.awinPublisherId),
+      awinApiToken: incomingAff.awinApiToken !== undefined ? incomingAff.awinApiToken : (currentAff.awinApiToken || DEFAULT_CONFIG.affiliate.awinApiToken),
+      awinApiKey: incomingAff.awinApiKey !== undefined ? incomingAff.awinApiKey : (currentAff.awinApiKey || DEFAULT_CONFIG.affiliate.awinApiKey),
       meliCookie: incomingAff.meliCookie || currentAff.meliCookie,
       amazonCookie: incomingAff.amazonCookie || currentAff.amazonCookie
+    };
+
+    const currentTpl = this.config.template || DEFAULT_CONFIG.template;
+    const incomingTpl = (newConfig.template || {}) as Partial<NonNullable<AppConfig['template']>>;
+
+    const cleanTemplate = {
+      mode: incomingTpl.mode || currentTpl?.mode || 'default',
+      customTemplate: incomingTpl.customTemplate !== undefined ? incomingTpl.customTemplate : (currentTpl?.customTemplate || DEFAULT_CONFIG.template?.customTemplate || ''),
+      customWarning: incomingTpl.customWarning !== undefined ? incomingTpl.customWarning : (currentTpl?.customWarning || DEFAULT_CONFIG.template?.customWarning || 'Preço sujeito a alteração a qualquer momento.')
     };
 
     this.config = {
@@ -168,7 +180,8 @@ class ConfigService {
       whatsapp: { ...this.config.whatsapp, ...(newConfig.whatsapp || {}) },
       forwarder: { ...this.config.forwarder, ...(newConfig.forwarder || {}) },
       filters: { ...this.config.filters, ...(newConfig.filters || {}) },
-      affiliate: cleanAffiliate
+      affiliate: cleanAffiliate,
+      template: cleanTemplate
     };
 
     try {
