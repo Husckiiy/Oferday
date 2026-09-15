@@ -599,7 +599,7 @@ function updateConfigUI(config) {
     cfgDestJid.value = config.whatsapp.destinationJid;
   }
 
-  // Affiliate Stores count (5 / 5)
+  // Affiliate Stores count (6 / 6)
   if (cardAffiliatesCount) {
     let activeStores = 0;
     if (config.affiliate?.mlAffiliateTag || config.affiliate?.meliAffiliateTag) activeStores++;
@@ -607,7 +607,8 @@ function updateConfigUI(config) {
     if (config.affiliate?.amazonTag) activeStores++;
     if (config.affiliate?.magaluTag) activeStores++;
     if (config.affiliate?.aliexpressAppKey) activeStores++;
-    cardAffiliatesCount.textContent = `${activeStores || 5} / 5`;
+    if (config.affiliate?.awinPublisherId || config.affiliate?.awinApiToken) activeStores++;
+    cardAffiliatesCount.textContent = `${activeStores || 6} / 6`;
   }
 
   // Telegram inputs
@@ -652,6 +653,12 @@ function updateConfigUI(config) {
   if (cfgAliAppKey && config.affiliate?.aliexpressAppKey) cfgAliAppKey.value = config.affiliate.aliexpressAppKey;
   if (cfgAliAppSecret && config.affiliate?.aliexpressAppSecret) cfgAliAppSecret.value = config.affiliate.aliexpressAppSecret;
   if (cfgAliTrackingId && config.affiliate?.aliexpressTrackingId) cfgAliTrackingId.value = config.affiliate.aliexpressTrackingId;
+
+  // Awin
+  const cfgAwinPublisherId = document.getElementById('cfgAwinPublisherId');
+  const cfgAwinApiToken = document.getElementById('cfgAwinApiToken');
+  if (cfgAwinPublisherId && config.affiliate?.awinPublisherId) cfgAwinPublisherId.value = config.affiliate.awinPublisherId;
+  if (cfgAwinApiToken && config.affiliate?.awinApiToken) cfgAwinApiToken.value = config.affiliate.awinApiToken;
 
   // Master Forwarder Switch
   if (forwarderActiveSwitch) {
@@ -1060,6 +1067,70 @@ btnRefreshAmazonToken?.addEventListener('click', async () => {
   }
 });
 
+// --- Awin Network Status & Validation ---
+const btnRefreshAwinToken = document.getElementById('btnRefreshAwinToken');
+async function loadAwinTokenStatus() {
+  const badge = document.getElementById('awinTokenBadge');
+  const info = document.getElementById('awinTokenExpireInfo');
+  try {
+    const res = await fetch('/api/awin/status');
+    const json = await res.json();
+    if (json.active) {
+      if (badge) {
+        badge.textContent = 'Awin Ativa ✅';
+        badge.className = 'badge badge-green';
+      }
+      if (info) {
+        info.textContent = json.message || 'Rede de afiliados Awin configurada e pronta para converter links!';
+      }
+    } else {
+      if (badge) {
+        badge.textContent = 'Não configurado ⚠️';
+        badge.className = 'badge badge-yellow';
+      }
+      if (info) {
+        info.textContent = json.message || 'Informe seu Publisher ID (Usuário) e OAuth2 Token (Senha) da Awin e clique em Salvar.';
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
+btnRefreshAwinToken?.addEventListener('click', async () => {
+  btnRefreshAwinToken.disabled = true;
+  btnRefreshAwinToken.textContent = 'Validando...';
+  try {
+    const pubId = document.getElementById('cfgAwinPublisherId')?.value.trim();
+    const token = document.getElementById('cfgAwinApiToken')?.value.trim();
+    if (pubId || token) {
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          affiliate: {
+            awinPublisherId: pubId,
+            awinApiToken: token
+          }
+        })
+      });
+    }
+    const res = await fetch('/api/awin/status');
+    const json = await res.json();
+    if (json.active) {
+      showToast('🎉 Sucesso! Credenciais da Awin salvas e validadas!', 'success');
+    } else {
+      showToast(`⚠️ ${json.message}`, 'warning');
+    }
+    loadAwinTokenStatus();
+  } catch (err) {
+    showToast(`Erro ao testar: ${err.message}`, 'error');
+  } finally {
+    btnRefreshAwinToken.disabled = false;
+    btnRefreshAwinToken.textContent = '🔄 Testar / Validar Awin';
+  }
+});
+
 // --- Save Configurations ---
 async function saveAllConfig(btn) {
   const sourceChannel = appState.sourceChannels.map((c) => c.url || c.name).join(', ');
@@ -1080,6 +1151,8 @@ async function saveAllConfig(btn) {
   const aliexpressAppKey = document.getElementById('cfgAliAppKey')?.value.trim() || '';
   const aliexpressAppSecret = document.getElementById('cfgAliAppSecret')?.value.trim() || '';
   const aliexpressTrackingId = document.getElementById('cfgAliTrackingId')?.value.trim() || '';
+  const awinPublisherId = document.getElementById('cfgAwinPublisherId')?.value.trim() || '';
+  const awinApiToken = document.getElementById('cfgAwinApiToken')?.value.trim() || '';
 
   if (btn) {
     btn.disabled = true;
@@ -1131,7 +1204,9 @@ async function saveAllConfig(btn) {
           magaluTag,
           aliexpressAppKey,
           aliexpressAppSecret,
-          aliexpressTrackingId
+          aliexpressTrackingId,
+          awinPublisherId,
+          awinApiToken
         }
       })
     });
@@ -1141,6 +1216,7 @@ async function saveAllConfig(btn) {
       updateDestinationDisplayName(destinationName);
       loadMeliTokenStatus();
       loadAmazonTokenStatus();
+      loadAwinTokenStatus();
       closeAllModals();
     } else {
       showToast(`Erro ao salvar: ${json.error}`, 'error');
@@ -1158,7 +1234,7 @@ async function saveAllConfig(btn) {
 btnSaveConfig?.addEventListener('click', () => saveAllConfig(btnSaveConfig));
 btnSaveConfigRouting?.addEventListener('click', () => saveAllConfig(btnSaveConfigRouting));
 
-// --- 5-Store Cards Grid & Store Details Switcher ---
+// --- 6-Store Cards Grid & Store Details Switcher ---
 const storesGridOverview = document.getElementById('storesGridOverview');
 const storesDetailContainer = document.getElementById('storesDetailContainer');
 const btnBackToStoresGrid = document.getElementById('btnBackToStoresGrid');
@@ -1172,7 +1248,8 @@ const storeFormMap = {
   amazon: { id: 'formStoreAmazon', title: 'Amazon Brasil', subtitle: 'Tag de associado e SiteStripe API' },
   shopee: { id: 'formStoreShopee', title: 'Shopee Brasil', subtitle: 'Credenciais da API Oficial GraphQL (s.shopee.com.br)' },
   magalu: { id: 'formStoreMagalu', title: 'Magazine Luiza', subtitle: 'Nome da loja Parceiro Magalu / Magazine Você' },
-  aliexpress: { id: 'formStoreAliexpress', title: 'AliExpress', subtitle: 'App Key, Secret e Tracking ID do AliExpress' }
+  aliexpress: { id: 'formStoreAliexpress', title: 'AliExpress', subtitle: 'App Key, Secret e Tracking ID do AliExpress' },
+  awin: { id: 'formStoreAwin', title: 'Awin Network', subtitle: 'Publisher ID (Usuário) e OAuth2 Token (Senha) da Awin' }
 };
 
 function showStoreDetail(storeKey) {
@@ -1199,6 +1276,8 @@ function showStoreDetail(storeKey) {
     loadMeliTokenStatus();
   } else if (storeKey === 'amazon') {
     loadAmazonTokenStatus();
+  } else if (storeKey === 'awin') {
+    loadAwinTokenStatus();
   }
 
   if (window.lucide) lucide.createIcons();

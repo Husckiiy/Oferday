@@ -511,6 +511,24 @@
               </div>
             </div>
 
+            <!-- 6. AWIN -->
+            <div class="store-shop-card" data-store-card="awin">
+              <div class="store-shop-banner banner-awin">
+                <div class="awin-wrap">
+                  <svg viewBox="0 0 160 50" class="awin-logo-svg" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <polygon points="12,38 24,12 36,38" fill="#00D2C6"/>
+                    <polygon points="28,38 38,16 48,38" fill="#FF5353"/>
+                    <polygon points="22,38 30,22 38,38" fill="#001E38"/>
+                    <text x="56" y="35" font-family="'Plus Jakarta Sans', -apple-system, sans-serif" font-weight="900" font-size="28" fill="#FFFFFF" letter-spacing="1.5">AWIN</text>
+                  </svg>
+                </div>
+              </div>
+              <div class="store-shop-body">
+                <h4 class="store-shop-name">Awin</h4>
+                <button type="button" class="btn-shop-configure" data-open-store-config="awin">Configurar</button>
+              </div>
+            </div>
+
           </div>
         </div>
 
@@ -667,6 +685,44 @@
                 <label>App Secret</label>
                 <input type="password" id="cfgAliAppSecret" value="g7NPfxfXQIYYvCHFfTd7VTgRDKgBbYDz" placeholder="App Secret">
               </div>
+            </div>
+          </div>
+
+          <!-- FORM: AWIN -->
+          <div class="store-detail-form" id="formStoreAwin" style="display: none;">
+            <div class="store-config-hero hero-awin">
+              <div class="store-config-hero-left">
+                <span class="store-tag-badge bg-awin">🟣 Awin Network (awin1.com)</span>
+                <h4>OAuth2 API & Linkbuilder Oficial</h4>
+              </div>
+              <span class="badge badge-green" id="awinTokenBadge">Awin Ativa</span>
+            </div>
+
+            <div class="form-row-2 mt-4">
+              <div class="form-group">
+                <label>Publisher ID (Usuário / ID de Afiliado Awin)</label>
+                <input type="text" id="cfgAwinPublisherId" placeholder="Ex: 1234567">
+              </div>
+              <div class="form-group">
+                <label>OAuth2 API Token (Senha / Token de Acesso)</label>
+                <input type="password" id="cfgAwinApiToken" placeholder="Cole seu OAuth2 Token da Awin">
+              </div>
+            </div>
+
+            <div class="form-group mt-3">
+              <label style="display: flex; justify-content: space-between; align-items: center;">
+                <span>Como obter suas credenciais na Awin</span>
+                <a href="https://ui.awin.com/awin/affiliate" target="_blank" rel="noopener noreferrer" style="font-size: 0.72rem; color: #38bdf8; text-decoration: underline;">Abrir Painel Awin ↗</a>
+              </label>
+              <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.85rem; font-size: 0.78rem; color: #cbd5e1; line-height: 1.5;">
+                <p style="margin-bottom: 0.35rem;">🔑 <b>Publisher ID (Usuário):</b> O ID numérico da sua conta de afiliado no canto superior do painel Awin.</p>
+                <p>⚡ <b>OAuth2 Token (Senha / API):</b> Acesse <b>Ferramentas (Tools) ➔ API Credentials / OAuth2 ➔ Gerar API Token</b> e cole aqui.</p>
+              </div>
+            </div>
+
+            <div class="token-banner mt-3">
+              <span id="awinTokenExpireInfo">Verificando credenciais com a rede de afiliados Awin...</span>
+              <button type="button" class="btn btn-secondary btn-sm" id="btnRefreshAwinToken">🔄 Testar / Validar Awin</button>
             </div>
           </div>
 

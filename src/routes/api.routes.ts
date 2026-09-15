@@ -310,6 +310,74 @@ apiRouter.get('/amazon/status', async (req: Request, res: Response) => {
   }
 });
 
+// Awin Status & Validation Endpoint
+apiRouter.get('/awin/status', async (req: Request, res: Response) => {
+  try {
+    const config = configService.getConfig();
+    const publisherId = config.affiliate?.awinPublisherId || '';
+    const apiToken = config.affiliate?.awinApiToken || '';
+
+    if (!publisherId && !apiToken) {
+      return res.json({
+        success: false,
+        active: false,
+        message: 'Publisher ID e OAuth2 Token da Awin não configurados.'
+      });
+    }
+
+    if (!publisherId) {
+      return res.json({
+        success: false,
+        active: false,
+        message: 'Publisher ID (Usuário) da Awin não configurado.'
+      });
+    }
+
+    if (!apiToken) {
+      return res.json({
+        success: true,
+        active: true,
+        message: `Publisher ID (${publisherId}) ativo para conversão de links awin1.com!`
+      });
+    }
+
+    // Try testing with Awin API if token provided
+    try {
+      const testRes = await fetch(`https://api.awin.com/publishers/${encodeURIComponent(publisherId)}/programmes?relationship=joined`, {
+        headers: {
+          'Authorization': `Bearer ${apiToken}`,
+          'User-Agent': 'OferDay-Bot/1.0'
+        },
+        signal: AbortSignal.timeout(6000)
+      });
+
+      if (testRes.ok) {
+        return res.json({
+          success: true,
+          active: true,
+          message: `Conexão OAuth2 com a API da Awin validada com sucesso! (Publisher ID: ${publisherId})`
+        });
+      } else if (testRes.status === 401 || testRes.status === 403) {
+        return res.json({
+          success: false,
+          active: false,
+          message: 'OAuth2 Token da Awin inválido ou sem permissão na API da Awin.'
+        });
+      }
+    } catch {
+      // Non-critical fallback
+    }
+
+    return res.json({
+      success: true,
+      active: true,
+      message: `Credenciais Awin configuradas com sucesso! (Publisher ID: ${publisherId})`
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, active: false, error: err.message });
+  }
+});
+
 // Extension 1-Click Cookie Sync Endpoint
 apiRouter.post('/extension/sync-cookies', (req: Request, res: Response) => {
   try {

@@ -1860,6 +1860,21 @@ select:focus {
   background: #e62e04;
 }
 
+.banner-awin {
+  background: #001e38;
+}
+
+.awin-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.awin-logo-svg {
+  width: 140px;
+  height: 44px;
+}
+
 /* Shopee Brand Styling */
 .shopee-logo-flex {
   display: flex;
@@ -2014,6 +2029,15 @@ select:focus {
 .hero-ali {
   background: linear-gradient(135deg, rgba(230, 46, 4, 0.2), rgba(15, 23, 42, 0.45));
   border-color: rgba(230, 46, 4, 0.3);
+}
+.hero-awin {
+  background: linear-gradient(135deg, rgba(0, 210, 198, 0.2), rgba(0, 30, 56, 0.65));
+  border-color: rgba(0, 210, 198, 0.35);
+}
+
+.bg-awin {
+  background: #00d2c6;
+  color: #001e38;
 }
 
 .modal-body-dark label {

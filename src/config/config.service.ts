@@ -60,7 +60,10 @@ export const DEFAULT_CONFIG: AppConfig = {
     magaluTag: process.env.MAGALU_TAG || process.env.MAGALU_AFFILIATE_TAG || 'magazineibanez01',
     aliexpressAppKey: process.env.ALIEXPRESS_APP_KEY || '544386',
     aliexpressAppSecret: process.env.ALIEXPRESS_APP_SECRET || 'g7NPfxfXQIYYvCHFfTd7VTgRDKgBbYDz',
-    aliexpressTrackingId: process.env.ALIEXPRESS_TRACKING_ID || process.env.ALIEXPRESS_AFFILIATE_TAG || 'ibanez'
+    aliexpressTrackingId: process.env.ALIEXPRESS_TRACKING_ID || process.env.ALIEXPRESS_AFFILIATE_TAG || 'ibanez',
+    awinPublisherId: process.env.AWIN_PUBLISHER_ID || process.env.AWIN_USER || '',
+    awinApiToken: process.env.AWIN_API_TOKEN || process.env.AWIN_OAUTH2_TOKEN || process.env.AWIN_TOKEN || '',
+    awinApiKey: process.env.AWIN_API_KEY || ''
   },
   template: {
     mode: 'default',

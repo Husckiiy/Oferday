@@ -4,7 +4,7 @@ import { logger } from './logger.service.js';
 import { meliAuthService } from './meli-auth.service.js';
 import { urlShortenerService } from './url-shortener.service.js';
 
-export type SupportedStore = 'MERCADO_LIVRE' | 'SHOPEE' | 'AMAZON' | 'MAGALU' | 'ALIEXPRESS' | 'UNKNOWN';
+export type SupportedStore = 'MERCADO_LIVRE' | 'SHOPEE' | 'AMAZON' | 'MAGALU' | 'ALIEXPRESS' | 'AWIN' | 'UNKNOWN';
 
 export interface AffiliateResult {
   originalUrl: string;
@@ -115,6 +115,10 @@ export class AffiliateService {
     {
       store: 'ALIEXPRESS' as SupportedStore,
       pattern: /https?:\/\/(?:www\.)?(?:s\.click\.aliexpress\.com|aliexpress\.com|pt\.aliexpress\.com|best\.aliexpress\.com)\/[^\s<>"')]+/gi
+    },
+    {
+      store: 'AWIN' as SupportedStore,
+      pattern: /https?:\/\/(?:www\.)?(?:awin1\.com|zanox\.com|click\.awin1\.com|ad\.zanox\.com)\/[^\s<>"')]+/gi
     }
   ];
 
@@ -148,6 +152,13 @@ export class AffiliateService {
       lower.includes('//a.co')
     ) {
       return 'AMAZON';
+    }
+    if (
+      lower.includes('awin1.com') ||
+      lower.includes('zanox.com') ||
+      lower.includes('awin.com')
+    ) {
+      return 'AWIN';
     }
     if (
       lower.includes('magazineluiza.com.br') ||
@@ -987,6 +998,54 @@ export class AffiliateService {
   }
 
   /**
+   * Official Awin Affiliate Link Converter (awin1.com / zanox).
+   */
+  public async gerarAfiliadoAwin(finalUrl: string): Promise<string> {
+    const config = configService.getConfig();
+    const publisherId = config.affiliate?.awinPublisherId || process.env.AWIN_PUBLISHER_ID || '';
+
+    if (!publisherId) {
+      return finalUrl;
+    }
+
+    try {
+      const parsed = new URL(finalUrl);
+
+      // If it's already an awin1.com or zanox link, replace awinaffid / affid with user's publisherId
+      if (parsed.hostname.includes('awin1.com') || parsed.hostname.includes('zanox.com')) {
+        if (parsed.searchParams.has('awinaffid')) {
+          parsed.searchParams.set('awinaffid', publisherId);
+          logger.success('AFFILIATE', `Awin: Link awin1.com atualizado com seu Publisher ID (${publisherId}): ${parsed.toString()}`);
+          return parsed.toString();
+        }
+        if (parsed.searchParams.has('affid')) {
+          parsed.searchParams.set('affid', publisherId);
+          logger.success('AFFILIATE', `Awin: Link zanox.com atualizado com seu Publisher ID (${publisherId}): ${parsed.toString()}`);
+          return parsed.toString();
+        }
+        parsed.searchParams.set('awinaffid', publisherId);
+        logger.success('AFFILIATE', `Awin: Tag awinaffid inserida no link: ${parsed.toString()}`);
+        return parsed.toString();
+      }
+
+      // If it has merchant tracking parameter (awinmid or mid)
+      const mid = parsed.searchParams.get('awinmid') || parsed.searchParams.get('mid');
+      if (mid) {
+        parsed.searchParams.delete('awinmid');
+        parsed.searchParams.delete('mid');
+        parsed.searchParams.delete('awinaffid');
+        const awinLink = `https://www.awin1.com/cread.php?awinmid=${mid}&awinaffid=${publisherId}&ued=${encodeURIComponent(parsed.toString())}`;
+        logger.success('AFFILIATE', `Awin: Link oficial gerado via cread.php: ${awinLink}`);
+        return awinLink;
+      }
+
+      return finalUrl;
+    } catch {
+      return finalUrl;
+    }
+  }
+
+  /**
    * Dispatches generation to the appropriate store method.
    */
   public async generateAffiliateUrl(store: SupportedStore, finalUrl: string, postText?: string): Promise<{ affiliateUrl: string; canonicalProductUrl?: string }> {
@@ -1001,6 +1060,8 @@ export class AffiliateService {
         return { affiliateUrl: await this.gerarAfiliadoMagalu(finalUrl), canonicalProductUrl: finalUrl };
       case 'ALIEXPRESS':
         return { affiliateUrl: await this.gerarAfiliadoAliexpress(finalUrl), canonicalProductUrl: finalUrl };
+      case 'AWIN':
+        return { affiliateUrl: await this.gerarAfiliadoAwin(finalUrl), canonicalProductUrl: finalUrl };
       default:
         return { affiliateUrl: finalUrl, canonicalProductUrl: finalUrl };
     }

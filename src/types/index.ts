@@ -38,6 +38,9 @@ export interface AppConfig {
     aliexpressAppKey?: string;
     aliexpressAppSecret?: string;
     aliexpressTrackingId?: string;
+    awinPublisherId?: string; // Publisher ID da Awin (Usuário)
+    awinApiToken?: string; // OAuth2 API Token da Awin (Senha/Token de Acesso)
+    awinApiKey?: string;
   };
   template?: {
     mode?: 'default' | 'custom';

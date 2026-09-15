@@ -65,7 +65,8 @@ export class TemplateService {
     'MERCADO_LIVRE': 'Mercado Livre',
     'SHOPEE': 'Shopee',
     'MAGALU': 'Magalu',
-    'ALIEXPRESS': 'AliExpress'
+    'ALIEXPRESS': 'AliExpress',
+    'AWIN': 'Awin'
   };
 
   private readonly storeEmojis: Record<string, string> = {
@@ -73,7 +74,8 @@ export class TemplateService {
     'MERCADO_LIVRE': '🟡',
     'SHOPEE': '🟠',
     'MAGALU': '🔵',
-    'ALIEXPRESS': '🔴'
+    'ALIEXPRESS': '🔴',
+    'AWIN': '🟣'
   };
 
   public formatCurrencyBRL(val?: number): string {
