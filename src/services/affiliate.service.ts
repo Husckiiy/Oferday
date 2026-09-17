@@ -1036,11 +1036,46 @@ export class AffiliateService {
   }
 
   /**
-   * Official Awin Affiliate Link Converter (KaBuM, Casas Bahia, cread.php, awin1.com, etc.).
+   * Generates official Awin shortlink via Awin Link Builder API (returns tidd.ly).
+   */
+  public async generateOfficialAwinShortLink(publisherId: string, apiToken: string, advertiserId: number, destinationUrl: string): Promise<string | null> {
+    if (!publisherId || !apiToken) return null;
+    try {
+      const res = await fetch(`https://api.awin.com/publishers/${encodeURIComponent(publisherId)}/linkbuilder/generate`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiToken}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'OferDay-Bot/1.0'
+        },
+        body: JSON.stringify({
+          advertiserId,
+          destinationUrl,
+          shorten: true
+        }),
+        signal: AbortSignal.timeout(4000)
+      });
+
+      if (res.ok) {
+        const data: any = await res.json();
+        const shortUrl = data?.shortUrl || data?.url;
+        if (shortUrl && typeof shortUrl === 'string') {
+          return shortUrl.trim();
+        }
+      }
+    } catch (err: any) {
+      logger.warn('AFFILIATE', `Aviso ao gerar link via API da Awin: ${err.message}`);
+    }
+    return null;
+  }
+
+  /**
+   * Official Awin Affiliate Link Converter (KaBuM, Casas Bahia, cread.php, awin1.com, tidd.ly).
    */
   public async gerarAfiliadoAwin(finalUrl: string): Promise<string> {
     const config = configService.getConfig();
     const publisherId = config.affiliate?.awinPublisherId || process.env.AWIN_PUBLISHER_ID || '';
+    const apiToken = config.affiliate?.awinApiToken || process.env.AWIN_API_TOKEN || process.env.AWIN_OAUTH2_TOKEN || '';
 
     if (!publisherId || publisherId.trim().length === 0) {
       logger.warn('AFFILIATE', `⚠️ Awin: Link de loja parceira da Awin detectado, mas seu Publisher ID não está preenchido em "Configurar Lojas -> Awin".`);
@@ -1102,7 +1137,16 @@ export class AffiliateService {
         cleanProductUrl = targetParsed.toString();
       } catch {}
 
-      // 3. Build official Awin tracking URL via cread.php
+      // 3. Try official Awin Link Builder API (returns official tidd.ly short link)
+      if (mid && apiToken && apiToken.trim().length > 0) {
+        const officialAwinShort = await this.generateOfficialAwinShortLink(cleanPubId, apiToken.trim(), Number(mid), cleanProductUrl);
+        if (officialAwinShort) {
+          logger.success('AFFILIATE', `Awin: Link oficial encurtado (tidd.ly) gerado via API: ${officialAwinShort}`);
+          return officialAwinShort;
+        }
+      }
+
+      // 4. Build official Awin tracking URL via cread.php
       if (mid) {
         const awinLink = `https://www.awin1.com/cread.php?awinmid=${mid}&awinaffid=${cleanPubId}&ued=${encodeURIComponent(cleanProductUrl)}`;
         logger.success('AFFILIATE', `Awin: Link oficial gerado via cread.php (MID ${mid}, Publisher ${cleanPubId}): ${awinLink}`);
@@ -1121,7 +1165,7 @@ export class AffiliateService {
         return awinLink;
       }
 
-      // 4. Fallback for generic awin1.com / zanox links
+      // 5. Fallback for generic awin1.com / zanox links
       if (parsed.hostname.includes('awin1.com') || parsed.hostname.includes('zanox.com')) {
         parsed.searchParams.set('awinaffid', cleanPubId);
         parsed.searchParams.delete('clickref');
