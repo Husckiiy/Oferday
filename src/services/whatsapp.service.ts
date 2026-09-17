@@ -39,8 +39,6 @@ class WhatsAppService extends EventEmitter {
     };
   }
 
-  private presenceInterval: NodeJS.Timeout | null = null;
-
   public async initialize(): Promise<void> {
     if (this.isConnecting || this.status === 'connected') {
       logger.info('WHATSAPP', 'Cliente WhatsApp já está conectado ou conectando.');
@@ -93,10 +91,6 @@ class WhatsAppService extends EventEmitter {
 
         if (connection === 'close') {
           this.isConnecting = false;
-          if (this.presenceInterval) {
-            clearInterval(this.presenceInterval);
-            this.presenceInterval = null;
-          }
           const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
           const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
@@ -120,26 +114,13 @@ class WhatsAppService extends EventEmitter {
           const userJid = this.sock?.user?.id || 'Conectado';
           logger.success('WHATSAPP', `Conexão do WhatsApp estabelecida com sucesso! (${userJid})`);
           
-          // Send offline/unavailable presence on connect so WhatsApp servers never show user as active
+          // Send offline/unavailable presence on connect once so WhatsApp servers keep status hidden
           try {
             await this.sock?.sendPresenceUpdate('unavailable');
-            logger.info('WHATSAPP', 'Modo silencioso ativo (Offline / Unavailable): notificações no celular 100% liberadas.');
+            logger.info('WHATSAPP', 'Modo silencioso ativo (Offline / Unavailable).');
           } catch {
             // ignore
           }
-
-          if (this.presenceInterval) {
-            clearInterval(this.presenceInterval);
-          }
-          this.presenceInterval = setInterval(async () => {
-            if (this.sock && this.status === 'connected') {
-              try {
-                await this.sock.sendPresenceUpdate('unavailable');
-              } catch {
-                // ignore
-              }
-            }
-          }, 45000);
 
           this.emit('status_change', this.getStatus());
         }
@@ -154,10 +135,6 @@ class WhatsAppService extends EventEmitter {
 
   public async disconnect(): Promise<void> {
     logger.info('WHATSAPP', 'Desconectando sessão do WhatsApp...');
-    if (this.presenceInterval) {
-      clearInterval(this.presenceInterval);
-      this.presenceInterval = null;
-    }
     try {
       if (this.sock) {
         await this.sock.logout().catch(() => {});
