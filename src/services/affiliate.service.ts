@@ -1088,12 +1088,17 @@ export class AffiliateService {
       let cleanProductUrl = targetUrl;
       try {
         const targetParsed = new URL(targetUrl);
-        const competitorParams = [
-          'aw_affid', 'sv1', 'sv_campaign_id', 'awc', 'awinmid', 'awinaffid',
-          'utm_source', 'utm_medium', 'utm_content', 'utm_term', 'utm_campaign',
-          'clickref', 'tag', 'aff_id', 'zanpid', 'origin', 'gclid', 'fbclid'
-        ];
-        competitorParams.forEach(p => targetParsed.searchParams.delete(p));
+        if (targetParsed.hostname.includes('kabum.com.br') || targetParsed.hostname.includes('casasbahia.com.br')) {
+          targetParsed.search = '';
+        } else {
+          const competitorParams = [
+            'aw_affid', 'sv1', 'sv_campaign_id', 'awc', 'awinmid', 'awinaffid',
+            'utm_source', 'utm_medium', 'utm_content', 'utm_term', 'utm_campaign', 'utm_id',
+            'gclid', 'fbclid', 'gclsrc', 'gad_source', 'gad_campaignid', 'gbraid', 'wbraid',
+            'clickref', 'tag', 'aff_id', 'zanpid', 'origin', 'aff_fcid', 'ref'
+          ];
+          competitorParams.forEach(p => targetParsed.searchParams.delete(p));
+        }
         cleanProductUrl = targetParsed.toString();
       } catch {}
 
@@ -1101,6 +1106,18 @@ export class AffiliateService {
       if (mid) {
         const awinLink = `https://www.awin1.com/cread.php?awinmid=${mid}&awinaffid=${cleanPubId}&ued=${encodeURIComponent(cleanProductUrl)}`;
         logger.success('AFFILIATE', `Awin: Link oficial gerado via cread.php (MID ${mid}, Publisher ${cleanPubId}): ${awinLink}`);
+
+        // Shorten the long cread.php link to a clean, elegant short URL
+        try {
+          const shortUrl = await urlShortenerService.shorten(awinLink);
+          if (shortUrl && shortUrl !== awinLink) {
+            logger.success('AFFILIATE', `Awin: Link encurtado com sucesso: ${shortUrl}`);
+            return shortUrl;
+          }
+        } catch (shortErr: any) {
+          logger.warn('AFFILIATE', `Aviso ao encurtar link Awin: ${shortErr.message}`);
+        }
+
         return awinLink;
       }
 
@@ -1108,7 +1125,14 @@ export class AffiliateService {
       if (parsed.hostname.includes('awin1.com') || parsed.hostname.includes('zanox.com')) {
         parsed.searchParams.set('awinaffid', cleanPubId);
         parsed.searchParams.delete('clickref');
-        return parsed.toString();
+        const genericLink = parsed.toString();
+        try {
+          const shortUrl = await urlShortenerService.shorten(genericLink);
+          if (shortUrl && shortUrl !== genericLink) {
+            return shortUrl;
+          }
+        } catch {}
+        return genericLink;
       }
 
       return cleanProductUrl;

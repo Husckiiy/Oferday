@@ -112,19 +112,15 @@ export class UrlShortenerService {
       return url;
     }
 
-    // 1. Try CleanURI (Cleanest direct redirect)
+    // 1. Try CleanURI (Cleanest direct 301 redirect, no tracking injection)
     const clean = await this.shortenWithCleanUri(url);
     if (clean) return clean;
 
-    // 2. Try Ulvis
+    // 2. Try Ulvis (Fast direct 301 redirect)
     const ulvis = await this.shortenWithUlvis(url);
     if (ulvis) return ulvis;
 
-    // 3. Try TinyURL
-    const tiny = await this.shortenWithTinyUrl(url);
-    if (tiny) return tiny;
-
-    // 4. Try is.gd
+    // 3. Try is.gd
     const isgd = await this.shortenWithIsGd(url);
     if (isgd) return isgd;
 
