@@ -1785,8 +1785,13 @@ fileUploadWatermark?.addEventListener('change', async (e) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageBase64: base64 })
       });
-      const data = await res.json();
-      if (data.success) {
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error('Servidor ainda aplicando atualização. Aguarde 10 segundos e tente novamente.');
+      }
+      if (data && data.success) {
         showToast('Logotipo/Selo atualizado com sucesso!', 'success');
         if (imgWatermarkPreview) {
           imgWatermarkPreview.src = base64;
@@ -1795,7 +1800,7 @@ fileUploadWatermark?.addEventListener('change', async (e) => {
         if (txtWatermarkDefaultBadge) txtWatermarkDefaultBadge.style.display = 'none';
         if (btnDeleteCustomWatermark) btnDeleteCustomWatermark.style.display = 'inline-flex';
       } else {
-        showToast(`Erro: ${data.error}`, 'error');
+        showToast(`Erro: ${data?.error || 'Falha ao salvar logo'}`, 'error');
       }
     } catch (err) {
       showToast(`Erro ao enviar logo: ${err.message}`, 'error');
