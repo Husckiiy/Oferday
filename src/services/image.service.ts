@@ -463,6 +463,8 @@ class ImageService {
               const asin = asinMatch[1].toUpperCase();
               try {
                 const cdnUrls = [
+                  `https://images-na.ssl-images-amazon.com/images/P/${asin}.01._SCLZZZZZZZ_SX1500_.jpg`,
+                  `https://images-na.ssl-images-amazon.com/images/P/${asin}.01._SCLZZZZZZZ_SX1000_.jpg`,
                   `https://images-na.ssl-images-amazon.com/images/P/${asin}.01._SCLZZZZZZZ_SX800_.jpg`,
                   `https://images-na.ssl-images-amazon.com/images/P/${asin}.01.LZZZZZZZ.jpg`
                 ];
@@ -471,7 +473,7 @@ class ImageService {
                   if (imgRes.ok) {
                     const buf = Buffer.from(await imgRes.arrayBuffer());
                     if (buf.length > 3000) {
-                      const jpegBuf = await sharp(buf).jpeg({ quality: 92 }).toBuffer();
+                      const jpegBuf = await sharp(buf).jpeg({ quality: 95 }).toBuffer();
                       logger.success('IMAGE', `✨ Imagem oficial HD extraída da Amazon CDN (${asin}) - 100% limpa sem marcas!`);
                       return jpegBuf;
                     }
@@ -570,7 +572,7 @@ class ImageService {
         if (imgResp.ok) {
           const rawBuf = Buffer.from(await imgResp.arrayBuffer());
           if (rawBuf.length > 3000) {
-            const jpegBuf = await sharp(rawBuf).jpeg({ quality: 92 }).toBuffer();
+            const jpegBuf = await sharp(rawBuf).jpeg({ quality: 95 }).toBuffer();
             return jpegBuf;
           }
         }
@@ -746,7 +748,7 @@ class ImageService {
             left
           }
         ])
-        .jpeg({ quality: 92 })
+        .jpeg({ quality: 95 })
         .toBuffer();
 
       logger.success('IMAGE', `🏷️ Marca d'água do canal aplicada com sucesso no canto [${targetCorner}] cobrindo a marca anterior!`);
