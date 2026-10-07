@@ -25,10 +25,15 @@ export class AffiliateService {
 
   private startKeepAlive(): void {
     if (this.keepAliveTimer) clearInterval(this.keepAliveTimer);
-    // Runs heartbeat every 20 minutes to keep Amazon and ML session active
+    // Runs heartbeat every 10 minutes to keep Amazon and ML session active
     this.keepAliveTimer = setInterval(async () => {
       await this.pingAmazonSiteStripeKeepAlive();
-    }, 20 * 60 * 1000);
+    }, 10 * 60 * 1000);
+
+    // Initial ping after 15 seconds
+    setTimeout(() => {
+      this.pingAmazonSiteStripeKeepAlive();
+    }, 15000);
   }
 
   private mergeCookies(oldCookieStr: string, setCookieHeaders: string[]): string {
@@ -58,6 +63,7 @@ export class AffiliateService {
     if (!cookie || cookie.length < 50) return;
 
     try {
+      const cleanCookie = cookie.replace(/x-amz-captcha-[12]=[^;]+;?\s*/gi, '').trim();
       const pingUrl = `https://www.amazon.com.br/associates/sitestripe/getShortUrl?longUrl=${encodeURIComponent('https://www.amazon.com.br/dp/B07Y3WXDTN')}&marketplaceId=526970&storeId=${tag}`;
       const res = await fetch(pingUrl, {
         headers: {
@@ -65,28 +71,29 @@ export class AffiliateService {
           'Accept': 'application/json, text/javascript, */*; q=0.01',
           'Referer': 'https://www.amazon.com.br/',
           'X-Requested-With': 'XMLHttpRequest',
-          'Cookie': cookie
+          'Cookie': cleanCookie
         },
         signal: AbortSignal.timeout(10000)
       });
 
-      if (res.ok) {
-        const getSetCookie = (res.headers as any).getSetCookie;
-        if (typeof getSetCookie === 'function') {
-          const newCookies = getSetCookie.call(res.headers);
-          if (Array.isArray(newCookies) && newCookies.length > 0) {
-            const merged = this.mergeCookies(cookie, newCookies);
-            if (merged !== cookie) {
-              configService.saveConfig({
-                affiliate: {
-                  ...config.affiliate,
-                  amazonCookie: merged
-                }
-              });
-              logger.info('AFFILIATE', 'Amazon SiteStripe: Cookies de sessão atualizados automaticamente via keep-alive.');
-            }
+      const getSetCookie = (res.headers as any).getSetCookie;
+      if (typeof getSetCookie === 'function') {
+        const newCookies = getSetCookie.call(res.headers);
+        if (Array.isArray(newCookies) && newCookies.length > 0) {
+          const merged = this.mergeCookies(cookie, newCookies);
+          if (merged !== cookie) {
+            configService.saveConfig({
+              affiliate: {
+                ...config.affiliate,
+                amazonCookie: merged
+              }
+            });
+            logger.info('AFFILIATE', 'Amazon SiteStripe: Cookies de sessão atualizados automaticamente via keep-alive.');
           }
         }
+      }
+
+      if (res.ok) {
         logger.info('AFFILIATE', 'Amazon SiteStripe: Heartbeat keep-alive executado (sessão ativa).');
       }
     } catch (err: any) {
@@ -882,15 +889,20 @@ export class AffiliateService {
     } else {
       try {
         const parsed = new URL(finalUrl);
-        parsed.searchParams.set('tag', tag);
-        parsed.searchParams.set('linkCode', 'sl2');
-        targetLongUrl = parsed.toString();
+        if (parsed.pathname.includes('/prime')) {
+          targetLongUrl = `https://www.amazon.com.br/prime?tag=${tag}&linkCode=sl2`;
+        } else {
+          const cleanParams = new URLSearchParams();
+          cleanParams.set('tag', tag);
+          cleanParams.set('linkCode', 'sl2');
+          targetLongUrl = `https://www.amazon.com.br${parsed.pathname}?${cleanParams.toString()}`;
+        }
       } catch {
         targetLongUrl = finalUrl;
       }
     }
 
-    // 1. Tenta gerar o link curto oficial via SiteStripe API (amzn.to)
+    // 1. Tenta gerar o link curto oficial via SiteStripe API (amzn.to / link.amazon)
     const officialShort = await this.generateOfficialAmazonShortLink(targetLongUrl, tag);
     if (officialShort) {
       logger.success('AFFILIATE', `Amazon: Link curto oficial SiteStripe gerado: ${officialShort}`);
