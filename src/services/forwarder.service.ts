@@ -283,7 +283,16 @@ class ForwarderService extends EventEmitter {
       }
     }
 
-    // 3. Apply custom watermark / brand overlay if enabled
+    // 3. Normalize product images to standard 1:1 square canvas (prevents WhatsApp mobile zoom/distortion)
+    if (finalMediaBuffer && finalMediaBuffer.length > 0) {
+      try {
+        finalMediaBuffer = await imageService.normalizeToSquareCanvas(finalMediaBuffer);
+      } catch (normErr: any) {
+        logger.warn('FORWARDER', `Aviso ao formatar canvas 1:1: ${normErr.message}`);
+      }
+    }
+
+    // 4. Apply custom watermark / brand overlay if enabled
     if (finalMediaBuffer && finalMediaBuffer.length > 0) {
       try {
         finalMediaBuffer = await imageService.applyCustomWatermark(finalMediaBuffer);

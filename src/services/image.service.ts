@@ -584,6 +584,37 @@ class ImageService {
   }
 
   /**
+   * Normalizes an image to a standard 1:1 square canvas (1000x1000) with clean white background.
+   * Prevents WhatsApp mobile from zooming in, cropping edges, or distorting landscape/portrait product photos.
+   */
+  public async normalizeToSquareCanvas(imageBuffer: Buffer): Promise<Buffer> {
+    try {
+      const meta = await sharp(imageBuffer).metadata();
+      const w = meta.width || 800;
+      const h = meta.height || 800;
+      const aspectRatio = w / h;
+
+      // If it's already approximately square (0.95 to 1.05) and high resolution, return intact
+      if (aspectRatio >= 0.95 && aspectRatio <= 1.05 && w >= 800) {
+        return imageBuffer;
+      }
+
+      const targetDim = Math.max(1000, Math.max(w, h));
+
+      return await sharp(imageBuffer)
+        .resize(targetDim, targetDim, {
+          fit: 'contain',
+          background: { r: 255, g: 255, b: 255, alpha: 1 }
+        })
+        .jpeg({ quality: 95 })
+        .toBuffer();
+    } catch (err: any) {
+      logger.warn('IMAGE', `Aviso ao normalizar canvas da imagem para 1:1: ${err.message}`);
+      return imageBuffer;
+    }
+  }
+
+  /**
    * Detects which corner contains a competitor watermark or tag.
    * Analyzes corner variance and non-background pixel density against the baseline background.
    */
