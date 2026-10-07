@@ -281,6 +281,15 @@ class ForwarderService extends EventEmitter {
       }
     }
 
+    // 3. Apply custom watermark / brand overlay if enabled
+    if (finalMediaBuffer && finalMediaBuffer.length > 0) {
+      try {
+        finalMediaBuffer = await imageService.applyCustomWatermark(finalMediaBuffer);
+      } catch (wmErr: any) {
+        logger.warn('FORWARDER', `Aviso ao aplicar marca d'água: ${wmErr.message}`);
+      }
+    }
+
     let mediaBase64: string | null = null;
     if (finalMediaBuffer && finalMediaBuffer.length > 0) {
       mediaBase64 = `data:image/jpeg;base64,${finalMediaBuffer.toString('base64')}`;
@@ -468,6 +477,15 @@ class ForwarderService extends EventEmitter {
         finalMediaBuffer = await imageService.processImageReplacement(text, finalMediaBuffer);
       } catch (imgErr: any) {
         logger.warn('FORWARDER', `Aviso ao processar substituição de imagem: ${imgErr.message}`);
+      }
+    }
+
+    // 3. Apply custom watermark / brand overlay if enabled
+    if (finalMediaBuffer && finalMediaBuffer.length > 0) {
+      try {
+        finalMediaBuffer = await imageService.applyCustomWatermark(finalMediaBuffer);
+      } catch (wmErr: any) {
+        logger.warn('FORWARDER', `Aviso ao aplicar marca d'água: ${wmErr.message}`);
       }
     }
 

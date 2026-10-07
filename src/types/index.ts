@@ -47,6 +47,12 @@ export interface AppConfig {
     customTemplate?: string;
     customWarning?: string;
   };
+  watermark?: {
+    enabled: boolean;
+    positionMode: 'AUTO_DETECT' | 'BOTTOM_RIGHT' | 'BOTTOM_LEFT' | 'TOP_RIGHT' | 'TOP_LEFT';
+    sizeScale: number; // 0.15 to 0.40 (default 0.25)
+    customImagePath?: string;
+  };
 }
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'waiting_code' | 'waiting_2fa' | 'connected' | 'error';

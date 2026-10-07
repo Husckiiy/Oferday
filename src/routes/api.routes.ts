@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import sharp from 'sharp';
 import { Router, Request, Response } from 'express';
 import { telegramService } from '../services/telegram.service.js';
 import { whatsappService } from '../services/whatsapp.service.js';
@@ -746,6 +747,105 @@ apiRouter.post('/template/preview', (req: Request, res: Response) => {
       category: 'Tech'
     });
     res.json({ success: true, rendered });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
+// MARCA D'ÁGUA & PERSONALIZAÇÃO DE IMAGENS
+// ==========================================
+apiRouter.get('/watermark', (req: Request, res: Response) => {
+  try {
+    const info = imageService.getWatermarkInfo();
+    res.json({ success: true, ...info });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+apiRouter.post('/watermark/config', (req: Request, res: Response) => {
+  try {
+    const { enabled, positionMode, sizeScale } = req.body;
+    const config = configService.getConfig();
+    const updated = configService.saveConfig({
+      ...config,
+      watermark: {
+        enabled: !!enabled,
+        positionMode: positionMode || 'AUTO_DETECT',
+        sizeScale: typeof sizeScale === 'number' ? sizeScale : 0.25
+      }
+    });
+    logger.success('IMAGE', `Configurações de marca d'água salvas (Ativo: ${updated.watermark?.enabled}, Modo: ${updated.watermark?.positionMode})`);
+    res.json({ success: true, watermark: updated.watermark });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+apiRouter.post('/watermark/upload', async (req: Request, res: Response) => {
+  try {
+    const { imageBase64 } = req.body;
+    if (!imageBase64) {
+      return res.status(400).json({ success: false, error: 'Nenhuma imagem foi enviada.' });
+    }
+
+    const cleanBase64 = imageBase64.replace(/^data:image\/[a-z0-9]+;base64,/i, '');
+    const buffer = Buffer.from(cleanBase64, 'base64');
+    
+    const BANNERS_DIR = path.resolve(process.cwd(), 'data', 'banners');
+    if (!fs.existsSync(BANNERS_DIR)) fs.mkdirSync(BANNERS_DIR, { recursive: true });
+    
+    fs.writeFileSync(path.join(BANNERS_DIR, 'custom_watermark.png'), buffer);
+    logger.success('IMAGE', 'Logotipo/Selo de marca d\'água personalizado atualizado com sucesso!');
+    
+    res.json({ success: true, message: 'Logo salva com sucesso!' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+apiRouter.post('/watermark/delete', (req: Request, res: Response) => {
+  try {
+    const BANNERS_DIR = path.resolve(process.cwd(), 'data', 'banners');
+    const customFile = path.join(BANNERS_DIR, 'custom_watermark.png');
+    if (fs.existsSync(customFile)) {
+      fs.unlinkSync(customFile);
+    }
+    logger.info('IMAGE', 'Logotipo customizado removido. Usando selo padrão Oferday.');
+    res.json({ success: true, message: 'Logo removida.' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+apiRouter.post('/watermark/test', async (req: Request, res: Response) => {
+  try {
+    const { imageBase64 } = req.body;
+    let inputBuffer: Buffer;
+    if (imageBase64) {
+      const cleanBase64 = imageBase64.replace(/^data:image\/[a-z0-9]+;base64,/i, '');
+      inputBuffer = Buffer.from(cleanBase64, 'base64');
+    } else {
+      inputBuffer = await sharp({
+        create: {
+          width: 600,
+          height: 600,
+          channels: 3,
+          background: { r: 255, g: 255, b: 255 }
+        }
+      }).jpeg().toBuffer();
+    }
+
+    const detectedCorner = await imageService.detectWatermarkCorner(inputBuffer);
+    const resultBuffer = await imageService.applyCustomWatermark(inputBuffer);
+    const resultBase64 = `data:image/jpeg;base64,${resultBuffer.toString('base64')}`;
+
+    res.json({
+      success: true,
+      detectedCorner,
+      preview: resultBase64
+    });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

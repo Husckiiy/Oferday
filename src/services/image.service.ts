@@ -3,6 +3,7 @@ import path from 'path';
 import sharp from 'sharp';
 import crypto from 'crypto';
 import { logger } from './logger.service.js';
+import { configService } from '../config/config.service.js';
 
 const BANNERS_DIR = path.resolve(process.cwd(), 'data', 'banners');
 const ASSETS_BANNERS_DIR = path.resolve(process.cwd(), 'assets', 'banners');
@@ -545,6 +546,226 @@ class ImageService {
       // ignore
     }
     return null;
+  }
+
+  /**
+   * Detects which corner contains a competitor watermark or tag.
+   * Analyzes corner variance and non-background pixel density against the baseline background.
+   */
+  public async detectWatermarkCorner(buffer: Buffer): Promise<'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'> {
+    try {
+      const { data, info } = await sharp(buffer)
+        .resize(100, 100, { fit: 'fill' })
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+
+      const channels = info.channels || 3;
+
+      // Sample background around center borders
+      const bgSamples = [[50, 10], [50, 90], [10, 50], [90, 50], [30, 50], [70, 50]];
+      let bgR = 0, bgG = 0, bgB = 0;
+      for (const [x, y] of bgSamples) {
+        const idx = (y * 100 + x) * channels;
+        bgR += data[idx];
+        bgG += data[idx + 1];
+        bgB += data[idx + 2];
+      }
+      bgR /= bgSamples.length;
+      bgG /= bgSamples.length;
+      bgB /= bgSamples.length;
+
+      const cornerZones = {
+        'bottom-right': { minX: 65, maxX: 96, minY: 65, maxY: 96 },
+        'bottom-left': { minX: 4, maxX: 35, minY: 65, maxY: 96 },
+        'top-right': { minX: 65, maxX: 96, minY: 6, maxY: 35 },
+        'top-left': { minX: 4, maxX: 35, minY: 6, maxY: 35 }
+      };
+
+      const cornerScores: Record<string, number> = {
+        'bottom-right': 0,
+        'bottom-left': 0,
+        'top-right': 0,
+        'top-left': 0
+      };
+
+      for (const [cornerKey, zone] of Object.entries(cornerZones)) {
+        let score = 0;
+        let totalSampled = 0;
+
+        for (let y = zone.minY; y <= zone.maxY; y += 2) {
+          for (let x = zone.minX; x <= zone.maxX; x += 2) {
+            totalSampled++;
+            const idx = (y * 100 + x) * channels;
+            const r = data[idx];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
+
+            const dist = Math.sqrt(
+              Math.pow(r - bgR, 2) + Math.pow(g - bgG, 2) + Math.pow(b - bgB, 2)
+            );
+            const saturation = Math.max(r, g, b) - Math.min(r, g, b);
+
+            if (dist > 30) {
+              score += 1 + (saturation > 25 ? 1.5 : 0);
+            }
+          }
+        }
+
+        cornerScores[cornerKey] = score / totalSampled;
+      }
+
+      let maxCorner: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left' = 'bottom-right';
+      let maxScore = -1;
+
+      for (const [corner, score] of Object.entries(cornerScores)) {
+        if (score > maxScore) {
+          maxScore = score;
+          maxCorner = corner as any;
+        }
+      }
+
+      logger.info('IMAGE', `🎯 Detecção de marca d'água nos cantos: BR=${(cornerScores['bottom-right']*100).toFixed(0)}%, BL=${(cornerScores['bottom-left']*100).toFixed(0)}%, TR=${(cornerScores['top-right']*100).toFixed(0)}%, TL=${(cornerScores['top-left']*100).toFixed(0)}% -> Canto Selecionado: ${maxCorner}`);
+      return maxCorner;
+    } catch (err: any) {
+      logger.warn('IMAGE', `Aviso ao detectar canto da marca d'água: ${err.message}`);
+      return 'bottom-right';
+    }
+  }
+
+  /**
+   * Overlays custom watermark / logo on the detected or specified corner
+   */
+  public async applyCustomWatermark(imageBuffer: Buffer): Promise<Buffer> {
+    const config = configService.getConfig();
+    if (!config.watermark?.enabled) {
+      return imageBuffer;
+    }
+
+    try {
+      const customFile = path.join(BANNERS_DIR, 'custom_watermark.png');
+      let watermarkBuffer: Buffer | null = null;
+
+      if (fs.existsSync(customFile)) {
+        watermarkBuffer = fs.readFileSync(customFile);
+      } else {
+        watermarkBuffer = await this.getDefaultWatermarkBuffer();
+      }
+
+      if (!watermarkBuffer || watermarkBuffer.length === 0) {
+        return imageBuffer;
+      }
+
+      const imgMetadata = await sharp(imageBuffer).metadata();
+      const imgWidth = imgMetadata.width || 800;
+      const imgHeight = imgMetadata.height || 800;
+
+      let targetCorner: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left' = 'bottom-right';
+      if (config.watermark.positionMode === 'AUTO_DETECT') {
+        targetCorner = await this.detectWatermarkCorner(imageBuffer);
+      } else if (config.watermark.positionMode === 'BOTTOM_LEFT') {
+        targetCorner = 'bottom-left';
+      } else if (config.watermark.positionMode === 'TOP_RIGHT') {
+        targetCorner = 'top-right';
+      } else if (config.watermark.positionMode === 'TOP_LEFT') {
+        targetCorner = 'top-left';
+      } else {
+        targetCorner = 'bottom-right';
+      }
+
+      const scale = config.watermark.sizeScale || 0.25;
+      const targetWidth = Math.max(100, Math.round(imgWidth * scale));
+
+      const resizedWatermark = await sharp(watermarkBuffer)
+        .resize({ width: targetWidth, withoutEnlargement: false, fit: 'inside' })
+        .toBuffer();
+
+      const wmMetadata = await sharp(resizedWatermark).metadata();
+      const wmWidth = wmMetadata.width || targetWidth;
+      const wmHeight = wmMetadata.height || Math.round(targetWidth * 0.4);
+
+      const margin = Math.max(12, Math.round(imgWidth * 0.025));
+
+      let left = 0;
+      let top = 0;
+
+      if (targetCorner === 'bottom-right') {
+        left = imgWidth - wmWidth - margin;
+        top = imgHeight - wmHeight - margin;
+      } else if (targetCorner === 'bottom-left') {
+        left = margin;
+        top = imgHeight - wmHeight - margin;
+      } else if (targetCorner === 'top-right') {
+        left = imgWidth - wmWidth - margin;
+        top = margin;
+      } else if (targetCorner === 'top-left') {
+        left = margin;
+        top = margin;
+      }
+
+      left = Math.max(0, left);
+      top = Math.max(0, top);
+
+      const result = await sharp(imageBuffer)
+        .composite([
+          {
+            input: resizedWatermark,
+            top,
+            left
+          }
+        ])
+        .jpeg({ quality: 92 })
+        .toBuffer();
+
+      logger.success('IMAGE', `🏷️ Marca d'água do canal aplicada com sucesso no canto [${targetCorner}] cobrindo a marca anterior!`);
+      return result;
+    } catch (err: any) {
+      logger.error('IMAGE', `Erro ao aplicar marca d'água: ${err.message}`);
+      return imageBuffer;
+    }
+  }
+
+  /**
+   * Generates a modern SVG badge for Oferday if no custom logo is uploaded
+   */
+  public async getDefaultWatermarkBuffer(): Promise<Buffer> {
+    const svg = `
+      <svg width="320" height="100" viewBox="0 0 320 100" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#f97316;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#ea580c;stop-opacity:1" />
+          </linearGradient>
+          <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+            <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.35"/>
+          </filter>
+        </defs>
+        <rect x="8" y="10" width="304" height="80" rx="40" fill="url(#grad1)" filter="url(#shadow)"/>
+        <path d="M 45 52 L 60 26 L 55 46 L 72 46 L 40 76 L 48 52 Z" fill="#ffffff"/>
+        <text x="82" y="60" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="900" fill="#ffffff" letter-spacing="2">OFERDAY</text>
+      </svg>
+    `;
+    return sharp(Buffer.from(svg)).png().toBuffer();
+  }
+
+  public getWatermarkInfo(): { enabled: boolean; positionMode: string; sizeScale: number; customExists: boolean; previewBase64?: string } {
+    const config = configService.getConfig();
+    const customFile = path.join(BANNERS_DIR, 'custom_watermark.png');
+    const customExists = fs.existsSync(customFile);
+
+    let previewBase64: string | undefined;
+    try {
+      if (customExists) {
+        previewBase64 = `data:image/png;base64,${fs.readFileSync(customFile).toString('base64')}`;
+      }
+    } catch {}
+
+    return {
+      enabled: !!config.watermark?.enabled,
+      positionMode: config.watermark?.positionMode || 'AUTO_DETECT',
+      sizeScale: config.watermark?.sizeScale || 0.25,
+      customExists,
+      previewBase64
+    };
   }
 }
 

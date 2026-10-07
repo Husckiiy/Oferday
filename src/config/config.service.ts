@@ -69,6 +69,11 @@ export const DEFAULT_CONFIG: AppConfig = {
     mode: 'default',
     customTemplate: '⚡ *OFERTA IMPERDÍVEL {LOJA}* {EMOJI_LOJA}\n\n🔥 *{TITULO}*\n\n{PRECOS}\n{CUPOM}\n🛒 *Compre aqui com segurança:* {LINK}\n\n⚠️ _{AVISO}_',
     customWarning: 'Preço sujeito a alteração a qualquer momento.'
+  },
+  watermark: {
+    enabled: false,
+    positionMode: 'AUTO_DETECT',
+    sizeScale: 0.25
   }
 };
 
@@ -98,7 +103,8 @@ class ConfigService {
           forwarder: { ...DEFAULT_CONFIG.forwarder, ...parsed.forwarder },
           filters: { ...DEFAULT_CONFIG.filters, ...parsed.filters },
           affiliate: { ...DEFAULT_CONFIG.affiliate, ...parsed.affiliate },
-          template: { ...DEFAULT_CONFIG.template, ...parsed.template }
+          template: { ...DEFAULT_CONFIG.template, ...parsed.template },
+          watermark: { ...DEFAULT_CONFIG.watermark, ...parsed.watermark }
         };
       } else {
         this.saveConfig(DEFAULT_CONFIG);

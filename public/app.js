@@ -28,6 +28,7 @@ function openModal(modalId) {
     if (modalId === 'modal-watermark') {
       loadFiltersConfig();
       loadBannerPreviews();
+      loadWatermarkConfig();
     }
     if (modalId === 'modal-promoter') {
       loadDivulgadorOffers();
@@ -1629,8 +1630,20 @@ btnSaveBlacklistConfig?.addEventListener('click', async () => {
       })
     });
     const data = await res.json();
+
+    // Save watermark configuration
+    await fetch('/api/watermark/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        enabled: cfgWatermarkEnabled?.checked,
+        positionMode: cfgWatermarkPosMode?.value,
+        sizeScale: parseFloat(cfgWatermarkSizeScale?.value || '0.25')
+      })
+    });
+
     if (data.success) {
-      showToast('Filtros de Limpeza e Blacklist salvos com sucesso!', 'success');
+      showToast('Filtros e Configurações de Marca d\'Água salvos com sucesso!', 'success');
       closeAllModals();
     } else {
       showToast(`Erro ao salvar: ${data.error}`, 'error');
@@ -1718,6 +1731,92 @@ fileUploadMeli?.addEventListener('change', (e) => {
 fileUploadMagalu?.addEventListener('change', (e) => {
   if (e.target.files && e.target.files[0]) {
     handleBannerUpload(e.target.files[0], 'MAGALU');
+  }
+});
+
+// ==========================================
+// MARCA D'ÁGUA / SELO PERSONALIZADO HANDLERS
+// ==========================================
+const cfgWatermarkEnabled = document.getElementById('cfgWatermarkEnabled');
+const cfgWatermarkPosMode = document.getElementById('cfgWatermarkPosMode');
+const cfgWatermarkSizeScale = document.getElementById('cfgWatermarkSizeScale');
+const fileUploadWatermark = document.getElementById('fileUploadWatermark');
+const imgWatermarkPreview = document.getElementById('imgWatermarkPreview');
+const txtWatermarkDefaultBadge = document.getElementById('txtWatermarkDefaultBadge');
+const btnDeleteCustomWatermark = document.getElementById('btnDeleteCustomWatermark');
+
+async function loadWatermarkConfig() {
+  try {
+    const res = await fetch('/api/watermark');
+    const data = await res.json();
+    if (data.success) {
+      if (cfgWatermarkEnabled) cfgWatermarkEnabled.checked = !!data.enabled;
+      if (cfgWatermarkPosMode && data.positionMode) cfgWatermarkPosMode.value = data.positionMode;
+      if (cfgWatermarkSizeScale && data.sizeScale) cfgWatermarkSizeScale.value = String(data.sizeScale);
+
+      if (data.customExists && data.previewBase64) {
+        if (imgWatermarkPreview) {
+          imgWatermarkPreview.src = data.previewBase64;
+          imgWatermarkPreview.style.display = 'block';
+        }
+        if (txtWatermarkDefaultBadge) txtWatermarkDefaultBadge.style.display = 'none';
+        if (btnDeleteCustomWatermark) btnDeleteCustomWatermark.style.display = 'inline-flex';
+      } else {
+        if (imgWatermarkPreview) imgWatermarkPreview.style.display = 'none';
+        if (txtWatermarkDefaultBadge) txtWatermarkDefaultBadge.style.display = 'block';
+        if (btnDeleteCustomWatermark) btnDeleteCustomWatermark.style.display = 'none';
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao carregar configurações de marca d\'água:', err);
+  }
+}
+
+fileUploadWatermark?.addEventListener('change', async (e) => {
+  if (!e.target.files || !e.target.files[0]) return;
+  const file = e.target.files[0];
+  const reader = new FileReader();
+  reader.onload = async (ev) => {
+    const base64 = ev.target.result;
+    showToast('Enviando seu logotipo personalizado...', 'info');
+    try {
+      const res = await fetch('/api/watermark/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: base64 })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Logotipo/Selo atualizado com sucesso!', 'success');
+        if (imgWatermarkPreview) {
+          imgWatermarkPreview.src = base64;
+          imgWatermarkPreview.style.display = 'block';
+        }
+        if (txtWatermarkDefaultBadge) txtWatermarkDefaultBadge.style.display = 'none';
+        if (btnDeleteCustomWatermark) btnDeleteCustomWatermark.style.display = 'inline-flex';
+      } else {
+        showToast(`Erro: ${data.error}`, 'error');
+      }
+    } catch (err) {
+      showToast(`Erro ao enviar logo: ${err.message}`, 'error');
+    }
+  };
+  reader.readAsDataURL(file);
+});
+
+btnDeleteCustomWatermark?.addEventListener('click', async () => {
+  if (!confirm('Deseja remover seu logotipo customizado e voltar a usar o selo padrão do Oferday?')) return;
+  try {
+    const res = await fetch('/api/watermark/delete', { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Logotipo customizado removido. Usando selo padrão.', 'info');
+      if (imgWatermarkPreview) imgWatermarkPreview.style.display = 'none';
+      if (txtWatermarkDefaultBadge) txtWatermarkDefaultBadge.style.display = 'block';
+      if (btnDeleteCustomWatermark) btnDeleteCustomWatermark.style.display = 'none';
+    }
+  } catch (err) {
+    showToast(`Erro: ${err.message}`, 'error');
   }
 });
 
