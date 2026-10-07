@@ -557,8 +557,21 @@ class ImageService {
       }
 
       if (imageUrl && imageUrl.startsWith('http')) {
+        // 1. Mercado Livre HD
         if (imageUrl.includes('mlstatic.com')) {
-          imageUrl = imageUrl.replace(/-[I|V]\.(jpg|jpeg|png|webp)/i, '-O.$1');
+          imageUrl = imageUrl.replace(/-[I|V|O]\.(jpg|jpeg|png|webp)/i, '-O.$1');
+        }
+        // 2. Magalu HD (replace thumbnail dimensions like 470x352 with 1000x1000)
+        if (imageUrl.includes('mlcdn.com.br')) {
+          imageUrl = imageUrl.replace(/\/\d+x\d+\//, '/1000x1000/');
+        }
+        // 3. Shopee HD
+        if (imageUrl.includes('shopee') || imageUrl.includes('shp.ee')) {
+          imageUrl = imageUrl.replace(/_tn(\.[a-z0-9]+)$/i, '$1').replace(/_\d+x\d+(\.[a-z0-9]+)$/i, '$1');
+        }
+        // 4. AliExpress HD
+        if (imageUrl.includes('alicdn.com')) {
+          imageUrl = imageUrl.replace(/_\d+x\d+\.(jpg|jpeg|png|webp)/i, '');
         }
 
         const imgResp = await fetch(imageUrl, {
