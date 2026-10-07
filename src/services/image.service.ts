@@ -398,6 +398,154 @@ class ImageService {
     // Default: keep the original product image intact
     return originalBuffer;
   }
+
+  /**
+   * Fetches official, high-resolution, watermark-free product image directly from the store
+   */
+  public async fetchOfficialStoreImage(affResults: any[]): Promise<Buffer | null> {
+    if (!affResults || affResults.length === 0) return null;
+
+    for (const res of affResults) {
+      if (!res || !res.store || res.store === 'UNKNOWN') continue;
+      const targetUrl = res.canonicalProductUrl || res.finalResolvedUrl || res.originalUrl;
+      if (!targetUrl) continue;
+
+      try {
+        // 1. Mercado Livre
+        if (res.store === 'MERCADO_LIVRE') {
+          const mlbMatch = targetUrl.match(/(MLB-?\d+)/i);
+          if (mlbMatch) {
+            const mlbId = mlbMatch[1].replace('-', '').toUpperCase();
+            try {
+              const apiRes = await fetch(`https://api.mercadolibre.com/items/${mlbId}`, {
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+                signal: AbortSignal.timeout(4000)
+              });
+              if (apiRes.ok) {
+                const data: any = await apiRes.json();
+                const picUrl = data.pictures?.[0]?.secure_url || data.pictures?.[0]?.url || data.thumbnail;
+                if (picUrl) {
+                  const hdUrl = picUrl.replace(/-[I|V|O]\.(jpg|jpeg|png|webp)/i, '-F.$1').replace(/-[I|V]\.(jpg|jpeg|png|webp)/i, '-O.$1');
+                  const imgRes = await fetch(hdUrl || picUrl, { signal: AbortSignal.timeout(6000) });
+                  if (imgRes.ok) {
+                    const buf = Buffer.from(await imgRes.arrayBuffer());
+                    if (buf.length > 5000) {
+                      logger.success('IMAGE', `✨ Imagem oficial HD extraída do Mercado Livre (${mlbId}) - 100% limpa sem marcas!`);
+                      return buf;
+                    }
+                  }
+                }
+              }
+            } catch {}
+          }
+
+          const scraped = await this.scrapeOgImageFromUrl(targetUrl);
+          if (scraped) {
+            logger.success('IMAGE', `✨ Imagem oficial extraída do Mercado Livre - 100% limpa sem marcas!`);
+            return scraped;
+          }
+        }
+
+        // 2. Amazon
+        if (res.store === 'AMAZON') {
+          const asinMatch = targetUrl.match(/\/(?:dp|gp\/product|product|ASIN)\/([A-Z0-9]{10})/i) || targetUrl.match(/\/([A-Z0-9]{10})(?:[/?]|$)/i);
+          const lookupUrl = asinMatch ? `https://www.amazon.com.br/dp/${asinMatch[1]}` : targetUrl;
+          const scraped = await this.scrapeOgImageFromUrl(lookupUrl);
+          if (scraped) {
+            logger.success('IMAGE', `✨ Imagem oficial extraída da Amazon - 100% limpa sem marcas!`);
+            return scraped;
+          }
+        }
+
+        // 3. Shopee
+        if (res.store === 'SHOPEE') {
+          const scraped = await this.scrapeOgImageFromUrl(targetUrl);
+          if (scraped) {
+            logger.success('IMAGE', `✨ Imagem oficial extraída da Shopee - 100% limpa sem marcas!`);
+            return scraped;
+          }
+        }
+
+        // 4. Magalu
+        if (res.store === 'MAGALU') {
+          const scraped = await this.scrapeOgImageFromUrl(targetUrl);
+          if (scraped) {
+            logger.success('IMAGE', `✨ Imagem oficial extraída do Magalu - 100% limpa sem marcas!`);
+            return scraped;
+          }
+        }
+
+        // 5. AliExpress / KaBuM / Awin / Outras
+        const scraped = await this.scrapeOgImageFromUrl(targetUrl);
+        if (scraped) {
+          logger.success('IMAGE', `✨ Imagem oficial extraída da loja (${res.store}) - 100% limpa sem marcas!`);
+          return scraped;
+        }
+      } catch (err: any) {
+        logger.warn('IMAGE', `Aviso ao buscar imagem da loja (${res.store}): ${err.message}`);
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Scrapes Open Graph og:image or high-res product image from HTML
+   */
+  private async scrapeOgImageFromUrl(url: string): Promise<Buffer | null> {
+    try {
+      const resp = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
+        },
+        signal: AbortSignal.timeout(5000)
+      });
+      if (!resp.ok) return null;
+
+      const html = await resp.text();
+      let imageUrl: string | null = null;
+      const ogMatch = html.match(/<meta[^>]+property=[\"']og:image[\"'][^>]+content=[\"']([^\"']+)[\"']/i) ||
+                      html.match(/<meta[^>]+content=[\"']([^\"']+)[\"'][^>]+property=[\"']og:image[\"']/i) ||
+                      html.match(/<meta[^>]+name=[\"']twitter:image[\"'][^>]+content=[\"']([^\"']+)[\"']/i);
+
+      if (ogMatch && ogMatch[1]) {
+        imageUrl = ogMatch[1].trim();
+      }
+
+      if (!imageUrl && url.includes('amazon')) {
+        const dynamicMatch = html.match(/data-a-dynamic-image=[\"']\{&quot;([^&]+)&quot;/i) || html.match(/\"large\":\"([^"]+)\"/i);
+        if (dynamicMatch && dynamicMatch[1]) {
+          imageUrl = dynamicMatch[1].replace(/\\/g, '');
+        }
+      }
+
+      if (imageUrl && imageUrl.startsWith('http')) {
+        if (imageUrl.includes('mlstatic.com')) {
+          imageUrl = imageUrl.replace(/-[I|V]\.(jpg|jpeg|png|webp)/i, '-O.$1');
+        }
+
+        const imgResp = await fetch(imageUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+            'Referer': url
+          },
+          signal: AbortSignal.timeout(6000)
+        });
+
+        if (imgResp.ok) {
+          const buf = Buffer.from(await imgResp.arrayBuffer());
+          if (buf.length > 3000) {
+            return buf;
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  }
 }
 
 export const imageService = new ImageService();

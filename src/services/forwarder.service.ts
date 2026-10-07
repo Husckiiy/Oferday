@@ -258,12 +258,27 @@ class ForwarderService extends EventEmitter {
       }
     }
 
-    // Process image replacement (e.g. Alerta de Cupons clean image via visual comparison)
+    // Process image:
+    // 1. First priority: Try fetching official 100% clean product image directly from store
     let finalMediaBuffer = data.mediaBuffer;
-    try {
-      finalMediaBuffer = await imageService.processImageReplacement(data.text, data.mediaBuffer);
-    } catch (imgErr: any) {
-      logger.warn('FORWARDER', `Aviso ao processar substituição de imagem: ${imgErr.message}`);
+    if (affResults && affResults.length > 0) {
+      try {
+        const cleanStoreImg = await imageService.fetchOfficialStoreImage(affResults);
+        if (cleanStoreImg && cleanStoreImg.length > 0) {
+          finalMediaBuffer = cleanStoreImg;
+        }
+      } catch (imgErr: any) {
+        logger.warn('FORWARDER', `Aviso ao buscar imagem oficial da loja: ${imgErr.message}`);
+      }
+    }
+
+    // 2. Second priority / Fallback: Check known banner rules (e.g. Alerta de Cupons)
+    if (finalMediaBuffer === data.mediaBuffer && finalMediaBuffer) {
+      try {
+        finalMediaBuffer = await imageService.processImageReplacement(data.text, finalMediaBuffer);
+      } catch (imgErr: any) {
+        logger.warn('FORWARDER', `Aviso ao processar substituição de imagem: ${imgErr.message}`);
+      }
     }
 
     let mediaBase64: string | null = null;
@@ -420,27 +435,44 @@ class ForwarderService extends EventEmitter {
       }
     }
 
-    // Process image replacement (e.g. Alerta de Cupons clean image)
-    let finalMediaBuffer = mediaBuffer;
-    try {
-      finalMediaBuffer = await imageService.processImageReplacement(text, mediaBuffer);
-    } catch (imgErr: any) {
-      logger.warn('FORWARDER', `Aviso ao processar substituição de imagem: ${imgErr.message}`);
-    }
-
-    if (finalMediaBuffer && finalMediaBuffer.length > 0) {
-      mediaBase64 = `data:image/jpeg;base64,${finalMediaBuffer.toString('base64')}`;
-    }
-
     // Process text through Affiliate Service
     let processedText = text;
+    let affResults: any[] = [];
     if (text) {
       try {
         const affResult = await affiliateService.processMessageText(text);
         processedText = affResult.text;
+        affResults = affResult.results || [];
       } catch (affErr: any) {
         logger.warn('FORWARDER', `Aviso ao processar links de afiliado: ${affErr.message}`);
       }
+    }
+
+    // Process image:
+    // 1. First priority: Try fetching official 100% clean product image directly from store
+    let finalMediaBuffer = mediaBuffer;
+    if (affResults && affResults.length > 0) {
+      try {
+        const cleanStoreImg = await imageService.fetchOfficialStoreImage(affResults);
+        if (cleanStoreImg && cleanStoreImg.length > 0) {
+          finalMediaBuffer = cleanStoreImg;
+        }
+      } catch (imgErr: any) {
+        logger.warn('FORWARDER', `Aviso ao buscar imagem oficial da loja: ${imgErr.message}`);
+      }
+    }
+
+    // 2. Second priority / Fallback: Check known banner rules (e.g. Alerta de Cupons)
+    if (finalMediaBuffer === mediaBuffer && finalMediaBuffer) {
+      try {
+        finalMediaBuffer = await imageService.processImageReplacement(text, finalMediaBuffer);
+      } catch (imgErr: any) {
+        logger.warn('FORWARDER', `Aviso ao processar substituição de imagem: ${imgErr.message}`);
+      }
+    }
+
+    if (finalMediaBuffer && finalMediaBuffer.length > 0) {
+      mediaBase64 = `data:image/jpeg;base64,${finalMediaBuffer.toString('base64')}`;
     }
 
     const item: ForwardedMessageItem = {
