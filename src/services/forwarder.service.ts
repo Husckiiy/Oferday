@@ -212,9 +212,11 @@ class ForwarderService extends EventEmitter {
 
     const { productFps, announcementFps } = this.extractFingerprints(data.text, affResults);
     
+    const isDedupActive = config.filters?.antiDuplicateEnabled !== false;
+
     // SCENARIO A: THIS IS A SPECIFIC PRODUCT OFFER (Has Product ID: MLB, ASIN, SKU, etc.)
     // Only block if the exact SAME product ID was sent before (allows all different deals using the same coupon code!)
-    if (productFps.length > 0) {
+    if (isDedupActive && productFps.length > 0) {
       for (const pFp of productFps) {
         if (this.sentOffers.has(pFp)) {
           const rec = this.sentOffers.get(pFp)!;
@@ -227,7 +229,7 @@ class ForwarderService extends EventEmitter {
       }
     } 
     // SCENARIO B: THIS IS A GENERIC ANNOUNCEMENT / COUPON BANNER (No specific product ID)
-    else {
+    else if (isDedupActive) {
       for (const aFp of announcementFps) {
         if (this.sentOffers.has(aFp)) {
           const rec = this.sentOffers.get(aFp)!;

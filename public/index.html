@@ -1325,46 +1325,46 @@
           </div>
         </div>
 
-        <!-- SECTION: ESTAMPAR MINHA MARCA D'ÁGUA / SELO -->
-        <div class="config-section-card" style="margin-top: 1.25rem; border: 1px solid rgba(249, 115, 22, 0.3); background: rgba(249, 115, 22, 0.03);">
-          <div class="section-title-wrap">
-            <i data-lucide="stamp" class="section-title-icon" style="color: #f97316;"></i>
-            <div style="flex: 1;">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700;">Estampar Minha Marca d'Água / Selo nas Imagens</h4>
-                <label class="switch-toggle" style="margin: 0;">
-                  <input type="checkbox" id="cfgWatermarkEnabled">
-                  <span class="slider-round"></span>
-                </label>
+        <!-- SECTION 3: ESTAMPAR MINHA MARCA D'ÁGUA / SELO -->
+        <div class="config-section-card" style="margin-top: 1.25rem;">
+          <div class="section-title-wrap" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;">
+            <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
+              <i data-lucide="stamp" class="section-title-icon" style="color: #f97316; width: 22px; height: 22px; margin-top: 2px;"></i>
+              <div>
+                <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-heading);">3. Estampar Minha Marca d'Água / Selo</h4>
+                <p class="text-muted" style="margin: 0.2rem 0 0; font-size: 0.8rem; line-height: 1.4;">
+                  Detecta a posição da marca d'água do concorrente e <strong>sobrepõe o seu selo ou logotipo por cima</strong> antes do envio.
+                </p>
               </div>
-              <p class="text-muted" style="margin: 0.2rem 0 0; font-size: 0.78rem;">
-                O bot detecta o local da marca d'água do concorrente e <strong>sobrepõe o seu logotipo / selo exatamente por cima</strong> antes de enviar ao canal.
-              </p>
             </div>
+            <label class="toggle-switch" style="flex-shrink: 0; margin-top: 4px;">
+              <input type="checkbox" id="cfgWatermarkEnabled">
+              <span class="toggle-slider"></span>
+            </label>
           </div>
 
-          <div id="watermarkSettingsContainer" style="margin-top: 1rem;">
+          <div id="watermarkSettingsContainer" style="margin-top: 1.15rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
             <div class="form-row-2">
               <div class="form-group">
-                <label style="font-size: 0.8rem; font-weight: 600; color: #cbd5e1; margin-bottom: 0.35rem; display: block;">
-                  🎯 Modo de Posicionamento
+                <label style="font-size: 0.82rem; font-weight: 600; color: var(--text-heading); margin-bottom: 0.4rem; display: block;">
+                  Posição do Selo
                 </label>
-                <select id="cfgWatermarkPosMode" class="form-control form-control-dark" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #fff; padding: 0.45rem 0.65rem; border-radius: 6px; font-size: 0.85rem; width: 100%;">
+                <select id="cfgWatermarkPosMode" class="form-control" style="width: 100%; padding: 0.55rem 0.75rem; font-size: 0.85rem; border-radius: var(--radius-sm);">
                   <option value="AUTO_DETECT">🎯 Auto-detectar e cobrir concorrente (Recomendado)</option>
-                  <option value="BOTTOM_RIGHT">↘️ Fixo no Canto Inferior Direito</option>
-                  <option value="BOTTOM_LEFT">↙️ Fixo no Canto Inferior Esquerdo</option>
-                  <option value="TOP_RIGHT">↗️ Fixo no Canto Superior Direito</option>
-                  <option value="TOP_LEFT">↖️ Fixo no Canto Superior Esquerdo</option>
+                  <option value="BOTTOM_RIGHT">↘️ Canto Inferior Direito</option>
+                  <option value="BOTTOM_LEFT">↙️ Canto Inferior Esquerdo</option>
+                  <option value="TOP_RIGHT">↗️ Canto Superior Direito</option>
+                  <option value="TOP_LEFT">↖️ Canto Superior Esquerdo</option>
                 </select>
               </div>
 
               <div class="form-group">
-                <label style="font-size: 0.8rem; font-weight: 600; color: #cbd5e1; margin-bottom: 0.35rem; display: block;">
-                  📏 Tamanho do Selo na Imagem
+                <label style="font-size: 0.82rem; font-weight: 600; color: var(--text-heading); margin-bottom: 0.4rem; display: block;">
+                  Tamanho do Selo
                 </label>
-                <select id="cfgWatermarkSizeScale" class="form-control form-control-dark" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #fff; padding: 0.45rem 0.65rem; border-radius: 6px; font-size: 0.85rem; width: 100%;">
+                <select id="cfgWatermarkSizeScale" class="form-control" style="width: 100%; padding: 0.55rem 0.75rem; font-size: 0.85rem; border-radius: var(--radius-sm);">
                   <option value="0.18">Pequeno (18% da imagem)</option>
-                  <option value="0.25" selected>Médio (25% - Padrão Ideal)</option>
+                  <option value="0.25" selected>Médio (25% - Padrão)</option>
                   <option value="0.32">Grande (32% da imagem)</option>
                   <option value="0.40">Extra Grande (40% da imagem)</option>
                 </select>
@@ -1372,21 +1372,21 @@
             </div>
 
             <!-- Upload Logo Card -->
-            <div style="margin-top: 1rem; padding: 1rem; border-radius: 8px; background: rgba(0,0,0,0.25); border: 1px dashed rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
-              <div style="display: flex; align-items: center; gap: 1rem;">
-                <div id="watermarkLogoPreviewWrap" style="width: 80px; height: 50px; background: rgba(255,255,255,0.05); border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid rgba(255,255,255,0.1);">
+            <div style="margin-top: 1rem; padding: 0.85rem 1rem; border-radius: var(--radius-md); background: var(--bg-hover, rgba(0,0,0,0.04)); border: 1px dashed var(--border-color); display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 0.85rem;">
+                <div id="watermarkLogoPreviewWrap" style="width: 70px; height: 46px; background: rgba(0,0,0,0.1); border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--border-color);">
                   <img id="imgWatermarkPreview" src="" alt="Selo" style="max-width: 100%; max-height: 100%; object-fit: contain; display: none;">
-                  <span id="txtWatermarkDefaultBadge" style="font-size: 0.65rem; font-weight: 800; color: #f97316; text-align: center;">OFERDAY<br>(Padrão)</span>
+                  <span id="txtWatermarkDefaultBadge" style="font-size: 0.65rem; font-weight: 800; color: #f97316; text-align: center; line-height: 1.1;">OFERDAY<br><span style="font-size: 0.55rem; font-weight: 500; opacity: 0.8;">(Padrão)</span></span>
                 </div>
                 <div>
-                  <strong style="font-size: 0.85rem; display: block; color: #e2e8f0;">Seu Logotipo / Selo Personalizado</strong>
-                  <span class="text-muted" style="font-size: 0.75rem;">Envie um arquivo PNG com transparência para substituir o selo padrão</span>
+                  <strong style="font-size: 0.85rem; display: block; color: var(--text-heading);">Logotipo / Selo Customizado</strong>
+                  <span class="text-muted" style="font-size: 0.75rem;">Envie sua imagem PNG com transparência (opcional)</span>
                 </div>
               </div>
-              <div style="display: flex; gap: 0.5rem;">
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
                 <input type="file" id="fileUploadWatermark" accept="image/png,image/jpeg,image/webp" style="display: none;">
                 <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('fileUploadWatermark').click()">
-                  <i data-lucide="upload"></i> Enviar Logo
+                  <i data-lucide="upload"></i> <span>Enviar Logo</span>
                 </button>
                 <button type="button" class="btn btn-danger btn-sm" id="btnDeleteCustomWatermark" style="display: none;" title="Restaurar selo padrão Oferday">
                   <i data-lucide="trash-2"></i>
@@ -1396,21 +1396,28 @@
           </div>
         </div>
 
-        <!-- SECTION 3: PROTEÇÕES COMPLEMENTARES -->
+        <!-- SECTION 4: PROTEÇÕES COMPLEMENTARES -->
         <div class="config-section-card" style="margin-top: 1.25rem;">
-          <div class="toggle-option-row">
-            <div>
-              <strong>Remover @arrobas de canais concorrentes</strong>
-              <p class="text-muted">Limpa automaticamente menções a outros canais no texto da mensagem</p>
+          <div class="toggle-option-row" style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0;">
+            <div style="padding-right: 1rem;">
+              <strong style="font-size: 0.9rem; color: var(--text-heading);">Remover @arrobas de canais concorrentes</strong>
+              <p class="text-muted" style="margin: 0.15rem 0 0; font-size: 0.78rem;">Limpa automaticamente menções a outros canais (@canal, @bot) no texto da mensagem</p>
             </div>
-            <span class="badge badge-green">Ativado</span>
+            <label class="toggle-switch" style="flex-shrink: 0;">
+              <input type="checkbox" id="cfgFilterRemoveHandles" checked>
+              <span class="toggle-slider"></span>
+            </label>
           </div>
-          <div class="toggle-option-row" style="margin-top: 0.85rem;">
-            <div>
-              <strong>Filtro Anti-Duplicados (Cross-Channel 4 Horas)</strong>
-              <p class="text-muted">Evita repassar o mesmo produto repetido se múltiplos canais postarem</p>
+          
+          <div class="toggle-option-row" style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0 0.2rem; margin-top: 0.6rem; border-top: 1px solid var(--border-color);">
+            <div style="padding-right: 1rem;">
+              <strong style="font-size: 0.9rem; color: var(--text-heading);">Filtro Anti-Duplicados (Cross-Channel 4 Horas)</strong>
+              <p class="text-muted" style="margin: 0.15rem 0 0; font-size: 0.78rem;">Evita repassar o mesmo produto repetido se múltiplos canais postarem a mesma oferta</p>
             </div>
-            <span class="badge badge-green">Ativado</span>
+            <label class="toggle-switch" style="flex-shrink: 0;">
+              <input type="checkbox" id="cfgFilterAntiDuplicate" checked>
+              <span class="toggle-slider"></span>
+            </label>
           </div>
         </div>
 

@@ -1621,12 +1621,17 @@ btnSaveBlacklistConfig?.addEventListener('click', async () => {
     btnSaveBlacklistConfig.textContent = 'Salvando...';
   }
   try {
+    const cfgFilterRemoveHandles = document.getElementById('cfgFilterRemoveHandles');
+    const cfgFilterAntiDuplicate = document.getElementById('cfgFilterAntiDuplicate');
+
     const res = await fetch('/api/filters', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         blacklist: blacklistItems,
-        removeTerms: removeTermsItems
+        removeTerms: removeTermsItems,
+        removeHandles: cfgFilterRemoveHandles ? cfgFilterRemoveHandles.checked : true,
+        antiDuplicateEnabled: cfgFilterAntiDuplicate ? cfgFilterAntiDuplicate.checked : true
       })
     });
     const data = await res.json();
@@ -1670,6 +1675,14 @@ async function loadFiltersConfig() {
       if (Array.isArray(data.filters.removeTerms)) {
         removeTermsItems = data.filters.removeTerms;
         renderRemoveTermsTags();
+      }
+      const cfgFilterRemoveHandles = document.getElementById('cfgFilterRemoveHandles');
+      const cfgFilterAntiDuplicate = document.getElementById('cfgFilterAntiDuplicate');
+      if (cfgFilterRemoveHandles) {
+        cfgFilterRemoveHandles.checked = data.filters.removeHandles !== false;
+      }
+      if (cfgFilterAntiDuplicate) {
+        cfgFilterAntiDuplicate.checked = data.filters.antiDuplicateEnabled !== false;
       }
     }
   } catch (err) {

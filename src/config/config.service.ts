@@ -42,6 +42,8 @@ export const DEFAULT_CONFIG: AppConfig = {
       '@economizandocomjp'
     ],
     removeWatermarks: true,
+    removeHandles: true,
+    antiDuplicateEnabled: true,
     dedupHours: 4
   },
   affiliate: {

@@ -549,7 +549,7 @@ apiRouter.get('/filters', (req: Request, res: Response) => {
 
 apiRouter.post('/filters', (req: Request, res: Response) => {
   try {
-    const { blacklist, removeTerms, removeWatermarks, dedupHours } = req.body;
+    const { blacklist, removeTerms, removeWatermarks, removeHandles, antiDuplicateEnabled, dedupHours } = req.body;
     const current = configService.getConfig();
     const updated = configService.saveConfig({
       filters: {
@@ -557,6 +557,8 @@ apiRouter.post('/filters', (req: Request, res: Response) => {
         blacklist: Array.isArray(blacklist) ? blacklist : current.filters?.blacklist || [],
         removeTerms: Array.isArray(removeTerms) ? removeTerms : current.filters?.removeTerms || [],
         removeWatermarks: typeof removeWatermarks === 'boolean' ? removeWatermarks : current.filters?.removeWatermarks ?? true,
+        removeHandles: typeof removeHandles === 'boolean' ? removeHandles : current.filters?.removeHandles ?? true,
+        antiDuplicateEnabled: typeof antiDuplicateEnabled === 'boolean' ? antiDuplicateEnabled : current.filters?.antiDuplicateEnabled ?? true,
         dedupHours: typeof dedupHours === 'number' ? dedupHours : current.filters?.dedupHours ?? 4
       }
     });

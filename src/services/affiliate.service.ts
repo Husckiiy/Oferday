@@ -1367,14 +1367,17 @@ export class AffiliateService {
         continue;
       }
 
-      // 5. Remove competitor handles
-      let cleanedHandleLine = line
-        .replace(/@economizandocomjp\b/gi, '')
-        .replace(/@economizandobot\b/gi, '')
-        .replace(/@promos_tech1\b/gi, '')
-        .replace(/@jptechofertasgerais\b/gi, '')
-        .replace(/@portaldossachadinhos\b/gi, '')
-        .replace(/\(?\s*an[uú]ncio\s*\)?$/i, '');
+      // 5. Remove competitor handles (if enabled)
+      let cleanedHandleLine = line;
+      if (config.filters?.removeHandles !== false) {
+        cleanedHandleLine = cleanedHandleLine
+          .replace(/@economizandocomjp\b/gi, '')
+          .replace(/@economizandobot\b/gi, '')
+          .replace(/@promos_tech1\b/gi, '')
+          .replace(/@jptechofertasgerais\b/gi, '')
+          .replace(/@portaldossachadinhos\b/gi, '')
+          .replace(/\(?\s*an[uú]ncio\s*\)?$/i, '');
+      }
 
       // Remove any removeTerms that appear as inline words
       for (const rTerm of lowerRemoveTerms) {

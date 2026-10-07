@@ -19,6 +19,8 @@ export interface AppConfig {
     blacklist: string[]; // Termos que BLOQUEIAM a mensagem inteira (descarte de spam)
     removeTerms?: string[]; // Termos/linhas que são REMOVIDOS do texto mantendo a oferta
     removeWatermarks: boolean;
+    removeHandles?: boolean; // Remover @arrobas de canais concorrentes
+    antiDuplicateEnabled?: boolean; // Filtro Anti-Duplicados (Cross-Channel)
     dedupHours: number;
   };
   affiliate: {
