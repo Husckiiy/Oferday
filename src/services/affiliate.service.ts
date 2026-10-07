@@ -106,7 +106,7 @@ export class AffiliateService {
     },
     {
       store: 'AMAZON' as SupportedStore,
-      pattern: /https?:\/\/(?:www\.)?(?:amzn\.to|amazon\.com(?:\.br)?|a\.co)\/[^\s<>"')]+/gi
+      pattern: /https?:\/\/(?:www\.)?(?:amzn\.to|amazon\.com(?:\.br)?|a\.co|link\.amazon)\/[^\s<>"')]+/gi
     },
     {
       store: 'MAGALU' as SupportedStore,
@@ -162,6 +162,7 @@ export class AffiliateService {
       lower.includes('amazon.com') ||
       lower.includes('amazon.com.br') ||
       lower.includes('amzn.to') ||
+      lower.includes('link.amazon') ||
       lower.includes('a.co/') ||
       lower.includes('//a.co')
     ) {

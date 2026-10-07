@@ -71,7 +71,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     customWarning: 'Preço sujeito a alteração a qualquer momento.'
   },
   watermark: {
-    enabled: false,
+    enabled: true,
     positionMode: 'AUTO_DETECT',
     sizeScale: 0.25
   }

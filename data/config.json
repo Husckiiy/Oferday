@@ -81,5 +81,10 @@
     "mode": "default",
     "customTemplate": "⚡ *OFERTA IMPERDÍVEL {LOJA}* {EMOJI_LOJA}\n\n🔥 *{TITULO}*\n\n{PRECOS}\n{CUPOM}\n🛒 *Compre aqui com segurança:* {LINK}\n\n⚠️ _{AVISO}_",
     "customWarning": "Preço sujeito a alteração a qualquer momento."
+  },
+  "watermark": {
+    "enabled": true,
+    "positionMode": "AUTO_DETECT",
+    "sizeScale": 0.25
   }
 }

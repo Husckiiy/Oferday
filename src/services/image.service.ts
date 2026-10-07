@@ -449,7 +449,30 @@ class ImageService {
 
         // 2. Amazon
         if (res.store === 'AMAZON') {
-          const asinMatch = targetUrl.match(/\/(?:dp|gp\/product|product|ASIN)\/([A-Z0-9]{10})/i) || targetUrl.match(/\/([A-Z0-9]{10})(?:[/?]|$)/i);
+          const asinMatch = targetUrl.match(/\/(?:dp|gp\/product|product|ASIN)\/([A-Z0-9]{10})/i) ||
+                            targetUrl.match(/\/([A-Z0-9]{10})(?:[/?]|$)/i) ||
+                            (res.finalResolvedUrl && res.finalResolvedUrl.match(/\/(?:dp|gp\/product|product|ASIN)\/([A-Z0-9]{10})/i)) ||
+                            (res.canonicalProductUrl && res.canonicalProductUrl.match(/\/(?:dp|gp\/product|product|ASIN)\/([A-Z0-9]{10})/i));
+          if (asinMatch) {
+            const asin = asinMatch[1].toUpperCase();
+            try {
+              const cdnUrls = [
+                `https://images-na.ssl-images-amazon.com/images/P/${asin}.01._SCLZZZZZZZ_SX800_.jpg`,
+                `https://images-na.ssl-images-amazon.com/images/P/${asin}.01.LZZZZZZZ.jpg`
+              ];
+              for (const cdnUrl of cdnUrls) {
+                const imgRes = await fetch(cdnUrl, { signal: AbortSignal.timeout(5000) });
+                if (imgRes.ok) {
+                  const buf = Buffer.from(await imgRes.arrayBuffer());
+                  if (buf.length > 3000) {
+                    logger.success('IMAGE', `✨ Imagem oficial HD extraída da Amazon CDN (${asin}) - 100% limpa sem marcas!`);
+                    return buf;
+                  }
+                }
+              }
+            } catch {}
+          }
+
           const lookupUrl = asinMatch ? `https://www.amazon.com.br/dp/${asinMatch[1]}` : targetUrl;
           const scraped = await this.scrapeOgImageFromUrl(lookupUrl);
           if (scraped) {
