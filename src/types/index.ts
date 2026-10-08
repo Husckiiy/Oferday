@@ -54,6 +54,7 @@ export interface AppConfig {
     positionMode: 'AUTO_DETECT' | 'BOTTOM_RIGHT' | 'BOTTOM_LEFT' | 'TOP_RIGHT' | 'TOP_LEFT';
     sizeScale: number; // 0.15 to 0.40 (default 0.25)
     customImagePath?: string;
+    customLogoBase64?: string;
   };
 }
 

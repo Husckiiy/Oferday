@@ -796,9 +796,25 @@ apiRouter.post('/watermark/upload', async (req: Request, res: Response) => {
     const buffer = Buffer.from(cleanBase64, 'base64');
     
     const BANNERS_DIR = path.resolve(process.cwd(), 'data', 'banners');
+    const ASSETS_DIR = path.resolve(process.cwd(), 'assets', 'banners');
     if (!fs.existsSync(BANNERS_DIR)) fs.mkdirSync(BANNERS_DIR, { recursive: true });
+    if (!fs.existsSync(ASSETS_DIR)) fs.mkdirSync(ASSETS_DIR, { recursive: true });
     
     fs.writeFileSync(path.join(BANNERS_DIR, 'custom_watermark.png'), buffer);
+    fs.writeFileSync(path.join(ASSETS_DIR, 'custom_watermark.png'), buffer);
+
+    const config = configService.getConfig();
+    configService.saveConfig({
+      ...config,
+      watermark: {
+        enabled: config.watermark?.enabled ?? true,
+        positionMode: config.watermark?.positionMode ?? 'AUTO_DETECT',
+        sizeScale: config.watermark?.sizeScale ?? 0.25,
+        customImagePath: config.watermark?.customImagePath,
+        customLogoBase64: `data:image/png;base64,${cleanBase64}`
+      }
+    });
+
     logger.success('IMAGE', 'Logotipo/Selo de marca d\'água personalizado atualizado com sucesso!');
     
     res.json({ success: true, message: 'Logo salva com sucesso!' });
@@ -810,10 +826,26 @@ apiRouter.post('/watermark/upload', async (req: Request, res: Response) => {
 apiRouter.post('/watermark/delete', (req: Request, res: Response) => {
   try {
     const BANNERS_DIR = path.resolve(process.cwd(), 'data', 'banners');
+    const ASSETS_DIR = path.resolve(process.cwd(), 'assets', 'banners');
     const customFile = path.join(BANNERS_DIR, 'custom_watermark.png');
+    const assetCustomFile = path.join(ASSETS_DIR, 'custom_watermark.png');
     if (fs.existsSync(customFile)) {
       fs.unlinkSync(customFile);
     }
+    if (fs.existsSync(assetCustomFile)) {
+      fs.unlinkSync(assetCustomFile);
+    }
+    const config = configService.getConfig();
+    configService.saveConfig({
+      ...config,
+      watermark: {
+        enabled: config.watermark?.enabled ?? true,
+        positionMode: config.watermark?.positionMode ?? 'AUTO_DETECT',
+        sizeScale: config.watermark?.sizeScale ?? 0.25,
+        customImagePath: config.watermark?.customImagePath,
+        customLogoBase64: undefined
+      }
+    });
     logger.info('IMAGE', 'Logotipo customizado removido. Usando selo padrão Oferday.');
     res.json({ success: true, message: 'Logo removida.' });
   } catch (err: any) {

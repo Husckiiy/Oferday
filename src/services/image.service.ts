@@ -742,10 +742,16 @@ class ImageService {
 
     try {
       const customFile = path.join(BANNERS_DIR, 'custom_watermark.png');
+      const assetCustomFile = path.join(ASSETS_BANNERS_DIR, 'custom_watermark.png');
       let watermarkBuffer: Buffer | null = null;
 
       if (fs.existsSync(customFile)) {
         watermarkBuffer = fs.readFileSync(customFile);
+      } else if (fs.existsSync(assetCustomFile)) {
+        watermarkBuffer = fs.readFileSync(assetCustomFile);
+      } else if (config.watermark?.customLogoBase64) {
+        const cleanBase64 = config.watermark.customLogoBase64.replace(/^data:image\/[a-z0-9]+;base64,/i, '');
+        watermarkBuffer = Buffer.from(cleanBase64, 'base64');
       } else {
         watermarkBuffer = await this.getDefaultWatermarkBuffer();
       }
@@ -849,12 +855,17 @@ class ImageService {
   public getWatermarkInfo(): { enabled: boolean; positionMode: string; sizeScale: number; customExists: boolean; previewBase64?: string } {
     const config = configService.getConfig();
     const customFile = path.join(BANNERS_DIR, 'custom_watermark.png');
-    const customExists = fs.existsSync(customFile);
+    const assetCustomFile = path.join(ASSETS_BANNERS_DIR, 'custom_watermark.png');
+    const customExists = fs.existsSync(customFile) || fs.existsSync(assetCustomFile) || !!config.watermark?.customLogoBase64;
 
     let previewBase64: string | undefined;
     try {
-      if (customExists) {
+      if (fs.existsSync(customFile)) {
         previewBase64 = `data:image/png;base64,${fs.readFileSync(customFile).toString('base64')}`;
+      } else if (fs.existsSync(assetCustomFile)) {
+        previewBase64 = `data:image/png;base64,${fs.readFileSync(assetCustomFile).toString('base64')}`;
+      } else if (config.watermark?.customLogoBase64) {
+        previewBase64 = config.watermark.customLogoBase64;
       }
     } catch {}
 
