@@ -528,14 +528,24 @@ class ImageService {
    */
   private async scrapeOgImageFromUrl(url: string): Promise<Buffer | null> {
     try {
+      const headers: Record<string, string> = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
+      };
+
+      if (url.includes('amazon')) {
+        const config = configService.getConfig();
+        const cookie = config.affiliate?.amazonCookie || '';
+        if (cookie) {
+          headers['Cookie'] = cookie.replace(/x-amz-captcha-[12]=[^;]+;?\s*/gi, '').trim();
+        }
+      }
+
       const resp = await fetch(url, {
         redirect: 'follow',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
-        },
-        signal: AbortSignal.timeout(6000)
+        headers,
+        signal: AbortSignal.timeout(7000)
       });
       if (!resp.ok) return null;
 
@@ -545,14 +555,20 @@ class ImageService {
                       html.match(/<meta[^>]+content=[\"']([^\"']+)[\"'][^>]+property=[\"']og:image[\"']/i) ||
                       html.match(/<meta[^>]+name=[\"']twitter:image[\"'][^>]+content=[\"']([^\"']+)[\"']/i);
 
-      if (ogMatch && ogMatch[1]) {
+      if (ogMatch && ogMatch[1] && !ogMatch[1].includes('default-avatar') && !ogMatch[1].includes('amazon_logo')) {
         imageUrl = ogMatch[1].trim();
       }
 
       if (!imageUrl && (url.includes('amazon') || html.includes('amazon'))) {
-        const dynamicMatch = html.match(/data-a-dynamic-image=[\"']\{&quot;([^&]+)&quot;/i) || html.match(/\"large\":\"([^"]+)\"/i);
+        const dynamicMatch = html.match(/data-a-dynamic-image=[\"']\{&quot;([^&]+)&quot;/i) ||
+                             html.match(/\"hiRes\"\s*:\s*\"([^\"]+)\"/i) ||
+                             html.match(/\"large\"\s*:\s*\"([^\"]+)\"/i) ||
+                             html.match(/data-old-hires=[\"']([^\"']+)[\"']/i) ||
+                             html.match(/https:\/\/m\.media-amazon\.com\/images\/I\/[A-Za-z0-9%_\-+]+\.(?:jpg|jpeg|png)/i);
         if (dynamicMatch && dynamicMatch[1]) {
           imageUrl = dynamicMatch[1].replace(/\\/g, '');
+        } else if (dynamicMatch && dynamicMatch[0]) {
+          imageUrl = dynamicMatch[0];
         }
       }
 
@@ -572,6 +588,10 @@ class ImageService {
         // 4. AliExpress HD
         if (imageUrl.includes('alicdn.com')) {
           imageUrl = imageUrl.replace(/_\d+x\d+\.(jpg|jpeg|png|webp)/i, '');
+        }
+        // 5. Amazon media-amazon HD (upgrade to 1500px resolution)
+        if (imageUrl.includes('media-amazon.com')) {
+          imageUrl = imageUrl.replace(/\._[A-Z0-9_,]+_\./i, '._AC_SL1500_.');
         }
 
         const imgResp = await fetch(imageUrl, {
