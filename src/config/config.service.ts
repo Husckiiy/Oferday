@@ -183,13 +183,25 @@ class ConfigService {
       customWarning: incomingTpl.customWarning !== undefined ? incomingTpl.customWarning : (currentTpl?.customWarning || DEFAULT_CONFIG.template?.customWarning || 'Preço sujeito a alteração a qualquer momento.')
     };
 
+    const currentWatermark = this.config.watermark || DEFAULT_CONFIG.watermark;
+    const incomingWatermark = (newConfig.watermark || {}) as Partial<NonNullable<AppConfig['watermark']>>;
+
+    const cleanWatermark = {
+      enabled: incomingWatermark.enabled !== undefined ? incomingWatermark.enabled : (currentWatermark?.enabled ?? true),
+      positionMode: incomingWatermark.positionMode || currentWatermark?.positionMode || 'AUTO_DETECT',
+      sizeScale: incomingWatermark.sizeScale !== undefined ? incomingWatermark.sizeScale : (currentWatermark?.sizeScale || 0.25),
+      customImagePath: incomingWatermark.customImagePath || currentWatermark?.customImagePath,
+      customLogoBase64: incomingWatermark.customLogoBase64 !== undefined ? incomingWatermark.customLogoBase64 : currentWatermark?.customLogoBase64
+    };
+
     this.config = {
       telegram: { ...this.config.telegram, ...(newConfig.telegram || {}) },
       whatsapp: { ...this.config.whatsapp, ...(newConfig.whatsapp || {}) },
       forwarder: { ...this.config.forwarder, ...(newConfig.forwarder || {}) },
       filters: { ...this.config.filters, ...(newConfig.filters || {}) },
       affiliate: cleanAffiliate,
-      template: cleanTemplate
+      template: cleanTemplate,
+      watermark: cleanWatermark
     };
 
     try {

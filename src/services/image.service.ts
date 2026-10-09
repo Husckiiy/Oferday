@@ -327,9 +327,32 @@ class ImageService {
   }
 
   /**
-   * Process image replacement strictly by visual comparison (Perceptual dHash and Exact Hash).
-   * Will ONLY replace if the incoming image is actually a known coupon banner image.
-   * Product photos will never be replaced.
+   * Checks if a URL is a generic landing page, coupon hub, or showcase rather than a single specific product.
+   */
+  public isGenericNonProductUrl(url: string): boolean {
+    if (!url) return true;
+    const lower = url.toLowerCase();
+    return (
+      lower.includes('/cupons') ||
+      lower.includes('/selecao/') ||
+      lower.includes('/campanha/') ||
+      lower.includes('/hotsite/') ||
+      lower.includes('/ofertas') ||
+      lower.includes('/landing/') ||
+      lower.includes('/gz/promocoes') ||
+      lower.includes('amazon.com.br/b?') ||
+      lower.includes('amazon.com.br/b/') ||
+      lower.includes('amazon.com.br/deals') ||
+      lower.includes('amazon.com.br/gp/coupons') ||
+      lower.includes('shopee.com.br/m/') ||
+      lower.includes('shopee.com.br/events') ||
+      lower.includes('best.aliexpress.com')
+    );
+  }
+
+  /**
+   * Process image replacement strictly by visual comparison (Perceptual dHash, Exact Hash, and Theme).
+   * Replaces competitor coupon banners with clean official banners.
    */
   public async processImageReplacement(text: string, originalBuffer: Buffer | null): Promise<Buffer | null> {
     if (!originalBuffer || originalBuffer.length === 0) {
@@ -343,16 +366,14 @@ class ImageService {
     const inSha256 = crypto.createHash('sha256').update(originalBuffer).digest('hex');
     const inMd5 = crypto.createHash('md5').update(originalBuffer).digest('hex');
     const inDHash = await this.computeDHash(originalBuffer);
-
-    if (!inDHash) {
-      return originalBuffer;
-    }
+    const colorTheme = await this.detectColorTheme(originalBuffer);
+    const lowerText = (text || '').toLowerCase();
 
     for (const rule of this.rules) {
       let isMatch = false;
       let matchReason = '';
 
-      if (rule.cachedRefs && rule.cachedRefs.length > 0) {
+      if (rule.cachedRefs && rule.cachedRefs.length > 0 && inDHash) {
         for (const ref of rule.cachedRefs) {
           // 1. Exact Hash Match
           if (inSha256 === ref.sha256 || inMd5 === ref.md5) {
@@ -361,10 +382,10 @@ class ImageService {
             break;
           }
 
-          // 2. Perceptual dHash Match (Distance <= 14 indicates visual banner match)
+          // 2. Perceptual dHash Match (Distance <= 16 indicates visual banner match)
           if (ref.dHashBinary) {
             const dist = this.hammingDistance(inDHash.binary, ref.dHashBinary);
-            if (dist <= 14) {
+            if (dist <= 16) {
               const hashMatchPct = (((64 - dist) / 64) * 100).toFixed(1);
               isMatch = true;
               matchReason = `Perceptual dHash (${hashMatchPct}% precisão, dist ${dist}/64)`;
@@ -374,7 +395,24 @@ class ImageService {
         }
       }
 
-      // If matched, replace with clean image
+      // 3. Keyword + Visual Color Theme Match
+      if (!isMatch && lowerText) {
+        const hasKeyword = rule.keywords.some((kw) => lowerText.includes(kw));
+        if (hasKeyword && (colorTheme === rule.theme || colorTheme === 'UNKNOWN')) {
+          if (inDHash && rule.cachedRefs && rule.cachedRefs.length > 0) {
+            const minDistance = Math.min(...rule.cachedRefs.map(r => this.hammingDistance(inDHash.binary, r.dHashBinary)));
+            if (minDistance <= 24) {
+              isMatch = true;
+              matchReason = `Palavras-chave de cupom + similaridade visual de banner (dist ${minDistance}/64)`;
+            }
+          } else if (colorTheme === rule.theme) {
+            isMatch = true;
+            matchReason = `Palavras-chave de cupom + tema de cores ${colorTheme}`;
+          }
+        }
+      }
+
+      // If matched, replace with clean banner image
       if (isMatch) {
         let cleanPath = rule.cleanImagePath;
         if (!fs.existsSync(cleanPath)) {
@@ -387,7 +425,7 @@ class ImageService {
         if (fs.existsSync(cleanPath)) {
           try {
             const cleanBuffer = fs.readFileSync(cleanPath);
-            logger.success('IMAGE', `🎯 Regra acionada [${rule.name}] via ${matchReason}! Imagem de banner substituída pelo banner limpo.`);
+            logger.success('IMAGE', `🎯 Regra de banner acionada [${rule.name}] via ${matchReason}! Imagem substituída pelo banner oficial limpo.`);
             return cleanBuffer;
           } catch (err: any) {
             logger.error('IMAGE', `Erro ao carregar banner limpo (${cleanPath}): ${err.message}`);
@@ -396,12 +434,13 @@ class ImageService {
       }
     }
 
-    // Default: keep the original product image intact
+    // Default: keep original image
     return originalBuffer;
   }
 
   /**
-   * Fetches official, high-resolution, watermark-free product image directly from the store
+   * Fetches official, high-resolution, watermark-free product image directly from the store.
+   * Prioritizes canonical product URLs and filters out generic campaign / coupon pages.
    */
   public async fetchOfficialStoreImage(affResults: any[]): Promise<Buffer | null> {
     if (!affResults || affResults.length === 0) return null;
@@ -409,24 +448,22 @@ class ImageService {
     for (const res of affResults) {
       if (!res || !res.store || res.store === 'UNKNOWN') continue;
 
-      // Candidate URLs to inspect in priority order (original shortlink first, then resolved, then canonical)
+      // Candidate URLs to inspect: canonical product URL FIRST, then resolved, then original
       const candidateUrls: string[] = Array.from(new Set([
-        res.originalUrl,
+        res.canonicalProductUrl,
         res.finalResolvedUrl,
-        res.canonicalProductUrl
+        res.originalUrl
       ].filter(Boolean)));
 
       for (const targetUrl of candidateUrls) {
+        // Skip generic coupon/landing/campaign pages so we don't grab random items
+        if (this.isGenericNonProductUrl(targetUrl)) {
+          continue;
+        }
+
         try {
           // 1. Mercado Livre
           if (res.store === 'MERCADO_LIVRE') {
-            // First priority: scrape og:image directly from shortlink (meli.la) or product page
-            const scraped = await this.scrapeOgImageFromUrl(targetUrl);
-            if (scraped) {
-              logger.success('IMAGE', `✨ Imagem oficial extraída do Mercado Livre (${targetUrl}) - 100% limpa sem marcas!`);
-              return scraped;
-            }
-
             const mlbMatch = targetUrl.match(/(MLB-?\d+)/i);
             if (mlbMatch) {
               const mlbId = mlbMatch[1].replace('-', '').toUpperCase();
@@ -452,6 +489,12 @@ class ImageService {
                   }
                 }
               } catch {}
+            }
+
+            const scraped = await this.scrapeOgImageFromUrl(targetUrl);
+            if (scraped) {
+              logger.success('IMAGE', `✨ Imagem oficial extraída do Mercado Livre (${targetUrl}) - 100% limpa sem marcas!`);
+              return scraped;
             }
           }
 

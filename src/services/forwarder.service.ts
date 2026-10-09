@@ -261,9 +261,24 @@ class ForwarderService extends EventEmitter {
     }
 
     // Process image:
-    // 1. First priority: Try fetching official 100% clean product image directly from store
+    // 1. First priority: Check known banner rules (e.g. Alerta de Cupons)
     let finalMediaBuffer = data.mediaBuffer;
-    if (affResults && affResults.length > 0) {
+    let isBannerReplaced = false;
+
+    if (finalMediaBuffer) {
+      try {
+        const replacedBanner = await imageService.processImageReplacement(data.text, finalMediaBuffer);
+        if (replacedBanner && replacedBanner !== finalMediaBuffer) {
+          finalMediaBuffer = replacedBanner;
+          isBannerReplaced = true;
+        }
+      } catch (imgErr: any) {
+        logger.warn('FORWARDER', `Aviso ao processar substituição de banner: ${imgErr.message}`);
+      }
+    }
+
+    // 2. Second priority: If NOT a coupon banner, try fetching official 100% clean product image directly from store
+    if (!isBannerReplaced && affResults && affResults.length > 0) {
       try {
         const cleanStoreImg = await imageService.fetchOfficialStoreImage(affResults);
         if (cleanStoreImg && cleanStoreImg.length > 0) {
@@ -271,15 +286,6 @@ class ForwarderService extends EventEmitter {
         }
       } catch (imgErr: any) {
         logger.warn('FORWARDER', `Aviso ao buscar imagem oficial da loja: ${imgErr.message}`);
-      }
-    }
-
-    // 2. Second priority / Fallback: Check known banner rules (e.g. Alerta de Cupons)
-    if (finalMediaBuffer === data.mediaBuffer && finalMediaBuffer) {
-      try {
-        finalMediaBuffer = await imageService.processImageReplacement(data.text, finalMediaBuffer);
-      } catch (imgErr: any) {
-        logger.warn('FORWARDER', `Aviso ao processar substituição de imagem: ${imgErr.message}`);
       }
     }
 
@@ -292,8 +298,8 @@ class ForwarderService extends EventEmitter {
       }
     }
 
-    // 4. Apply custom watermark / brand overlay if enabled
-    if (finalMediaBuffer && finalMediaBuffer.length > 0) {
+    // 4. Apply custom watermark / brand overlay if enabled (unless it's an official clean banner)
+    if (finalMediaBuffer && finalMediaBuffer.length > 0 && !isBannerReplaced) {
       try {
         finalMediaBuffer = await imageService.applyCustomWatermark(finalMediaBuffer);
       } catch (wmErr: any) {
