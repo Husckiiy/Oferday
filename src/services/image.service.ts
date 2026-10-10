@@ -20,7 +20,7 @@ export interface CachedImageReference {
 export interface BannerRule {
   id: string;
   name: string;
-  theme: 'YELLOW_ML' | 'BLUE_MAGALU' | 'OTHER';
+  theme: 'YELLOW_ML' | 'BLUE_MAGALU' | 'ORANGE_SHOPEE' | 'OTHER';
   keywords: string[];
   cleanImagePath: string;
   referenceImages: string[];
@@ -45,17 +45,22 @@ class ImageService {
     await this.initDefaultRules();
   }
 
-  public getBannerStatus(): { ml: boolean; magalu: boolean; mlPreview?: string; magaluPreview?: string } {
+  public getBannerStatus(): { ml: boolean; magalu: boolean; shopee: boolean; mlPreview?: string; magaluPreview?: string; shopeePreview?: string } {
     const mlPath = path.join(BANNERS_DIR, 'alerta_cupons_ml_limpo.jpg');
     const magaluPath = path.join(BANNERS_DIR, 'alerta_cupons_magalu_limpo.jpg');
+    const shopeePath = path.join(BANNERS_DIR, 'alerta_cupons_shopee_limpo.jpg');
+
     const mlFallback = path.join(ASSETS_BANNERS_DIR, 'alerta_cupons_ml_limpo.jpg');
     const magaluFallback = path.join(ASSETS_BANNERS_DIR, 'alerta_cupons_magalu_limpo.jpg');
+    const shopeeFallback = path.join(ASSETS_BANNERS_DIR, 'alerta_cupons_shopee_limpo.jpg');
 
     let mlPreview: string | undefined;
     let magaluPreview: string | undefined;
+    let shopeePreview: string | undefined;
 
     const actualMl = fs.existsSync(mlPath) ? mlPath : (fs.existsSync(mlFallback) ? mlFallback : null);
     const actualMagalu = fs.existsSync(magaluPath) ? magaluPath : (fs.existsSync(magaluFallback) ? magaluFallback : null);
+    const actualShopee = fs.existsSync(shopeePath) ? shopeePath : (fs.existsSync(shopeeFallback) ? shopeeFallback : null);
 
     if (actualMl) {
       try {
@@ -67,12 +72,19 @@ class ImageService {
         magaluPreview = `data:image/jpeg;base64,${fs.readFileSync(actualMagalu).toString('base64')}`;
       } catch {}
     }
+    if (actualShopee) {
+      try {
+        shopeePreview = `data:image/jpeg;base64,${fs.readFileSync(actualShopee).toString('base64')}`;
+      } catch {}
+    }
 
     return {
       ml: !!actualMl,
       magalu: !!actualMagalu,
+      shopee: !!actualShopee,
       mlPreview,
-      magaluPreview
+      magaluPreview,
+      shopeePreview
     };
   }
 
@@ -100,7 +112,7 @@ class ImageService {
   /**
    * Detects the dominant background color theme from the banner image corners
    */
-  public async detectColorTheme(buffer: Buffer): Promise<'YELLOW_ML' | 'BLUE_MAGALU' | 'UNKNOWN'> {
+  public async detectColorTheme(buffer: Buffer): Promise<'YELLOW_ML' | 'BLUE_MAGALU' | 'ORANGE_SHOPEE' | 'UNKNOWN'> {
     try {
       const { data, info } = await sharp(buffer)
         .resize(50, 50, { fit: 'fill' })
@@ -110,6 +122,7 @@ class ImageService {
       const channels = info.channels || 3;
       let yellowVotes = 0;
       let blueVotes = 0;
+      let orangeVotes = 0;
 
       // Sample 16 key background points (corners, top/bottom borders, inner margins)
       const samplePoints = [
@@ -127,17 +140,24 @@ class ImageService {
         const b = data[idx + 2];
 
         // Yellow (Mercado Livre): High Red + Green, Low Blue
-        if (r > 140 && g > 130 && b < 120) {
+        if (r > 150 && g > 130 && b < 100) {
           yellowVotes++;
         }
+        // Orange (Shopee): High Red, Medium Green, Low Blue
+        else if (r > 170 && g >= 40 && g <= 140 && b < 90) {
+          orangeVotes++;
+        }
         // Blue (Magalu): High Blue, Low Red
-        if (b > 130 && r < 140) {
+        else if (b > 130 && r < 130) {
           blueVotes++;
         }
       }
 
       if (yellowVotes >= 4) {
         return 'YELLOW_ML';
+      }
+      if (orangeVotes >= 4) {
+        return 'ORANGE_SHOPEE';
       }
       if (blueVotes >= 4) {
         return 'BLUE_MAGALU';
@@ -254,6 +274,8 @@ class ImageService {
     const magaluClean = path.join(BANNERS_DIR, 'alerta_cupons_magalu_limpo.jpg');
     const magaluComp = path.join(BANNERS_DIR, 'alerta_cupons_magalu_concorrente.png');
 
+    const shopeeClean = path.join(BANNERS_DIR, 'alerta_cupons_shopee_limpo.jpg');
+
     this.rules = [
       {
         id: 'ml_coupon_alert',
@@ -309,6 +331,28 @@ class ImageService {
         ],
         cleanImagePath: magaluClean,
         referenceImages: [magaluComp, magaluClean]
+      },
+      {
+        id: 'shopee_coupon_alert',
+        name: 'Alerta de Cupons Shopee',
+        theme: 'ORANGE_SHOPEE',
+        keywords: [
+          'alerta de cupons shopee',
+          'alerta de cupom shopee',
+          'cupons shopee',
+          'cupom shopee',
+          'alerta shopee',
+          'cupons na shopee',
+          'cupom na shopee',
+          'desconto na shopee',
+          'resgate seu cupom shopee',
+          'cupom ativo shopee',
+          'novo cupom shopee',
+          'salve seu cupom shopee',
+          'moedas shopee'
+        ],
+        cleanImagePath: shopeeClean,
+        referenceImages: [shopeeClean]
       }
     ];
 
@@ -324,6 +368,76 @@ class ImageService {
     }
 
     this.initialized = true;
+  }
+
+  /**
+   * Checks if text contains explicit coupon alert keywords
+   */
+  public isCouponAlertText(lowerText: string): boolean {
+    if (!lowerText) return false;
+    const couponKeywords = [
+      'alerta de cupom',
+      'alerta de cupons',
+      'alerta cupom',
+      'cupons mercado livre',
+      'cupom mercado livre',
+      'cupons magalu',
+      'cupom magalu',
+      'alerta magalu',
+      'cupons shopee',
+      'cupom shopee',
+      'alerta shopee',
+      'cupons na shopee',
+      'cupom na shopee',
+      'novo cupom',
+      'novos cupons',
+      'resgate seu cupom',
+      'resgate o cupom',
+      'salve seu cupom',
+      'ativou o cupom',
+      'resgatou na conta',
+      'para quem resgatou',
+      'lista de cupons',
+      'central de cupons',
+      'cupons disponíveis',
+      'cupons ativos',
+      'cupom ativo',
+      'cupons full',
+      'moedas shopee',
+      'cupom de desconto'
+    ];
+    return couponKeywords.some(kw => lowerText.includes(kw));
+  }
+
+  public detectStoreFromCouponText(lowerText: string, storeHint?: string): 'MERCADO_LIVRE' | 'MAGALU' | 'SHOPEE' {
+    if (storeHint === 'SHOPEE' || lowerText.includes('shopee') || lowerText.includes('shp.ee')) {
+      return 'SHOPEE';
+    }
+    if (storeHint === 'MAGALU' || lowerText.includes('magalu') || lowerText.includes('magazine luiza') || lowerText.includes('magazinevoce')) {
+      return 'MAGALU';
+    }
+    return 'MERCADO_LIVRE';
+  }
+
+  public readCleanBannerFile(cleanPath: string): Buffer | null {
+    if (fs.existsSync(cleanPath)) {
+      return fs.readFileSync(cleanPath);
+    }
+    const fallback = path.join(ASSETS_BANNERS_DIR, path.basename(cleanPath));
+    if (fs.existsSync(fallback)) {
+      return fs.readFileSync(fallback);
+    }
+    return null;
+  }
+
+  public async getCleanBannerForStore(store: 'MERCADO_LIVRE' | 'MAGALU' | 'SHOPEE' | string): Promise<Buffer | null> {
+    let filename = 'alerta_cupons_ml_limpo.jpg';
+    if (store === 'MAGALU' || store.includes('magalu')) {
+      filename = 'alerta_cupons_magalu_limpo.jpg';
+    } else if (store === 'SHOPEE' || store.includes('shopee')) {
+      filename = 'alerta_cupons_shopee_limpo.jpg';
+    }
+    return this.readCleanBannerFile(path.join(BANNERS_DIR, filename));
   }
 
   /**
@@ -351,86 +465,85 @@ class ImageService {
   }
 
   /**
-   * Process image replacement strictly by visual comparison (Perceptual dHash, Exact Hash, and Theme).
-   * Replaces competitor coupon banners with clean official banners.
+   * Process image replacement strictly for coupon alerts (Perceptual dHash, Exact Hash, Theme, and Keywords).
+   * Replaces competitor coupon banners (or text-only coupon alerts) with clean official banners.
    */
-  public async processImageReplacement(text: string, originalBuffer: Buffer | null): Promise<Buffer | null> {
-    if (!originalBuffer || originalBuffer.length === 0) {
-      return originalBuffer;
-    }
-
+  public async processImageReplacement(text: string, originalBuffer: Buffer | null, storeHint?: string): Promise<Buffer | null> {
     if (!this.initialized) {
       await this.initDefaultRules();
     }
 
-    const inSha256 = crypto.createHash('sha256').update(originalBuffer).digest('hex');
-    const inMd5 = crypto.createHash('md5').update(originalBuffer).digest('hex');
-    const inDHash = await this.computeDHash(originalBuffer);
-    const colorTheme = await this.detectColorTheme(originalBuffer);
     const lowerText = (text || '').toLowerCase();
+    const isCouponText = this.isCouponAlertText(lowerText);
 
-    for (const rule of this.rules) {
-      let isMatch = false;
-      let matchReason = '';
+    // 1. If visual buffer is provided, run visual comparison against known banners
+    if (originalBuffer && originalBuffer.length > 0) {
+      const inSha256 = crypto.createHash('sha256').update(originalBuffer).digest('hex');
+      const inMd5 = crypto.createHash('md5').update(originalBuffer).digest('hex');
+      const inDHash = await this.computeDHash(originalBuffer);
+      const colorTheme = await this.detectColorTheme(originalBuffer);
 
-      if (rule.cachedRefs && rule.cachedRefs.length > 0 && inDHash) {
-        for (const ref of rule.cachedRefs) {
-          // 1. Exact Hash Match
-          if (inSha256 === ref.sha256 || inMd5 === ref.md5) {
-            isMatch = true;
-            matchReason = `Hash exato idêntico (MD5: ${inMd5})`;
-            break;
-          }
+      for (const rule of this.rules) {
+        let isMatch = false;
+        let matchReason = '';
 
-          // 2. Perceptual dHash Match (Distance <= 16 indicates visual banner match)
-          if (ref.dHashBinary) {
-            const dist = this.hammingDistance(inDHash.binary, ref.dHashBinary);
-            if (dist <= 16) {
-              const hashMatchPct = (((64 - dist) / 64) * 100).toFixed(1);
+        if (rule.cachedRefs && rule.cachedRefs.length > 0 && inDHash) {
+          for (const ref of rule.cachedRefs) {
+            // 1a. Exact Hash Match
+            if (inSha256 === ref.sha256 || inMd5 === ref.md5) {
               isMatch = true;
-              matchReason = `Perceptual dHash (${hashMatchPct}% precisão, dist ${dist}/64)`;
+              matchReason = `Hash exato idêntico (MD5: ${inMd5})`;
               break;
             }
-          }
-        }
-      }
 
-      // 3. Keyword + Visual Color Theme Match
-      if (!isMatch && lowerText) {
-        const hasKeyword = rule.keywords.some((kw) => lowerText.includes(kw));
-        if (hasKeyword && (colorTheme === rule.theme || colorTheme === 'UNKNOWN')) {
-          if (inDHash && rule.cachedRefs && rule.cachedRefs.length > 0) {
-            const minDistance = Math.min(...rule.cachedRefs.map(r => this.hammingDistance(inDHash.binary, r.dHashBinary)));
-            if (minDistance <= 24) {
-              isMatch = true;
-              matchReason = `Palavras-chave de cupom + similaridade visual de banner (dist ${minDistance}/64)`;
+            // 1b. Perceptual dHash Match (Distance <= 16 indicates visual banner match)
+            if (ref.dHashBinary) {
+              const dist = this.hammingDistance(inDHash.binary, ref.dHashBinary);
+              if (dist <= 16) {
+                const hashMatchPct = (((64 - dist) / 64) * 100).toFixed(1);
+                isMatch = true;
+                matchReason = `Perceptual dHash (${hashMatchPct}% precisão, dist ${dist}/64)`;
+                break;
+              }
             }
-          } else if (colorTheme === rule.theme) {
-            isMatch = true;
-            matchReason = `Palavras-chave de cupom + tema de cores ${colorTheme}`;
-          }
-        }
-      }
-
-      // If matched, replace with clean banner image
-      if (isMatch) {
-        let cleanPath = rule.cleanImagePath;
-        if (!fs.existsSync(cleanPath)) {
-          const fallback = path.join(ASSETS_BANNERS_DIR, path.basename(rule.cleanImagePath));
-          if (fs.existsSync(fallback)) {
-            cleanPath = fallback;
           }
         }
 
-        if (fs.existsSync(cleanPath)) {
-          try {
-            const cleanBuffer = fs.readFileSync(cleanPath);
+        // 1c. Keyword + Visual Color Theme Match
+        if (!isMatch && lowerText) {
+          const hasKeyword = rule.keywords.some((kw) => lowerText.includes(kw));
+          if (hasKeyword && (colorTheme === rule.theme || colorTheme === 'UNKNOWN')) {
+            if (inDHash && rule.cachedRefs && rule.cachedRefs.length > 0) {
+              const minDistance = Math.min(...rule.cachedRefs.map(r => this.hammingDistance(inDHash.binary, r.dHashBinary)));
+              if (minDistance <= 24) {
+                isMatch = true;
+                matchReason = `Palavras-chave de cupom + similaridade visual de banner (dist ${minDistance}/64)`;
+              }
+            } else if (colorTheme === rule.theme) {
+              isMatch = true;
+              matchReason = `Palavras-chave de cupom + tema de cores ${colorTheme}`;
+            }
+          }
+        }
+
+        // If matched, replace with clean banner image
+        if (isMatch) {
+          const cleanBuffer = this.readCleanBannerFile(rule.cleanImagePath);
+          if (cleanBuffer) {
             logger.success('IMAGE', `🎯 Regra de banner acionada [${rule.name}] via ${matchReason}! Imagem substituída pelo banner oficial limpo.`);
             return cleanBuffer;
-          } catch (err: any) {
-            logger.error('IMAGE', `Erro ao carregar banner limpo (${cleanPath}): ${err.message}`);
           }
         }
+      }
+    }
+
+    // 2. Fallback / Text-only coupon detection: If message is clearly an alert for coupons
+    if (isCouponText) {
+      const detectedStore = this.detectStoreFromCouponText(lowerText, storeHint);
+      const cleanBuffer = await this.getCleanBannerForStore(detectedStore);
+      if (cleanBuffer) {
+        logger.success('IMAGE', `🎯 Alerta de cupom detectado no texto para [${detectedStore}]! Banner oficial limpo carregado.`);
+        return cleanBuffer;
       }
     }
 

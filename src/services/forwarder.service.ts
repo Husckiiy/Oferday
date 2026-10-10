@@ -265,16 +265,17 @@ class ForwarderService extends EventEmitter {
     let finalMediaBuffer = data.mediaBuffer;
     let isBannerReplaced = false;
 
-    if (finalMediaBuffer) {
-      try {
-        const replacedBanner = await imageService.processImageReplacement(data.text, finalMediaBuffer);
-        if (replacedBanner && replacedBanner !== finalMediaBuffer) {
-          finalMediaBuffer = replacedBanner;
-          isBannerReplaced = true;
-        }
-      } catch (imgErr: any) {
-        logger.warn('FORWARDER', `Aviso ao processar substituição de banner: ${imgErr.message}`);
+    // Detect primary store hint from affResults if present
+    const primaryStore = affResults?.[0]?.store;
+
+    try {
+      const bannerBuffer = await imageService.processImageReplacement(data.text, finalMediaBuffer, primaryStore);
+      if (bannerBuffer && bannerBuffer.length > 0 && (bannerBuffer !== finalMediaBuffer || !finalMediaBuffer)) {
+        finalMediaBuffer = bannerBuffer;
+        isBannerReplaced = true;
       }
+    } catch (imgErr: any) {
+      logger.warn('FORWARDER', `Aviso ao processar substituição de banner: ${imgErr.message}`);
     }
 
     // 2. Second priority: If NOT a coupon banner, try fetching official 100% clean product image directly from store
