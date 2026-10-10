@@ -371,42 +371,62 @@ class ImageService {
   }
 
   /**
-   * Checks if text contains explicit coupon alert keywords
+   * Checks if text contains explicit general coupon alert headlines (e.g. "Alerta de Cupons", "Cupons Shopee")
    */
   public isCouponAlertText(lowerText: string): boolean {
     if (!lowerText) return false;
-    const couponKeywords = [
+    const explicitAlertPhrases = [
       'alerta de cupom',
       'alerta de cupons',
       'alerta cupom',
       'cupons mercado livre',
-      'cupom mercado livre',
       'cupons magalu',
-      'cupom magalu',
-      'alerta magalu',
       'cupons shopee',
-      'cupom shopee',
-      'alerta shopee',
       'cupons na shopee',
-      'cupom na shopee',
-      'novo cupom',
-      'novos cupons',
-      'resgate seu cupom',
-      'resgate o cupom',
-      'salve seu cupom',
-      'ativou o cupom',
-      'resgatou na conta',
-      'para quem resgatou',
       'lista de cupons',
       'central de cupons',
       'cupons disponíveis',
       'cupons ativos',
-      'cupom ativo',
-      'cupons full',
-      'moedas shopee',
-      'cupom de desconto'
+      'novos cupons liberados',
+      'novo cupom liberado',
+      'todos os cupons'
     ];
-    return couponKeywords.some(kw => lowerText.includes(kw));
+    return explicitAlertPhrases.some(kw => lowerText.includes(kw));
+  }
+
+  /**
+   * Identifies if a message is a specific product offer (e.g. has product link, price, specs)
+   * so that product photos are NEVER replaced by coupon alert banners.
+   */
+  public isSpecificProductOffer(text: string, affResults?: any[]): boolean {
+    if (!text) return false;
+    const lower = text.toLowerCase();
+
+    // 1. If any affiliate result has a canonical product ID (MLB, ASIN, SKU, Shopee product ID)
+    if (affResults && affResults.length > 0) {
+      const hasSpecificProduct = affResults.some(r => {
+        const url = r.canonicalProductUrl || r.finalResolvedUrl || r.originalUrl;
+        if (!url) return false;
+        const low = url.toLowerCase();
+        // If it's a generic coupon hub or category list, not a product
+        if (this.isGenericNonProductUrl(url)) return false;
+        // Check for specific product patterns
+        return (
+          /(?:MLB-?\d+|\/p\/[a-zA-Z0-9]+|\/up\/[a-zA-Z0-9]+|\/dp\/[a-zA-Z0-9]{10}|-i\.\d+\.\d+|\/product\/\d+\/\d+|\/item\/\d+|sku=\d+|codigo_produto=\d+)/i.test(url)
+        );
+      });
+      if (hasSpecificProduct) return true;
+    }
+
+    // 2. Check price indicators (e.g. "POR: 699", "POR R$", "R$ 1.754", "A PARTIR DE R$", "699 REAIS", "1754 REAIS")
+    const hasPrice = /(?:por\s*:?\s*(?:r\$\s*)?\d+|\br\$\s*\d+|\b\d+\s*reais\b|\bem\s*at[eé]\s*\d+x)/i.test(lower);
+    if (hasPrice) return true;
+
+    // 3. Check product link patterns (e.g. /p/, /dp/, /item/, -i., /produto/, sku=)
+    const hasProductUrl = /(?:\/p\/|\/dp\/|\/item\/|\/produto\/|-i\.\d+\.\d+|\/product\/|sku=|codigo_produto=)/i.test(text);
+    if (hasProductUrl) return true;
+
+    return false;
   }
 
   public detectStoreFromCouponText(lowerText: string, storeHint?: string): 'MERCADO_LIVRE' | 'MAGALU' | 'SHOPEE' {
@@ -467,16 +487,53 @@ class ImageService {
   /**
    * Process image replacement strictly for coupon alerts (Perceptual dHash, Exact Hash, Theme, and Keywords).
    * Replaces competitor coupon banners (or text-only coupon alerts) with clean official banners.
+   * NEVER replaces specific product offer photos with a coupon banner.
    */
-  public async processImageReplacement(text: string, originalBuffer: Buffer | null, storeHint?: string): Promise<Buffer | null> {
+  public async processImageReplacement(
+    text: string,
+    originalBuffer: Buffer | null,
+    storeHint?: string,
+    affResults?: any[]
+  ): Promise<Buffer | null> {
     if (!this.initialized) {
       await this.initDefaultRules();
     }
 
     const lowerText = (text || '').toLowerCase();
-    const isCouponText = this.isCouponAlertText(lowerText);
+    const isProduct = this.isSpecificProductOffer(text, affResults);
+    const isCouponAlert = this.isCouponAlertText(lowerText);
 
-    // 1. If visual buffer is provided, run visual comparison against known banners
+    // 1. If this is a specific product offer, NEVER replace with a coupon banner unless
+    // the incoming buffer has a strict exact match with a competitor coupon banner graphic.
+    if (isProduct) {
+      if (originalBuffer && originalBuffer.length > 0) {
+        const inSha256 = crypto.createHash('sha256').update(originalBuffer).digest('hex');
+        const inMd5 = crypto.createHash('md5').update(originalBuffer).digest('hex');
+        const inDHash = await this.computeDHash(originalBuffer);
+
+        if (inDHash) {
+          for (const rule of this.rules) {
+            if (rule.cachedRefs && rule.cachedRefs.length > 0) {
+              for (const ref of rule.cachedRefs) {
+                // Strict match only (Exact hash or dHash distance <= 8)
+                if (inSha256 === ref.sha256 || inMd5 === ref.md5) {
+                  const cleanBuffer = this.readCleanBannerFile(rule.cleanImagePath);
+                  if (cleanBuffer) return cleanBuffer;
+                }
+                if (ref.dHashBinary && this.hammingDistance(inDHash.binary, ref.dHashBinary) <= 8) {
+                  const cleanBuffer = this.readCleanBannerFile(rule.cleanImagePath);
+                  if (cleanBuffer) return cleanBuffer;
+                }
+              }
+            }
+          }
+        }
+      }
+      // Keep product image
+      return originalBuffer;
+    }
+
+    // 2. If it's a generic announcement (NOT a specific product):
     if (originalBuffer && originalBuffer.length > 0) {
       const inSha256 = crypto.createHash('sha256').update(originalBuffer).digest('hex');
       const inMd5 = crypto.createHash('md5').update(originalBuffer).digest('hex');
@@ -489,44 +546,36 @@ class ImageService {
 
         if (rule.cachedRefs && rule.cachedRefs.length > 0 && inDHash) {
           for (const ref of rule.cachedRefs) {
-            // 1a. Exact Hash Match
             if (inSha256 === ref.sha256 || inMd5 === ref.md5) {
               isMatch = true;
               matchReason = `Hash exato idêntico (MD5: ${inMd5})`;
               break;
             }
 
-            // 1b. Perceptual dHash Match (Distance <= 16 indicates visual banner match)
-            if (ref.dHashBinary) {
-              const dist = this.hammingDistance(inDHash.binary, ref.dHashBinary);
-              if (dist <= 16) {
-                const hashMatchPct = (((64 - dist) / 64) * 100).toFixed(1);
-                isMatch = true;
-                matchReason = `Perceptual dHash (${hashMatchPct}% precisão, dist ${dist}/64)`;
-                break;
-              }
-            }
-          }
-        }
-
-        // 1c. Keyword + Visual Color Theme Match
-        if (!isMatch && lowerText) {
-          const hasKeyword = rule.keywords.some((kw) => lowerText.includes(kw));
-          if (hasKeyword && (colorTheme === rule.theme || colorTheme === 'UNKNOWN')) {
-            if (inDHash && rule.cachedRefs && rule.cachedRefs.length > 0) {
-              const minDistance = Math.min(...rule.cachedRefs.map(r => this.hammingDistance(inDHash.binary, r.dHashBinary)));
-              if (minDistance <= 24) {
-                isMatch = true;
-                matchReason = `Palavras-chave de cupom + similaridade visual de banner (dist ${minDistance}/64)`;
-              }
-            } else if (colorTheme === rule.theme) {
+            const dist = this.hammingDistance(inDHash.binary, ref.dHashBinary);
+            if (dist <= 16) {
+              const hashMatchPct = (((64 - dist) / 64) * 100).toFixed(1);
               isMatch = true;
-              matchReason = `Palavras-chave de cupom + tema de cores ${colorTheme}`;
+              matchReason = `Perceptual dHash (${hashMatchPct}% precisão, dist ${dist}/64)`;
+              break;
             }
           }
         }
 
-        // If matched, replace with clean banner image
+        // Match keyword + theme for general coupon announcements
+        if (!isMatch && isCouponAlert) {
+          if (colorTheme === rule.theme) {
+            isMatch = true;
+            matchReason = `Alerta de cupom + tema de cores ${colorTheme}`;
+          } else if (inDHash && rule.cachedRefs && rule.cachedRefs.length > 0) {
+            const minDistance = Math.min(...rule.cachedRefs.map(r => this.hammingDistance(inDHash.binary, r.dHashBinary)));
+            if (minDistance <= 22) {
+              isMatch = true;
+              matchReason = `Alerta de cupom + similaridade visual (dist ${minDistance}/64)`;
+            }
+          }
+        }
+
         if (isMatch) {
           const cleanBuffer = this.readCleanBannerFile(rule.cleanImagePath);
           if (cleanBuffer) {
@@ -537,17 +586,16 @@ class ImageService {
       }
     }
 
-    // 2. Fallback / Text-only coupon detection: If message is clearly an alert for coupons
-    if (isCouponText) {
+    // 3. Text-only coupon announcement (without any media)
+    if (isCouponAlert && (!originalBuffer || originalBuffer.length === 0)) {
       const detectedStore = this.detectStoreFromCouponText(lowerText, storeHint);
       const cleanBuffer = await this.getCleanBannerForStore(detectedStore);
       if (cleanBuffer) {
-        logger.success('IMAGE', `🎯 Alerta de cupom detectado no texto para [${detectedStore}]! Banner oficial limpo carregado.`);
+        logger.success('IMAGE', `🎯 Alerta geral de cupom detectado para [${detectedStore}]! Banner oficial limpo carregado.`);
         return cleanBuffer;
       }
     }
 
-    // Default: keep original image
     return originalBuffer;
   }
 

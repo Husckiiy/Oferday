@@ -269,7 +269,7 @@ class ForwarderService extends EventEmitter {
     const primaryStore = affResults?.[0]?.store;
 
     try {
-      const bannerBuffer = await imageService.processImageReplacement(data.text, finalMediaBuffer, primaryStore);
+      const bannerBuffer = await imageService.processImageReplacement(data.text, finalMediaBuffer, primaryStore, affResults);
       if (bannerBuffer && bannerBuffer.length > 0 && (bannerBuffer !== finalMediaBuffer || !finalMediaBuffer)) {
         finalMediaBuffer = bannerBuffer;
         isBannerReplaced = true;
