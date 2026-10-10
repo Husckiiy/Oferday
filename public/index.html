@@ -1292,7 +1292,7 @@
             </div>
           </div>
 
-          <div class="banners-grid-row">
+          <div class="banners-grid-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
             <!-- Card Mercado Livre -->
             <div class="banner-card-item">
               <div class="banner-card-header">
@@ -1304,6 +1304,36 @@
                 <input type="file" id="fileUploadMeli" accept="image/*" style="display: none;">
                 <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('fileUploadMeli').click()">
                   <i data-lucide="upload"></i> Trocar Banner Mercado Livre
+                </button>
+              </div>
+            </div>
+
+            <!-- Card Amazon -->
+            <div class="banner-card-item">
+              <div class="banner-card-header">
+                <span class="banner-store-badge badge-amazon" style="background: rgba(249, 115, 22, 0.15); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.3);">🟠 Amazon</span>
+                <span class="badge badge-green" style="font-size: 0.7rem;">Ativo</span>
+              </div>
+              <img id="previewAmazonBanner" src="/banners/alerta_cupons_amazon_limpo.jpg" alt="Banner Amazon" class="banner-preview-img" onerror="this.src='/data/banners/alerta_cupons_amazon_limpo.jpg'">
+              <div class="banner-upload-btn-wrap">
+                <input type="file" id="fileUploadAmazon" accept="image/*" style="display: none;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('fileUploadAmazon').click()">
+                  <i data-lucide="upload"></i> Trocar Banner Amazon
+                </button>
+              </div>
+            </div>
+
+            <!-- Card Shopee -->
+            <div class="banner-card-item">
+              <div class="banner-card-header">
+                <span class="banner-store-badge badge-shopee" style="background: rgba(238, 77, 45, 0.15); color: #ee4d2d; border: 1px solid rgba(238, 77, 45, 0.3);">🔴 Shopee</span>
+                <span class="badge badge-green" style="font-size: 0.7rem;">Ativo</span>
+              </div>
+              <img id="previewShopeeBanner" src="/banners/alerta_cupons_shopee_limpo.jpg" alt="Banner Shopee" class="banner-preview-img" onerror="this.src='/data/banners/alerta_cupons_shopee_limpo.jpg'">
+              <div class="banner-upload-btn-wrap">
+                <input type="file" id="fileUploadShopee" accept="image/*" style="display: none;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('fileUploadShopee').click()">
+                  <i data-lucide="upload"></i> Trocar Banner Shopee
                 </button>
               </div>
             </div>

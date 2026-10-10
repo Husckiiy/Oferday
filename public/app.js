@@ -1690,6 +1690,15 @@ async function loadFiltersConfig() {
   }
 }
 
+const previewMeliBanner = document.getElementById('previewMeliBanner');
+const previewMagaluBanner = document.getElementById('previewMagaluBanner');
+const previewShopeeBanner = document.getElementById('previewShopeeBanner');
+const previewAmazonBanner = document.getElementById('previewAmazonBanner');
+const fileUploadMeli = document.getElementById('fileUploadMeli');
+const fileUploadMagalu = document.getElementById('fileUploadMagalu');
+const fileUploadShopee = document.getElementById('fileUploadShopee');
+const fileUploadAmazon = document.getElementById('fileUploadAmazon');
+
 async function loadBannerPreviews() {
   try {
     const res = await fetch('/api/banners/status');
@@ -1700,6 +1709,12 @@ async function loadBannerPreviews() {
       }
       if (data.magaluPreview && previewMagaluBanner) {
         previewMagaluBanner.src = data.magaluPreview;
+      }
+      if (data.shopeePreview && previewShopeeBanner) {
+        previewShopeeBanner.src = data.shopeePreview;
+      }
+      if (data.amazonPreview && previewAmazonBanner) {
+        previewAmazonBanner.src = data.amazonPreview;
       }
     }
   } catch (err) {
@@ -1725,6 +1740,8 @@ async function handleBannerUpload(file, store) {
         showToast(`Banner de ${store} atualizado com sucesso!`, 'success');
         if (store === 'MELI' && previewMeliBanner) previewMeliBanner.src = base64;
         if (store === 'MAGALU' && previewMagaluBanner) previewMagaluBanner.src = base64;
+        if (store === 'SHOPEE' && previewShopeeBanner) previewShopeeBanner.src = base64;
+        if (store === 'AMAZON' && previewAmazonBanner) previewAmazonBanner.src = base64;
       } else {
         showToast(`Erro: ${data.error}`, 'error');
       }
@@ -1744,6 +1761,18 @@ fileUploadMeli?.addEventListener('change', (e) => {
 fileUploadMagalu?.addEventListener('change', (e) => {
   if (e.target.files && e.target.files[0]) {
     handleBannerUpload(e.target.files[0], 'MAGALU');
+  }
+});
+
+fileUploadShopee?.addEventListener('change', (e) => {
+  if (e.target.files && e.target.files[0]) {
+    handleBannerUpload(e.target.files[0], 'SHOPEE');
+  }
+});
+
+fileUploadAmazon?.addEventListener('change', (e) => {
+  if (e.target.files && e.target.files[0]) {
+    handleBannerUpload(e.target.files[0], 'AMAZON');
   }
 });
 

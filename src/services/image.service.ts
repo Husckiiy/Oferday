@@ -20,7 +20,7 @@ export interface CachedImageReference {
 export interface BannerRule {
   id: string;
   name: string;
-  theme: 'YELLOW_ML' | 'BLUE_MAGALU' | 'ORANGE_SHOPEE' | 'OTHER';
+  theme: 'YELLOW_ML' | 'BLUE_MAGALU' | 'ORANGE_SHOPEE' | 'BLACK_ORANGE_AMAZON' | 'OTHER';
   keywords: string[];
   cleanImagePath: string;
   referenceImages: string[];
@@ -45,22 +45,26 @@ class ImageService {
     await this.initDefaultRules();
   }
 
-  public getBannerStatus(): { ml: boolean; magalu: boolean; shopee: boolean; mlPreview?: string; magaluPreview?: string; shopeePreview?: string } {
+  public getBannerStatus(): { ml: boolean; magalu: boolean; shopee: boolean; amazon: boolean; mlPreview?: string; magaluPreview?: string; shopeePreview?: string; amazonPreview?: string } {
     const mlPath = path.join(BANNERS_DIR, 'alerta_cupons_ml_limpo.jpg');
     const magaluPath = path.join(BANNERS_DIR, 'alerta_cupons_magalu_limpo.jpg');
     const shopeePath = path.join(BANNERS_DIR, 'alerta_cupons_shopee_limpo.jpg');
+    const amazonPath = path.join(BANNERS_DIR, 'alerta_cupons_amazon_limpo.jpg');
 
     const mlFallback = path.join(ASSETS_BANNERS_DIR, 'alerta_cupons_ml_limpo.jpg');
     const magaluFallback = path.join(ASSETS_BANNERS_DIR, 'alerta_cupons_magalu_limpo.jpg');
     const shopeeFallback = path.join(ASSETS_BANNERS_DIR, 'alerta_cupons_shopee_limpo.jpg');
+    const amazonFallback = path.join(ASSETS_BANNERS_DIR, 'alerta_cupons_amazon_limpo.jpg');
 
     let mlPreview: string | undefined;
     let magaluPreview: string | undefined;
     let shopeePreview: string | undefined;
+    let amazonPreview: string | undefined;
 
     const actualMl = fs.existsSync(mlPath) ? mlPath : (fs.existsSync(mlFallback) ? mlFallback : null);
     const actualMagalu = fs.existsSync(magaluPath) ? magaluPath : (fs.existsSync(magaluFallback) ? magaluFallback : null);
     const actualShopee = fs.existsSync(shopeePath) ? shopeePath : (fs.existsSync(shopeeFallback) ? shopeeFallback : null);
+    const actualAmazon = fs.existsSync(amazonPath) ? amazonPath : (fs.existsSync(amazonFallback) ? amazonFallback : null);
 
     if (actualMl) {
       try {
@@ -77,14 +81,21 @@ class ImageService {
         shopeePreview = `data:image/jpeg;base64,${fs.readFileSync(actualShopee).toString('base64')}`;
       } catch {}
     }
+    if (actualAmazon) {
+      try {
+        amazonPreview = `data:image/jpeg;base64,${fs.readFileSync(actualAmazon).toString('base64')}`;
+      } catch {}
+    }
 
     return {
       ml: !!actualMl,
       magalu: !!actualMagalu,
       shopee: !!actualShopee,
+      amazon: !!actualAmazon,
       mlPreview,
       magaluPreview,
-      shopeePreview
+      shopeePreview,
+      amazonPreview
     };
   }
 
@@ -276,6 +287,9 @@ class ImageService {
 
     const shopeeClean = path.join(BANNERS_DIR, 'alerta_cupons_shopee_limpo.jpg');
 
+    const amazonClean = path.join(BANNERS_DIR, 'alerta_cupons_amazon_limpo.jpg');
+    const amazonComp = path.join(BANNERS_DIR, 'alerta_cupons_amazon_concorrente.png');
+
     this.rules = [
       {
         id: 'ml_coupon_alert',
@@ -353,6 +367,35 @@ class ImageService {
         ],
         cleanImagePath: shopeeClean,
         referenceImages: [shopeeClean]
+      },
+      {
+        id: 'amazon_coupon_alert',
+        name: 'Alerta de Cupons Amazon',
+        theme: 'BLACK_ORANGE_AMAZON',
+        keywords: [
+          'cupom amazon',
+          'cupons amazon',
+          'alerta amazon',
+          'alerta de cupom amazon',
+          'alerta de cupons amazon',
+          'desconto na amazon',
+          'desconto amazon',
+          'cupom de desconto amazon',
+          'cupom de desconto na amazon',
+          'cupom de desconto: 20offamazon',
+          'cupom de desconto: 10offamazon',
+          'novo cupom amazon',
+          'cupons ativos amazon',
+          'cupom ativo amazon',
+          'prime day',
+          'mega oferta amazon',
+          'válido no site quase todo',
+          'valido no site quase todo',
+          'válido no site todo',
+          'valido no site todo'
+        ],
+        cleanImagePath: amazonClean,
+        referenceImages: [amazonComp, amazonClean]
       }
     ];
 
@@ -371,7 +414,7 @@ class ImageService {
   }
 
   /**
-   * Checks if text contains explicit general coupon alert headlines (e.g. "Alerta de Cupons", "Cupons Shopee")
+   * Checks if text contains explicit general coupon alert headlines (e.g. "Alerta de Cupons", "Cupom Amazon")
    */
   public isCouponAlertText(lowerText: string): boolean {
     if (!lowerText) return false;
@@ -379,6 +422,11 @@ class ImageService {
       'alerta de cupom',
       'alerta de cupons',
       'alerta cupom',
+      'cupom amazon',
+      'cupons amazon',
+      'alerta amazon',
+      'cupom de desconto amazon',
+      'cupom de desconto na amazon',
       'cupons mercado livre',
       'cupons magalu',
       'cupons shopee',
@@ -389,7 +437,12 @@ class ImageService {
       'cupons ativos',
       'novos cupons liberados',
       'novo cupom liberado',
-      'todos os cupons'
+      'todos os cupons',
+      'válido no site quase todo',
+      'valido no site quase todo',
+      'válido no site todo',
+      'valido no site todo',
+      'em compras a partir de r$'
     ];
     return explicitAlertPhrases.some(kw => lowerText.includes(kw));
   }
@@ -407,7 +460,6 @@ class ImageService {
       const hasSpecificProduct = affResults.some(r => {
         const url = r.canonicalProductUrl || r.finalResolvedUrl || r.originalUrl;
         if (!url) return false;
-        const low = url.toLowerCase();
         // If it's a generic coupon hub or category list, not a product
         if (this.isGenericNonProductUrl(url)) return false;
         // Check for specific product patterns
@@ -429,7 +481,10 @@ class ImageService {
     return false;
   }
 
-  public detectStoreFromCouponText(lowerText: string, storeHint?: string): 'MERCADO_LIVRE' | 'MAGALU' | 'SHOPEE' {
+  public detectStoreFromCouponText(lowerText: string, storeHint?: string): 'MERCADO_LIVRE' | 'MAGALU' | 'SHOPEE' | 'AMAZON' {
+    if (storeHint === 'AMAZON' || lowerText.includes('amazon') || lowerText.includes('amzn.to') || lowerText.includes('link.amazon') || lowerText.includes('prime')) {
+      return 'AMAZON';
+    }
     if (storeHint === 'SHOPEE' || lowerText.includes('shopee') || lowerText.includes('shp.ee')) {
       return 'SHOPEE';
     }
@@ -450,9 +505,11 @@ class ImageService {
     return null;
   }
 
-  public async getCleanBannerForStore(store: 'MERCADO_LIVRE' | 'MAGALU' | 'SHOPEE' | string): Promise<Buffer | null> {
+  public async getCleanBannerForStore(store: 'MERCADO_LIVRE' | 'MAGALU' | 'SHOPEE' | 'AMAZON' | string): Promise<Buffer | null> {
     let filename = 'alerta_cupons_ml_limpo.jpg';
-    if (store === 'MAGALU' || store.includes('magalu')) {
+    if (store === 'AMAZON' || store.includes('amazon')) {
+      filename = 'alerta_cupons_amazon_limpo.jpg';
+    } else if (store === 'MAGALU' || store.includes('magalu')) {
       filename = 'alerta_cupons_magalu_limpo.jpg';
     } else if (store === 'SHOPEE' || store.includes('shopee')) {
       filename = 'alerta_cupons_shopee_limpo.jpg';
@@ -562,9 +619,19 @@ class ImageService {
           }
         }
 
-        // Match keyword + theme for general coupon announcements
+        // Match keyword for general coupon announcements (even if competitor image is a plain logo)
         if (!isMatch && isCouponAlert) {
-          if (colorTheme === rule.theme) {
+          const ruleMatchesKeyword = rule.keywords.some(kw => lowerText.includes(kw));
+          const detectedStore = this.detectStoreFromCouponText(lowerText, storeHint);
+          const isStoreMatch = (rule.id === 'amazon_coupon_alert' && detectedStore === 'AMAZON') ||
+                               (rule.id === 'ml_coupon_alert' && detectedStore === 'MERCADO_LIVRE') ||
+                               (rule.id === 'magalu_coupon_alert' && detectedStore === 'MAGALU') ||
+                               (rule.id === 'shopee_coupon_alert' && detectedStore === 'SHOPEE');
+
+          if (isStoreMatch && ruleMatchesKeyword) {
+            isMatch = true;
+            matchReason = `Alerta geral de cupom + loja [${detectedStore}]`;
+          } else if (colorTheme === rule.theme) {
             isMatch = true;
             matchReason = `Alerta de cupom + tema de cores ${colorTheme}`;
           } else if (inDHash && rule.cachedRefs && rule.cachedRefs.length > 0) {

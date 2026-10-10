@@ -582,7 +582,7 @@ apiRouter.post('/banners/upload', async (req: Request, res: Response) => {
   try {
     const { store, imageBase64 } = req.body;
     if (!store || !imageBase64) {
-      return res.status(400).json({ success: false, error: 'Loja (store: MELI ou MAGALU) e imagem em base64 são obrigatórios.' });
+      return res.status(400).json({ success: false, error: 'Loja (store: MELI, MAGALU, SHOPEE ou AMAZON) e imagem em base64 são obrigatórios.' });
     }
 
     const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
@@ -592,7 +592,16 @@ apiRouter.post('/banners/upload', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'Arquivo de imagem inválido ou muito pequeno.' });
     }
 
-    const filename = store.toUpperCase() === 'MAGALU' ? 'alerta_cupons_magalu_limpo.jpg' : 'alerta_cupons_ml_limpo.jpg';
+    let filename = 'alerta_cupons_ml_limpo.jpg';
+    const s = String(store).toUpperCase();
+    if (s === 'MAGALU') {
+      filename = 'alerta_cupons_magalu_limpo.jpg';
+    } else if (s === 'SHOPEE') {
+      filename = 'alerta_cupons_shopee_limpo.jpg';
+    } else if (s === 'AMAZON') {
+      filename = 'alerta_cupons_amazon_limpo.jpg';
+    }
+
     const dataDir = path.resolve(process.cwd(), 'data', 'banners');
     const assetsDir = path.resolve(process.cwd(), 'assets', 'banners');
 
@@ -603,11 +612,11 @@ apiRouter.post('/banners/upload', async (req: Request, res: Response) => {
     fs.writeFileSync(path.join(assetsDir, filename), buffer);
 
     await imageService.reload();
-    logger.success('IMAGE', `Novo banner carregado para [${store.toUpperCase()}] com sucesso! (${buffer.length} bytes)`);
+    logger.success('IMAGE', `Novo banner carregado para [${s}] com sucesso! (${buffer.length} bytes)`);
 
     res.json({
       success: true,
-      message: `Banner de ${store.toUpperCase()} atualizado com sucesso!`,
+      message: `Banner de ${s} atualizado com sucesso!`,
       status: imageService.getBannerStatus()
     });
   } catch (err: any) {
