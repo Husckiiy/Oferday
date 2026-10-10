@@ -600,10 +600,99 @@ class ImageService {
   }
 
   /**
+   * Extracts a clean product title from post text for catalog / store search
+   */
+  public extractProductTitleFromText(text?: string): string {
+    if (!text) return '';
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    for (const line of lines) {
+      // Skip greetings, urls, prices, coupons, emojis-only lines
+      if (line.startsWith('http') || line.toLowerCase().includes('cupom') || line.toLowerCase().includes('resgate') || line.toLowerCase().includes('corre')) continue;
+      const cleaned = line
+        .replace(/^[🚨🔥💥⚡️📦⭐🛒📢\s\-_*]+/, '')
+        .replace(/[🚨🔥💥⚡️📦⭐🛒📢\s\-_*]+$/, '')
+        .replace(/R\$\s*\d+(?:[.,]\d+)?/gi, '')
+        .replace(/\b\d+%\s*off\b/gi, '')
+        .replace(/por\s+apenas/gi, '')
+        .replace(/de:\s*/gi, '')
+        .replace(/por:\s*/gi, '')
+        .trim();
+
+      if (cleaned.length >= 8 && !cleaned.startsWith('http')) {
+        return cleaned.substring(0, 80);
+      }
+    }
+    return '';
+  }
+
+  /**
+   * Fetches official product image directly from Shopee Affiliate GraphQL API by keyword/title
+   */
+  public async fetchShopeeImageViaGraphQL(keyword: string): Promise<Buffer | null> {
+    if (!keyword || keyword.length < 4) return null;
+    const config = configService.getConfig();
+    const appId = config.affiliate?.shopeeAppId || process.env.SHOPEE_APP_ID || '18378190901';
+    const secret = config.affiliate?.shopeeAppSecret || process.env.SHOPEE_APP_SECRET || 'ITHJMNNGTV4JOSEZLT27UZ3TY7ICCC6L';
+
+    if (!appId || !secret) return null;
+
+    try {
+      const cleanKeyword = keyword.replace(/[\\"\n\r]/g, ' ').trim();
+      const timestamp = Math.floor(Date.now() / 1000);
+      const bodyStr = JSON.stringify({
+        query: `{
+          productOfferV2(keyword: "${cleanKeyword}", page: 1, limit: 1) {
+            nodes {
+              imageUrl
+              productName
+            }
+          }
+        }`
+      });
+
+      const factor = `${appId}${timestamp}${bodyStr}${secret}`;
+      const signature = crypto.createHash('sha256').update(factor, 'utf8').digest('hex');
+
+      const resp = await fetch('https://open-api.affiliate.shopee.com.br/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `SHA256 Credential=${appId}, Timestamp=${timestamp}, Signature=${signature}`
+        },
+        body: bodyStr,
+        signal: AbortSignal.timeout(7000)
+      });
+
+      if (resp.ok) {
+        const data: any = await resp.json();
+        const firstNode = data?.data?.productOfferV2?.nodes?.[0];
+        const imageUrl = firstNode?.imageUrl;
+        if (imageUrl && imageUrl.startsWith('http')) {
+          const imgResp = await fetch(imageUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+            signal: AbortSignal.timeout(6000)
+          });
+          if (imgResp.ok) {
+            const buf = Buffer.from(await imgResp.arrayBuffer());
+            if (buf.length > 3000) {
+              const jpegBuf = await sharp(buf).jpeg({ quality: 95 }).toBuffer();
+              logger.success('IMAGE', `✨ Imagem oficial HD extraída da API Shopee GraphQL ("${firstNode?.productName?.substring(0, 40) || cleanKeyword}") - 100% limpa sem marcas!`);
+              return jpegBuf;
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      logger.warn('IMAGE', `Aviso ao buscar imagem Shopee via GraphQL: ${err.message}`);
+    }
+    return null;
+  }
+
+  /**
    * Fetches official, high-resolution, watermark-free product image directly from the store.
    * Prioritizes canonical product URLs and filters out generic campaign / coupon pages.
    */
-  public async fetchOfficialStoreImage(affResults: any[]): Promise<Buffer | null> {
+  public async fetchOfficialStoreImage(affResults: any[], postText?: string): Promise<Buffer | null> {
     if (!affResults || affResults.length === 0) return null;
 
     for (const res of affResults) {
@@ -700,6 +789,16 @@ class ImageService {
             if (scraped) {
               logger.success('IMAGE', `✨ Imagem oficial extraída da Shopee (${targetUrl}) - 100% limpa sem marcas!`);
               return scraped;
+            }
+
+            if (postText) {
+              const prodTitle = this.extractProductTitleFromText(postText);
+              if (prodTitle) {
+                const graphqlImg = await this.fetchShopeeImageViaGraphQL(prodTitle);
+                if (graphqlImg) {
+                  return graphqlImg;
+                }
+              }
             }
           }
 
@@ -948,14 +1047,18 @@ class ImageService {
       const customFile = path.join(BANNERS_DIR, 'custom_watermark.png');
       const assetCustomFile = path.join(ASSETS_BANNERS_DIR, 'custom_watermark.png');
       let watermarkBuffer: Buffer | null = null;
+      let isCustomLogo = false;
 
       if (fs.existsSync(customFile)) {
         watermarkBuffer = fs.readFileSync(customFile);
+        isCustomLogo = true;
       } else if (fs.existsSync(assetCustomFile)) {
         watermarkBuffer = fs.readFileSync(assetCustomFile);
+        isCustomLogo = true;
       } else if (config.watermark?.customLogoBase64) {
         const cleanBase64 = config.watermark.customLogoBase64.replace(/^data:image\/[a-z0-9]+;base64,/i, '');
         watermarkBuffer = Buffer.from(cleanBase64, 'base64');
+        isCustomLogo = true;
       } else {
         watermarkBuffer = await this.getDefaultWatermarkBuffer();
       }
@@ -981,18 +1084,45 @@ class ImageService {
         targetCorner = 'bottom-right';
       }
 
-      const scale = config.watermark.sizeScale || 0.25;
-      const targetWidth = Math.max(100, Math.round(imgWidth * scale));
+      const scale = Math.max(0.18, Math.min(0.40, config.watermark.sizeScale || 0.26));
+      const targetWidth = Math.max(120, Math.round(imgWidth * scale));
 
-      const resizedWatermark = await sharp(watermarkBuffer)
-        .resize({ width: targetWidth, withoutEnlargement: false, fit: 'inside' })
-        .toBuffer();
+      let finalBadgeBuffer: Buffer;
+      if (isCustomLogo) {
+        // Overlay custom logo on a solid modern white rounded card backing to guarantee 100% masking of competitor watermark
+        const logoResized = await sharp(watermarkBuffer)
+          .resize({ width: Math.round(targetWidth * 0.88), height: Math.round(targetWidth * 0.40), fit: 'inside' })
+          .toBuffer();
+        const logoMeta = await sharp(logoResized).metadata();
+        const cardW = Math.round((logoMeta.width || targetWidth * 0.88) + targetWidth * 0.12);
+        const cardH = Math.round((logoMeta.height || targetWidth * 0.35) + targetWidth * 0.08);
 
-      const wmMetadata = await sharp(resizedWatermark).metadata();
+        const cardSvg = `
+          <svg width="${cardW}" height="${cardH}" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <filter id="cshadow" x="-10%" y="-10%" width="120%" height="120%">
+                <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000000" flood-opacity="0.25"/>
+              </filter>
+            </defs>
+            <rect x="2" y="2" width="${cardW - 4}" height="${cardH - 4}" rx="14" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5" filter="url(#cshadow)"/>
+          </svg>
+        `;
+        const cardBg = await sharp(Buffer.from(cardSvg)).png().toBuffer();
+        finalBadgeBuffer = await sharp(cardBg)
+          .composite([{ input: logoResized, gravity: 'center' }])
+          .png()
+          .toBuffer();
+      } else {
+        finalBadgeBuffer = await sharp(watermarkBuffer)
+          .resize({ width: targetWidth, withoutEnlargement: false, fit: 'inside' })
+          .toBuffer();
+      }
+
+      const wmMetadata = await sharp(finalBadgeBuffer).metadata();
       const wmWidth = wmMetadata.width || targetWidth;
-      const wmHeight = wmMetadata.height || Math.round(targetWidth * 0.4);
+      const wmHeight = wmMetadata.height || Math.round(targetWidth * 0.38);
 
-      const margin = Math.max(12, Math.round(imgWidth * 0.025));
+      const margin = Math.max(10, Math.round(imgWidth * 0.02));
 
       let left = 0;
       let top = 0;
@@ -1017,7 +1147,7 @@ class ImageService {
       const result = await sharp(imageBuffer)
         .composite([
           {
-            input: resizedWatermark,
+            input: finalBadgeBuffer,
             top,
             left
           }
@@ -1025,7 +1155,7 @@ class ImageService {
         .jpeg({ quality: 95 })
         .toBuffer();
 
-      logger.success('IMAGE', `🏷️ Marca d'água do canal aplicada com sucesso no canto [${targetCorner}] cobrindo a marca anterior!`);
+      logger.success('IMAGE', `🏷️ Selo/Marca oficial aplicada no canto [${targetCorner}] cobrindo 100% da marca anterior!`);
       return result;
     } catch (err: any) {
       logger.error('IMAGE', `Erro ao aplicar marca d'água: ${err.message}`);
@@ -1038,19 +1168,19 @@ class ImageService {
    */
   public async getDefaultWatermarkBuffer(): Promise<Buffer> {
     const svg = `
-      <svg width="320" height="100" viewBox="0 0 320 100" xmlns="http://www.w3.org/2000/svg">
+      <svg width="340" height="108" viewBox="0 0 340 108" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" style="stop-color:#f97316;stop-opacity:1" />
             <stop offset="100%" style="stop-color:#ea580c;stop-opacity:1" />
           </linearGradient>
           <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
-            <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.35"/>
+            <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#000000" flood-opacity="0.38"/>
           </filter>
         </defs>
-        <rect x="8" y="10" width="304" height="80" rx="40" fill="url(#grad1)" filter="url(#shadow)"/>
-        <path d="M 45 52 L 60 26 L 55 46 L 72 46 L 40 76 L 48 52 Z" fill="#ffffff"/>
-        <text x="82" y="60" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="900" fill="#ffffff" letter-spacing="2">OFERDAY</text>
+        <rect x="6" y="8" width="328" height="92" rx="22" fill="url(#grad1)" stroke="#ffffff" stroke-width="2.5" filter="url(#shadow)"/>
+        <path d="M 46 56 L 62 26 L 57 48 L 76 48 L 42 82 L 50 56 Z" fill="#ffffff"/>
+        <text x="88" y="64" font-family="Arial, Helvetica, sans-serif" font-size="36" font-weight="900" fill="#ffffff" letter-spacing="2">OFERDAY</text>
       </svg>
     `;
     return sharp(Buffer.from(svg)).png().toBuffer();
