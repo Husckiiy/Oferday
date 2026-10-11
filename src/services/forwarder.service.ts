@@ -278,8 +278,21 @@ class ForwarderService extends EventEmitter {
       logger.warn('FORWARDER', `Aviso ao processar substituição de banner: ${imgErr.message}`);
     }
 
-    // 2. Second priority: If NOT a coupon banner, try fetching official 100% clean product image directly from store
-    if (!isBannerReplaced && affResults && affResults.length > 0) {
+    const isCouponAnnouncement = imageService.isCouponAlertText((data.text || '').toLowerCase());
+
+    // Fallback: If it's a coupon announcement and banner was not replaced by rules, force load clean official banner
+    if (isCouponAnnouncement && !isBannerReplaced) {
+      const store = imageService.detectStoreFromCouponText((data.text || '').toLowerCase(), primaryStore);
+      const cleanBanner = await imageService.getCleanBannerForStore(store);
+      if (cleanBanner && cleanBanner.length > 0) {
+        finalMediaBuffer = cleanBanner;
+        isBannerReplaced = true;
+        logger.success('FORWARDER', `🎯 Alerta geral de cupom detectado para [${store}]! Banner oficial limpo carregado com sucesso.`);
+      }
+    }
+
+    // 2. Second priority: If NOT a coupon banner AND NOT a coupon announcement, try fetching official 100% clean product image directly from store
+    if (!isBannerReplaced && !isCouponAnnouncement && affResults && affResults.length > 0) {
       try {
         const cleanStoreImg = await imageService.fetchOfficialStoreImage(affResults, data.text);
         if (cleanStoreImg && cleanStoreImg.length > 0) {

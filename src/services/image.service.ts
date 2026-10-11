@@ -281,6 +281,7 @@ class ImageService {
   private async initDefaultRules(): Promise<void> {
     const mlClean = path.join(BANNERS_DIR, 'alerta_cupons_ml_limpo.jpg');
     const mlComp = path.join(BANNERS_DIR, 'alerta_cupons_ml_concorrente.png');
+    const mlComp2 = path.join(BANNERS_DIR, 'ref_competitor_meli_ticket.png');
 
     const magaluClean = path.join(BANNERS_DIR, 'alerta_cupons_magalu_limpo.jpg');
     const magaluComp = path.join(BANNERS_DIR, 'alerta_cupons_magalu_concorrente.png');
@@ -289,6 +290,7 @@ class ImageService {
 
     const amazonClean = path.join(BANNERS_DIR, 'alerta_cupons_amazon_limpo.jpg');
     const amazonComp = path.join(BANNERS_DIR, 'alerta_cupons_amazon_concorrente.png');
+    const amazonComp2 = path.join(BANNERS_DIR, 'ref_competitor_amazon_blue.png');
 
     this.rules = [
       {
@@ -298,8 +300,8 @@ class ImageService {
         keywords: [
           'alerta de cupom',
           'alerta de cupons',
-          'cupons mercado livre',
           'cupom mercado livre',
+          'cupons mercado livre',
           'economizandocomjp',
           'alerta cupom',
           'novo cupom de desconto',
@@ -318,10 +320,12 @@ class ImageService {
           'valido em produtos',
           'cupom ativo',
           'cupons ativos',
-          'cupons full'
+          'cupons full',
+          'livrosejogos',
+          'full1110'
         ],
         cleanImagePath: mlClean,
-        referenceImages: [mlComp, mlClean]
+        referenceImages: [mlComp, mlComp2, mlClean]
       },
       {
         id: 'magalu_coupon_alert',
@@ -384,6 +388,7 @@ class ImageService {
           'cupom de desconto na amazon',
           'cupom de desconto: 20offamazon',
           'cupom de desconto: 10offamazon',
+          'domingo10',
           'novo cupom amazon',
           'cupons ativos amazon',
           'cupom ativo amazon',
@@ -395,7 +400,7 @@ class ImageService {
           'valido no site todo'
         ],
         cleanImagePath: amazonClean,
-        referenceImages: [amazonComp, amazonClean]
+        referenceImages: [amazonComp, amazonComp2, amazonClean]
       }
     ];
 
@@ -422,13 +427,18 @@ class ImageService {
       'alerta de cupom',
       'alerta de cupons',
       'alerta cupom',
+      'alerta cupons',
       'cupom amazon',
       'cupons amazon',
       'alerta amazon',
       'cupom de desconto amazon',
       'cupom de desconto na amazon',
+      'cupom mercado livre',
       'cupons mercado livre',
+      'cupom magalu',
       'cupons magalu',
+      'cupom magazine luiza',
+      'cupom shopee',
       'cupons shopee',
       'cupons na shopee',
       'lista de cupons',
@@ -442,9 +452,27 @@ class ImageService {
       'valido no site quase todo',
       'válido no site todo',
       'valido no site todo',
-      'em compras a partir de r$'
+      'em compras a partir de r$',
+      'resgate aqui:',
+      'resgate aqui',
+      'resgate o cupom',
+      'resgate seu cupom',
+      'ative o cupom',
+      'ativar cupom',
+      'limite de r$',
+      'a partir de, limite de'
     ];
-    return explicitAlertPhrases.some(kw => lowerText.includes(kw));
+
+    if (explicitAlertPhrases.some(kw => lowerText.includes(kw))) {
+      return true;
+    }
+
+    // Pattern matching e.g. "15% OFF...: LIVROSEJOGOS" or "10% OFF a partir de R$ 30, Limite de R$ 15 OFF: DOMINGO10"
+    if (/\b\d+%\s*off\b.*:\s*[a-z0-9_]+/i.test(lowerText) && (lowerText.includes('cupom') || lowerText.includes('limite') || lowerText.includes('resgate') || lowerText.includes('off'))) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
@@ -454,6 +482,15 @@ class ImageService {
   public isSpecificProductOffer(text: string, affResults?: any[]): boolean {
     if (!text) return false;
     const lower = text.toLowerCase();
+
+    // 0. If it is detected as a coupon announcement, it is NOT a product offer
+    // unless there is an explicit product sale price ("Por apenas R$..." or "De R$... Por R$...")
+    if (this.isCouponAlertText(lower)) {
+      const hasDirectProductSalePrice = /(?:por\s+apenas|de\s*:?\s*r\$\s*\d+.*por\s*:?\s*r\$\s*\d+|por\s*:?\s*r\$\s*\d+(?:[.,]\d+)?\b)/i.test(lower);
+      if (!hasDirectProductSalePrice) {
+        return false;
+      }
+    }
 
     // 1. If any affiliate result has a canonical product ID (MLB, ASIN, SKU, Shopee product ID)
     if (affResults && affResults.length > 0) {
@@ -596,11 +633,18 @@ class ImageService {
       const inMd5 = crypto.createHash('md5').update(originalBuffer).digest('hex');
       const inDHash = await this.computeDHash(originalBuffer);
       const colorTheme = await this.detectColorTheme(originalBuffer);
+      const detectedStore = this.detectStoreFromCouponText(lowerText, storeHint);
 
       for (const rule of this.rules) {
         let isMatch = false;
         let matchReason = '';
 
+        const isRuleForDetectedStore = (rule.id === 'amazon_coupon_alert' && detectedStore === 'AMAZON') ||
+                                       (rule.id === 'ml_coupon_alert' && detectedStore === 'MERCADO_LIVRE') ||
+                                       (rule.id === 'magalu_coupon_alert' && detectedStore === 'MAGALU') ||
+                                       (rule.id === 'shopee_coupon_alert' && detectedStore === 'SHOPEE');
+
+        // Check reference images (hashes and perceptual dHash)
         if (rule.cachedRefs && rule.cachedRefs.length > 0 && inDHash) {
           for (const ref of rule.cachedRefs) {
             if (inSha256 === ref.sha256 || inMd5 === ref.md5) {
@@ -619,27 +663,14 @@ class ImageService {
           }
         }
 
-        // Match keyword for general coupon announcements (even if competitor image is a plain logo)
+        // Match coupon announcement
         if (!isMatch && isCouponAlert) {
-          const ruleMatchesKeyword = rule.keywords.some(kw => lowerText.includes(kw));
-          const detectedStore = this.detectStoreFromCouponText(lowerText, storeHint);
-          const isStoreMatch = (rule.id === 'amazon_coupon_alert' && detectedStore === 'AMAZON') ||
-                               (rule.id === 'ml_coupon_alert' && detectedStore === 'MERCADO_LIVRE') ||
-                               (rule.id === 'magalu_coupon_alert' && detectedStore === 'MAGALU') ||
-                               (rule.id === 'shopee_coupon_alert' && detectedStore === 'SHOPEE');
-
-          if (isStoreMatch && ruleMatchesKeyword) {
+          if (isRuleForDetectedStore) {
             isMatch = true;
-            matchReason = `Alerta geral de cupom + loja [${detectedStore}]`;
-          } else if (colorTheme === rule.theme) {
+            matchReason = `Alerta geral de cupom para loja [${detectedStore}]`;
+          } else if (colorTheme === rule.theme && (!storeHint || storeHint === 'UNKNOWN') && !lowerText.includes('amazon') && !lowerText.includes('shopee') && !lowerText.includes('magalu')) {
             isMatch = true;
             matchReason = `Alerta de cupom + tema de cores ${colorTheme}`;
-          } else if (inDHash && rule.cachedRefs && rule.cachedRefs.length > 0) {
-            const minDistance = Math.min(...rule.cachedRefs.map(r => this.hammingDistance(inDHash.binary, r.dHashBinary)));
-            if (minDistance <= 22) {
-              isMatch = true;
-              matchReason = `Alerta de cupom + similaridade visual (dist ${minDistance}/64)`;
-            }
           }
         }
 
