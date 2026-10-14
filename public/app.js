@@ -1522,8 +1522,12 @@ const blacklistTagsContainer = document.getElementById('blacklistTagsContainer')
 const btnSaveBlacklistConfig = document.getElementById('btnSaveBlacklistConfig');
 const fileUploadMeli = document.getElementById('fileUploadMeli');
 const fileUploadMagalu = document.getElementById('fileUploadMagalu');
+const fileUploadShopee = document.getElementById('fileUploadShopee');
+const fileUploadAmazon = document.getElementById('fileUploadAmazon');
 const previewMeliBanner = document.getElementById('previewMeliBanner');
 const previewMagaluBanner = document.getElementById('previewMagaluBanner');
+const previewShopeeBanner = document.getElementById('previewShopeeBanner');
+const previewAmazonBanner = document.getElementById('previewAmazonBanner');
 
 // 1. Render Remove Terms (Option 1)
 function renderRemoveTermsTags() {
@@ -1690,14 +1694,6 @@ async function loadFiltersConfig() {
   }
 }
 
-const previewMeliBanner = document.getElementById('previewMeliBanner');
-const previewMagaluBanner = document.getElementById('previewMagaluBanner');
-const previewShopeeBanner = document.getElementById('previewShopeeBanner');
-const previewAmazonBanner = document.getElementById('previewAmazonBanner');
-const fileUploadMeli = document.getElementById('fileUploadMeli');
-const fileUploadMagalu = document.getElementById('fileUploadMagalu');
-const fileUploadShopee = document.getElementById('fileUploadShopee');
-const fileUploadAmazon = document.getElementById('fileUploadAmazon');
 
 async function loadBannerPreviews() {
   try {

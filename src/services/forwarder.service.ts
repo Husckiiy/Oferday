@@ -278,7 +278,8 @@ class ForwarderService extends EventEmitter {
       logger.warn('FORWARDER', `Aviso ao processar substituição de banner: ${imgErr.message}`);
     }
 
-    const isCouponAnnouncement = imageService.isCouponAlertText((data.text || '').toLowerCase());
+    const isProduct = imageService.isSpecificProductOffer(data.text, affResults);
+    const isCouponAnnouncement = !isProduct && imageService.isCouponAlertText((data.text || '').toLowerCase());
 
     // Fallback: If it's a coupon announcement and banner was not replaced by rules, force load clean official banner
     if (isCouponAnnouncement && !isBannerReplaced) {

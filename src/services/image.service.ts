@@ -310,12 +310,8 @@ class ImageService {
           'salve seu cupom',
           'novo cupom',
           'ativou',
-          'resgatou',
-          'resgate',
-          'resgate seu cupom',
-          'resgate o cupom',
           'resgatou na conta',
-          'para quem resgatou',
+          'para quem resgatou na conta',
           'produtos full',
           'valido em produtos',
           'cupom ativo',
@@ -452,15 +448,8 @@ class ImageService {
       'valido no site quase todo',
       'válido no site todo',
       'valido no site todo',
-      'em compras a partir de r$',
-      'resgate aqui:',
-      'resgate aqui',
-      'resgate o cupom',
-      'resgate seu cupom',
-      'ative o cupom',
-      'ativar cupom',
-      'limite de r$',
-      'a partir de, limite de'
+      'para quem resgatou na conta',
+      'resgatou na conta'
     ];
 
     if (explicitAlertPhrases.some(kw => lowerText.includes(kw))) {
@@ -468,7 +457,7 @@ class ImageService {
     }
 
     // Pattern matching e.g. "15% OFF...: LIVROSEJOGOS" or "10% OFF a partir de R$ 30, Limite de R$ 15 OFF: DOMINGO10"
-    if (/\b\d+%\s*off\b.*:\s*[a-z0-9_]+/i.test(lowerText) && (lowerText.includes('cupom') || lowerText.includes('limite') || lowerText.includes('resgate') || lowerText.includes('off'))) {
+    if (/\b\d+%\s*off\b.*:\s*[a-z0-9_]+/i.test(lowerText) && (lowerText.includes('cupom') || lowerText.includes('limite') || lowerText.includes('válido') || lowerText.includes('valido'))) {
       return true;
     }
 
@@ -482,15 +471,6 @@ class ImageService {
   public isSpecificProductOffer(text: string, affResults?: any[]): boolean {
     if (!text) return false;
     const lower = text.toLowerCase();
-
-    // 0. If it is detected as a coupon announcement, it is NOT a product offer
-    // unless there is an explicit product sale price ("Por apenas R$..." or "De R$... Por R$...")
-    if (this.isCouponAlertText(lower)) {
-      const hasDirectProductSalePrice = /(?:por\s+apenas|de\s*:?\s*r\$\s*\d+.*por\s*:?\s*r\$\s*\d+|por\s*:?\s*r\$\s*\d+(?:[.,]\d+)?\b)/i.test(lower);
-      if (!hasDirectProductSalePrice) {
-        return false;
-      }
-    }
 
     // 1. If any affiliate result has a canonical product ID (MLB, ASIN, SKU, Shopee product ID)
     if (affResults && affResults.length > 0) {
@@ -507,13 +487,22 @@ class ImageService {
       if (hasSpecificProduct) return true;
     }
 
-    // 2. Check price indicators (e.g. "POR: 699", "POR R$", "R$ 1.754", "A PARTIR DE R$", "699 REAIS", "1754 REAIS")
-    const hasPrice = /(?:por\s*:?\s*(?:r\$\s*)?\d+|\br\$\s*\d+|\b\d+\s*reais\b|\bem\s*at[eé]\s*\d+x)/i.test(lower);
-    if (hasPrice) return true;
+    // 2. Check price indicators (e.g. "POR: 699", "POR R$", "R$ 1.754", "A PARTIR DE R$", "699 REAIS", "1754 REAIS", "10x de R$")
+    const hasPrice = /(?:por\s*:?\s*(?:r\$\s*)?\d+|\br\$\s*\d+(?:[.,]\d+)?|\b\d+\s*reais\b|\bem\s*at[eé]\s*\d+x|\b\d+x\s*de\s*(?:r\$\s*)?\d+)/i.test(lower);
 
     // 3. Check product link patterns (e.g. /p/, /dp/, /item/, -i., /produto/, sku=)
     const hasProductUrl = /(?:\/p\/|\/dp\/|\/item\/|\/produto\/|-i\.\d+\.\d+|\/product\/|sku=|codigo_produto=)/i.test(text);
-    if (hasProductUrl) return true;
+
+    // 4. If it has a price or product URL, verify it's not a generic coupon-only headline
+    if (hasPrice || hasProductUrl) {
+      const isPureCouponHeadline = /^(?:🚨|⚡️|💥|🔥)?\s*(?:alerta\s+de\s+cupom|alerta\s+de\s+cupons|novos?\s+cupons?|central\s+de\s+cupons|lista\s+de\s+cupons)/i.test(lower.trim());
+      const hasCouponConditionOnly = /em\s+compras\s+a\s+partir\s+de\s+r\$|limite\s+de\s+r\$/i.test(lower);
+
+      if (isPureCouponHeadline && !hasProductUrl && hasCouponConditionOnly) {
+        return false;
+      }
+      return true;
+    }
 
     return false;
   }
@@ -716,8 +705,11 @@ class ImageService {
         .replace(/por:\s*/gi, '')
         .trim();
 
-      if (cleaned.length >= 8 && !cleaned.startsWith('http')) {
-        return cleaned.substring(0, 80);
+      if (cleaned.length >= 6 && !cleaned.startsWith('http')) {
+        if (cleaned.length <= 70) return cleaned;
+        const truncated = cleaned.substring(0, 70);
+        const lastSpace = truncated.lastIndexOf(' ');
+        return lastSpace > 20 ? truncated.substring(0, lastSpace).trim() : truncated.trim();
       }
     }
     return '';
@@ -727,62 +719,87 @@ class ImageService {
    * Fetches official product image directly from Shopee Affiliate GraphQL API by keyword/title
    */
   public async fetchShopeeImageViaGraphQL(keyword: string): Promise<Buffer | null> {
-    if (!keyword || keyword.length < 4) return null;
+    if (!keyword || keyword.length < 3) return null;
     const config = configService.getConfig();
     const appId = config.affiliate?.shopeeAppId || process.env.SHOPEE_APP_ID || '18378190901';
     const secret = config.affiliate?.shopeeAppSecret || process.env.SHOPEE_APP_SECRET || 'ITHJMNNGTV4JOSEZLT27UZ3TY7ICCC6L';
 
     if (!appId || !secret) return null;
 
-    try {
-      const cleanKeyword = keyword.replace(/[\\"\n\r]/g, ' ').trim();
-      const timestamp = Math.floor(Date.now() / 1000);
-      const bodyStr = JSON.stringify({
-        query: `{
-          productOfferV2(keyword: "${cleanKeyword}", page: 1, limit: 1) {
-            nodes {
-              imageUrl
-              productName
+    const executeGraphqlQuery = async (queryKeyword: string): Promise<Buffer | null> => {
+      try {
+        const cleanKeyword = queryKeyword.replace(/[\\"\n\r]/g, ' ').replace(/\s+/g, ' ').trim();
+        if (!cleanKeyword || cleanKeyword.length < 3) return null;
+
+        const timestamp = Math.floor(Date.now() / 1000);
+        const bodyStr = JSON.stringify({
+          query: `{
+            productOfferV2(keyword: "${cleanKeyword}", page: 1, limit: 1) {
+              nodes {
+                imageUrl
+                productName
+              }
             }
-          }
-        }`
-      });
+          }`
+        });
 
-      const factor = `${appId}${timestamp}${bodyStr}${secret}`;
-      const signature = crypto.createHash('sha256').update(factor, 'utf8').digest('hex');
+        const factor = `${appId}${timestamp}${bodyStr}${secret}`;
+        const signature = crypto.createHash('sha256').update(factor, 'utf8').digest('hex');
 
-      const resp = await fetch('https://open-api.affiliate.shopee.com.br/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `SHA256 Credential=${appId}, Timestamp=${timestamp}, Signature=${signature}`
-        },
-        body: bodyStr,
-        signal: AbortSignal.timeout(7000)
-      });
+        const resp = await fetch('https://open-api.affiliate.shopee.com.br/graphql', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `SHA256 Credential=${appId}, Timestamp=${timestamp}, Signature=${signature}`
+          },
+          body: bodyStr,
+          signal: AbortSignal.timeout(7000)
+        });
 
-      if (resp.ok) {
-        const data: any = await resp.json();
-        const firstNode = data?.data?.productOfferV2?.nodes?.[0];
-        const imageUrl = firstNode?.imageUrl;
-        if (imageUrl && imageUrl.startsWith('http')) {
-          const imgResp = await fetch(imageUrl, {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-            signal: AbortSignal.timeout(6000)
-          });
-          if (imgResp.ok) {
-            const buf = Buffer.from(await imgResp.arrayBuffer());
-            if (buf.length > 3000) {
-              const jpegBuf = await sharp(buf).jpeg({ quality: 95 }).toBuffer();
-              logger.success('IMAGE', `✨ Imagem oficial HD extraída da API Shopee GraphQL ("${firstNode?.productName?.substring(0, 40) || cleanKeyword}") - 100% limpa sem marcas!`);
-              return jpegBuf;
+        if (resp.ok) {
+          const data: any = await resp.json();
+          const firstNode = data?.data?.productOfferV2?.nodes?.[0];
+          const imageUrl = firstNode?.imageUrl;
+          if (imageUrl && imageUrl.startsWith('http')) {
+            const imgResp = await fetch(imageUrl, {
+              headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+              signal: AbortSignal.timeout(6000)
+            });
+            if (imgResp.ok) {
+              const buf = Buffer.from(await imgResp.arrayBuffer());
+              if (buf.length > 3000) {
+                const jpegBuf = await sharp(buf).jpeg({ quality: 95 }).toBuffer();
+                logger.success('IMAGE', `✨ Imagem oficial HD extraída da API Shopee GraphQL ("${firstNode?.productName?.substring(0, 40) || cleanKeyword}") - 100% limpa sem marcas!`);
+                return jpegBuf;
+              }
             }
           }
         }
+      } catch (err: any) {
+        logger.warn('IMAGE', `Aviso ao buscar imagem Shopee via GraphQL ("${queryKeyword}"): ${err.message}`);
       }
-    } catch (err: any) {
-      logger.warn('IMAGE', `Aviso ao buscar imagem Shopee via GraphQL: ${err.message}`);
+      return null;
+    };
+
+    // 1. Try full extracted title
+    const directResult = await executeGraphqlQuery(keyword);
+    if (directResult) return directResult;
+
+    // 2. Fallback: split words and try the first 5 core words (e.g. "Jogo De Panelas 10 Peças")
+    const words = keyword.replace(/[^\w\s\u00C0-\u017F]/gi, ' ').split(/\s+/).filter(w => w.length > 1);
+    if (words.length > 4) {
+      const shortKw = words.slice(0, 5).join(' ');
+      const shortResult = await executeGraphqlQuery(shortKw);
+      if (shortResult) return shortResult;
     }
+
+    // 3. Fallback: try first 3 core words if words > 3
+    if (words.length > 3) {
+      const miniKw = words.slice(0, 3).join(' ');
+      const miniResult = await executeGraphqlQuery(miniKw);
+      if (miniResult) return miniResult;
+    }
+
     return null;
   }
 
@@ -1137,7 +1154,8 @@ class ImageService {
    */
   public async applyCustomWatermark(imageBuffer: Buffer): Promise<Buffer> {
     const config = configService.getConfig();
-    if (!config.watermark?.enabled) {
+    const isWatermarkEnabled = config.watermark?.enabled !== false && (config.watermark?.enabled === true || config.filters?.removeWatermarks !== false);
+    if (!isWatermarkEnabled) {
       return imageBuffer;
     }
 
@@ -1170,19 +1188,20 @@ class ImageService {
       const imgHeight = imgMetadata.height || 800;
 
       let targetCorner: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left' = 'bottom-right';
-      if (config.watermark.positionMode === 'AUTO_DETECT') {
+      const posMode = config.watermark?.positionMode || 'AUTO_DETECT';
+      if (posMode === 'AUTO_DETECT') {
         targetCorner = await this.detectWatermarkCorner(imageBuffer);
-      } else if (config.watermark.positionMode === 'BOTTOM_LEFT') {
+      } else if (posMode === 'BOTTOM_LEFT') {
         targetCorner = 'bottom-left';
-      } else if (config.watermark.positionMode === 'TOP_RIGHT') {
+      } else if (posMode === 'TOP_RIGHT') {
         targetCorner = 'top-right';
-      } else if (config.watermark.positionMode === 'TOP_LEFT') {
+      } else if (posMode === 'TOP_LEFT') {
         targetCorner = 'top-left';
       } else {
         targetCorner = 'bottom-right';
       }
 
-      const scale = Math.max(0.18, Math.min(0.40, config.watermark.sizeScale || 0.26));
+      const scale = Math.max(0.18, Math.min(0.40, config.watermark?.sizeScale || 0.26));
       const targetWidth = Math.max(120, Math.round(imgWidth * scale));
 
       let finalBadgeBuffer: Buffer;
