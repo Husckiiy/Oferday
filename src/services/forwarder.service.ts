@@ -292,8 +292,8 @@ class ForwarderService extends EventEmitter {
       }
     }
 
-    // 2. Second priority: If NOT a coupon banner AND NOT a coupon announcement, try fetching official 100% clean product image directly from store
-    if (!isBannerReplaced && !isCouponAnnouncement && affResults && affResults.length > 0) {
+    // 2. Second priority: If NOT a coupon banner AND NOT a coupon announcement AND IS a specific product offer, try fetching official 100% clean product image directly from store
+    if (!isBannerReplaced && !isCouponAnnouncement && isProduct && affResults && affResults.length > 0) {
       try {
         const cleanStoreImg = await imageService.fetchOfficialStoreImage(affResults, data.text);
         if (cleanStoreImg && cleanStoreImg.length > 0) {

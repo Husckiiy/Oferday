@@ -287,6 +287,7 @@ class ImageService {
     const magaluComp = path.join(BANNERS_DIR, 'alerta_cupons_magalu_concorrente.png');
 
     const shopeeClean = path.join(BANNERS_DIR, 'alerta_cupons_shopee_limpo.jpg');
+    const shopeeComp = path.join(BANNERS_DIR, 'ref_competitor_shopee_dia_cupons.png');
 
     const amazonClean = path.join(BANNERS_DIR, 'alerta_cupons_amazon_limpo.jpg');
     const amazonComp = path.join(BANNERS_DIR, 'alerta_cupons_amazon_concorrente.png');
@@ -355,6 +356,10 @@ class ImageService {
           'alerta de cupom shopee',
           'cupons shopee',
           'cupom shopee',
+          'dia de cupons',
+          'dia de cupons shopee',
+          'evento dia de cupons',
+          'evento de cupons',
           'alerta shopee',
           'cupons na shopee',
           'cupom na shopee',
@@ -366,7 +371,7 @@ class ImageService {
           'moedas shopee'
         ],
         cleanImagePath: shopeeClean,
-        referenceImages: [shopeeClean]
+        referenceImages: [shopeeComp, shopeeClean]
       },
       {
         id: 'amazon_coupon_alert',
@@ -449,7 +454,16 @@ class ImageService {
       'válido no site todo',
       'valido no site todo',
       'para quem resgatou na conta',
-      'resgatou na conta'
+      'resgatou na conta',
+      'dia de cupons',
+      'dia de cupom',
+      'evento dia de cupons',
+      'evento de cupons',
+      'evento de cupom',
+      'festival de cupons',
+      'semana de cupons',
+      'maratona de cupons',
+      'chuva de cupons'
     ];
 
     if (explicitAlertPhrases.some(kw => lowerText.includes(kw))) {
@@ -551,6 +565,7 @@ class ImageService {
     const lower = url.toLowerCase();
     return (
       lower.includes('/cupons') ||
+      lower.includes('/cupom') ||
       lower.includes('/selecao/') ||
       lower.includes('/campanha/') ||
       lower.includes('/hotsite/') ||
@@ -563,6 +578,7 @@ class ImageService {
       lower.includes('amazon.com.br/gp/coupons') ||
       lower.includes('shopee.com.br/m/') ||
       lower.includes('shopee.com.br/events') ||
+      lower.includes('/m/cupom') ||
       lower.includes('best.aliexpress.com')
     );
   }
@@ -693,8 +709,27 @@ class ImageService {
     if (!text) return '';
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     for (const line of lines) {
-      // Skip greetings, urls, prices, coupons, emojis-only lines
-      if (line.startsWith('http') || line.toLowerCase().includes('cupom') || line.toLowerCase().includes('resgate') || line.toLowerCase().includes('corre')) continue;
+      const lower = line.toLowerCase();
+      // Skip greetings, urls, prices, coupons (singular cupom or plural cupons), announcements, events
+      if (
+        line.startsWith('http') ||
+        lower.includes('cupom') ||
+        lower.includes('cupon') ||
+        lower.includes('resgate') ||
+        lower.includes('corre') ||
+        lower.includes('evento') ||
+        lower.includes('alerta') ||
+        lower.includes('aviso') ||
+        lower.includes('desconto') ||
+        lower.includes('anuncio') ||
+        lower.includes('anúncio') ||
+        lower.includes('dia de') ||
+        lower.includes('semana de') ||
+        lower.includes('compre aqui') ||
+        lower.includes('link')
+      ) {
+        continue;
+      }
       const cleaned = line
         .replace(/^[🚨🔥💥⚡️📦⭐🛒📢\s\-_*]+/, '')
         .replace(/[🚨🔥💥⚡️📦⭐🛒📢\s\-_*]+$/, '')
