@@ -356,6 +356,10 @@ class ImageService {
           'alerta de cupom shopee',
           'cupons shopee',
           'cupom shopee',
+          'cupom de desconto na shopee',
+          'cupom de desconto shopee',
+          'cupons de desconto na shopee',
+          'cupons de desconto shopee',
           'dia de cupons',
           'dia de cupons shopee',
           'evento dia de cupons',
@@ -436,12 +440,22 @@ class ImageService {
       'cupom de desconto na amazon',
       'cupom mercado livre',
       'cupons mercado livre',
+      'cupom de desconto no mercado livre',
+      'cupom de desconto mercado livre',
+      'cupons no mercado livre',
       'cupom magalu',
       'cupons magalu',
       'cupom magazine luiza',
+      'cupom de desconto no magalu',
+      'cupom de desconto magalu',
       'cupom shopee',
       'cupons shopee',
       'cupons na shopee',
+      'cupom na shopee',
+      'cupom de desconto na shopee',
+      'cupom de desconto shopee',
+      'cupons de desconto na shopee',
+      'cupons de desconto shopee',
       'lista de cupons',
       'central de cupons',
       'cupons disponíveis',
@@ -470,6 +484,16 @@ class ImageService {
       return true;
     }
 
+    // Any store coupon alert headline e.g. "CUPOM DE DESCONTO NA SHOPEE", "CUPOM DE DESCONTO NO MERCADO LIVRE"
+    if (/\bcupo[mn]s?\s+(?:de\s+desconto\s+)?(?:na|no|para\s+a?)?\s*(?:shopee|amazon|mercado\s*livre|magalu|aliexpress)\b/i.test(lowerText)) {
+      return true;
+    }
+
+    // Pattern matching e.g. "R$30 OFF em R$299" or "R$90 OFF em R$899"
+    if (/\br\$\s*\d+\s*off\s+(?:em|acima|a\s+partir)\b/i.test(lowerText) && (lowerText.includes('cupom') || lowerText.includes('cupon') || lowerText.includes('shopee') || lowerText.includes('resgate') || lowerText.includes('amazon') || lowerText.includes('mercado'))) {
+      return true;
+    }
+
     // Pattern matching e.g. "15% OFF...: LIVROSEJOGOS" or "10% OFF a partir de R$ 30, Limite de R$ 15 OFF: DOMINGO10"
     if (/\b\d+%\s*off\b.*:\s*[a-z0-9_]+/i.test(lowerText) && (lowerText.includes('cupom') || lowerText.includes('limite') || lowerText.includes('válido') || lowerText.includes('valido'))) {
       return true;
@@ -485,6 +509,21 @@ class ImageService {
   public isSpecificProductOffer(text: string, affResults?: any[]): boolean {
     if (!text) return false;
     const lower = text.toLowerCase();
+
+    // 0. If it is detected as a coupon announcement:
+    // It can ONLY be a product offer if it has an explicit canonical product URL (MLB, ASIN, -i. item ID)
+    // OR direct product sale price ("Por apenas R$...", "De R$... Por R$...")
+    if (this.isCouponAlertText(lower)) {
+      const hasProductLink = affResults?.some(r => {
+        const u = r.canonicalProductUrl || r.finalResolvedUrl || r.originalUrl;
+        return u && !this.isGenericNonProductUrl(u) && /(?:MLB-?\d+|\/p\/[a-zA-Z0-9]+|\/dp\/[a-zA-Z0-9]{10}|-i\.\d+\.\d+|\/product\/\d+\/\d+|\/item\/\d+|sku=\d+)/i.test(u);
+      });
+      const hasDirectProductSalePrice = /(?:por\s+apenas|de\s*:?\s*r\$\s*\d+.*por\s*:?\s*r\$\s*\d+|por\s*:?\s*r\$\s*\d+(?:[.,]\d+)?\s*(?:no\s+pix|no\s+boleto|no\s+cart[aã]o|à\s+vista)?)/i.test(lower);
+
+      if (!hasProductLink && !hasDirectProductSalePrice) {
+        return false;
+      }
+    }
 
     // 1. If any affiliate result has a canonical product ID (MLB, ASIN, SKU, Shopee product ID)
     if (affResults && affResults.length > 0) {
@@ -509,7 +548,7 @@ class ImageService {
 
     // 4. If it has a price or product URL, verify it's not a generic coupon-only headline
     if (hasPrice || hasProductUrl) {
-      const isPureCouponHeadline = /^(?:🚨|⚡️|💥|🔥)?\s*(?:alerta\s+de\s+cupom|alerta\s+de\s+cupons|novos?\s+cupons?|central\s+de\s+cupons|lista\s+de\s+cupons)/i.test(lower.trim());
+      const isPureCouponHeadline = /^(?:🚨|⚡️|💥|🔥)?\s*(?:alerta\s+de\s+cupom|alerta\s+de\s+cupons|novos?\s+cupons?|central\s+de\s+cupons|lista\s+de\s+cupons|cupom\s+de\s+desconto|cupons\s+de\s+desconto)/i.test(lower.trim());
       const hasCouponConditionOnly = /em\s+compras\s+a\s+partir\s+de\s+r\$|limite\s+de\s+r\$/i.test(lower);
 
       if (isPureCouponHeadline && !hasProductUrl && hasCouponConditionOnly) {
@@ -726,21 +765,26 @@ class ImageService {
         lower.includes('dia de') ||
         lower.includes('semana de') ||
         lower.includes('compre aqui') ||
-        lower.includes('link')
+        lower.includes('link') ||
+        /\b(?:off|off\s+em|em\s+r\$|acima\s+de)\b/i.test(lower) ||
+        line.includes('🎟️') ||
+        line.includes('🎫')
       ) {
         continue;
       }
       const cleaned = line
-        .replace(/^[🚨🔥💥⚡️📦⭐🛒📢\s\-_*]+/, '')
-        .replace(/[🚨🔥💥⚡️📦⭐🛒📢\s\-_*]+$/, '')
+        .replace(/^[🚨🔥💥⚡️📦⭐🛒📢🎟️🎫\s\-_*]+/, '')
+        .replace(/[🚨🔥💥⚡️📦⭐🛒📢🎟️🎫\s\-_*]+$/, '')
         .replace(/R\$\s*\d+(?:[.,]\d+)?/gi, '')
         .replace(/\b\d+%\s*off\b/gi, '')
+        .replace(/\b\d+\s*off\b/gi, '')
+        .replace(/\boff\b/gi, '')
         .replace(/por\s+apenas/gi, '')
         .replace(/de:\s*/gi, '')
         .replace(/por:\s*/gi, '')
         .trim();
 
-      if (cleaned.length >= 6 && !cleaned.startsWith('http')) {
+      if (cleaned.length >= 8 && !cleaned.startsWith('http') && /[a-zA-Z]{3,}/.test(cleaned)) {
         if (cleaned.length <= 70) return cleaned;
         const truncated = cleaned.substring(0, 70);
         const lastSpace = truncated.lastIndexOf(' ');
