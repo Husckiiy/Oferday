@@ -462,7 +462,6 @@ class ImageService {
       'cupons ativos',
       'novos cupons liberados',
       'novo cupom liberado',
-      'todos os cupons',
       'válido no site quase todo',
       'valido no site quase todo',
       'válido no site todo',
@@ -510,17 +509,25 @@ class ImageService {
     if (!text) return false;
     const lower = text.toLowerCase();
 
+    const productRegex = /(?:MLB-?\d+|\/p\/[a-zA-Z0-9]+|\/up\/[a-zA-Z0-9]+|\/dp\/[a-zA-Z0-9]{10}|-i\.\d+\.\d+|\/product\/\d+\/\d+|\/opaanlp\/\d+\/\d+|\/universal-link\/\d+\/\d+|\/item\/\d+|\/produto\/\d+|sku=\d+|codigo_produto=\d+)/i;
+    const hasProductMarker = /link\s*(?:do\s*produto)?\s*:\s*https?:\/\//i.test(text);
+
+    const isCouponTierLine = /\br\$\s*\d+\s*off\s+(?:em|acima|a\s+partir)/i.test(lower);
+    const hasDirectProductSalePrice = (
+      /(?:por\s+apenas|de\s*:?\s*r\$\s*\d+.*por\s*:?\s*r\$\s*\d+|por\s*:?\s*r\$\s*\d+)/i.test(lower) ||
+      (/(?:^|\n)\s*(?:🔥|⚡|💥|💰|💸)?\s*(?:por\s*:?\s*)?r\$\s*\d+(?:[.,]\d+)?\s*(?:no\s+pix|no\s+boleto|no\s+cart[aã]o|à\s+vista)?\s*(?:$|\n)/im.test(text) && !isCouponTierLine)
+    );
+
     // 0. If it is detected as a coupon announcement:
-    // It can ONLY be a product offer if it has an explicit canonical product URL (MLB, ASIN, -i. item ID)
-    // OR direct product sale price ("Por apenas R$...", "De R$... Por R$...")
+    // It can ONLY be a product offer if it has an explicit canonical product URL (MLB, ASIN, Shopee item ID, etc.)
+    // OR direct product sale price ("Por apenas R$...", "🔥 R$ 3757", etc.)
     if (this.isCouponAlertText(lower)) {
       const hasProductLink = affResults?.some(r => {
         const u = r.canonicalProductUrl || r.finalResolvedUrl || r.originalUrl;
-        return u && !this.isGenericNonProductUrl(u) && /(?:MLB-?\d+|\/p\/[a-zA-Z0-9]+|\/dp\/[a-zA-Z0-9]{10}|-i\.\d+\.\d+|\/product\/\d+\/\d+|\/item\/\d+|sku=\d+)/i.test(u);
-      });
-      const hasDirectProductSalePrice = /(?:por\s+apenas|de\s*:?\s*r\$\s*\d+.*por\s*:?\s*r\$\s*\d+|por\s*:?\s*r\$\s*\d+(?:[.,]\d+)?\s*(?:no\s+pix|no\s+boleto|no\s+cart[aã]o|à\s+vista)?)/i.test(lower);
+        return u && !this.isGenericNonProductUrl(u) && productRegex.test(u);
+      }) || (hasProductMarker && productRegex.test(text));
 
-      if (!hasProductLink && !hasDirectProductSalePrice) {
+      if (!hasProductLink && !hasDirectProductSalePrice && !hasProductMarker) {
         return false;
       }
     }
@@ -530,28 +537,24 @@ class ImageService {
       const hasSpecificProduct = affResults.some(r => {
         const url = r.canonicalProductUrl || r.finalResolvedUrl || r.originalUrl;
         if (!url) return false;
-        // If it's a generic coupon hub or category list, not a product
         if (this.isGenericNonProductUrl(url)) return false;
-        // Check for specific product patterns
-        return (
-          /(?:MLB-?\d+|\/p\/[a-zA-Z0-9]+|\/up\/[a-zA-Z0-9]+|\/dp\/[a-zA-Z0-9]{10}|-i\.\d+\.\d+|\/product\/\d+\/\d+|\/item\/\d+|sku=\d+|codigo_produto=\d+)/i.test(url)
-        );
+        return productRegex.test(url);
       });
       if (hasSpecificProduct) return true;
     }
 
     // 2. Check price indicators (e.g. "POR: 699", "POR R$", "R$ 1.754", "A PARTIR DE R$", "699 REAIS", "1754 REAIS", "10x de R$")
-    const hasPrice = /(?:por\s*:?\s*(?:r\$\s*)?\d+|\br\$\s*\d+(?:[.,]\d+)?|\b\d+\s*reais\b|\bem\s*at[eé]\s*\d+x|\b\d+x\s*de\s*(?:r\$\s*)?\d+)/i.test(lower);
+    const hasPrice = hasDirectProductSalePrice || (/(?:por\s*:?\s*(?:r\$\s*)?\d+|\br\$\s*\d+(?:[.,]\d+)?|\b\d+\s*reais\b|\bem\s*at[eé]\s*\d+x|\b\d+x\s*de\s*(?:r\$\s*)?\d+)/i.test(lower) && !isCouponTierLine);
 
     // 3. Check product link patterns (e.g. /p/, /dp/, /item/, -i., /produto/, sku=)
-    const hasProductUrl = /(?:\/p\/|\/dp\/|\/item\/|\/produto\/|-i\.\d+\.\d+|\/product\/|sku=|codigo_produto=)/i.test(text);
+    const hasProductUrl = productRegex.test(text);
 
-    // 4. If it has a price or product URL, verify it's not a generic coupon-only headline
-    if (hasPrice || hasProductUrl) {
+    // 4. If it has a price or product URL or explicit product link marker
+    if (hasPrice || hasProductUrl || hasProductMarker) {
       const isPureCouponHeadline = /^(?:🚨|⚡️|💥|🔥)?\s*(?:alerta\s+de\s+cupom|alerta\s+de\s+cupons|novos?\s+cupons?|central\s+de\s+cupons|lista\s+de\s+cupons|cupom\s+de\s+desconto|cupons\s+de\s+desconto)/i.test(lower.trim());
       const hasCouponConditionOnly = /em\s+compras\s+a\s+partir\s+de\s+r\$|limite\s+de\s+r\$/i.test(lower);
 
-      if (isPureCouponHeadline && !hasProductUrl && hasCouponConditionOnly) {
+      if (isPureCouponHeadline && !hasProductUrl && !hasProductMarker && (hasCouponConditionOnly || isCouponTierLine)) {
         return false;
       }
       return true;
