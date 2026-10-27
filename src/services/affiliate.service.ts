@@ -1085,14 +1085,14 @@ export class AffiliateService {
   /**
    * Official Awin Affiliate Link Converter (KaBuM, Casas Bahia, cread.php, awin1.com, tidd.ly).
    */
-  public async gerarAfiliadoAwin(finalUrl: string): Promise<string> {
+  public async gerarAfiliadoAwin(finalUrl: string): Promise<{ affiliateUrl: string; canonicalProductUrl?: string }> {
     const config = configService.getConfig();
     const publisherId = config.affiliate?.awinPublisherId || process.env.AWIN_PUBLISHER_ID || '';
     const apiToken = config.affiliate?.awinApiToken || process.env.AWIN_API_TOKEN || process.env.AWIN_OAUTH2_TOKEN || '';
 
     if (!publisherId || publisherId.trim().length === 0) {
       logger.warn('AFFILIATE', `⚠️ Awin: Link de loja parceira da Awin detectado, mas seu Publisher ID não está preenchido em "Configurar Lojas -> Awin".`);
-      return finalUrl;
+      return { affiliateUrl: finalUrl, canonicalProductUrl: finalUrl };
     }
 
     try {
@@ -1155,7 +1155,7 @@ export class AffiliateService {
         const officialAwinShort = await this.generateOfficialAwinShortLink(cleanPubId, apiToken.trim(), Number(mid), cleanProductUrl);
         if (officialAwinShort) {
           logger.success('AFFILIATE', `Awin: Link oficial encurtado (tidd.ly) gerado via API: ${officialAwinShort}`);
-          return officialAwinShort;
+          return { affiliateUrl: officialAwinShort, canonicalProductUrl: cleanProductUrl };
         }
       }
 
@@ -1169,13 +1169,13 @@ export class AffiliateService {
           const shortUrl = await urlShortenerService.shorten(awinLink);
           if (shortUrl && shortUrl !== awinLink) {
             logger.success('AFFILIATE', `Awin: Link encurtado com sucesso: ${shortUrl}`);
-            return shortUrl;
+            return { affiliateUrl: shortUrl, canonicalProductUrl: cleanProductUrl };
           }
         } catch (shortErr: any) {
           logger.warn('AFFILIATE', `Aviso ao encurtar link Awin: ${shortErr.message}`);
         }
 
-        return awinLink;
+        return { affiliateUrl: awinLink, canonicalProductUrl: cleanProductUrl };
       }
 
       // 5. Fallback for generic awin1.com / zanox links
@@ -1186,15 +1186,15 @@ export class AffiliateService {
         try {
           const shortUrl = await urlShortenerService.shorten(genericLink);
           if (shortUrl && shortUrl !== genericLink) {
-            return shortUrl;
+            return { affiliateUrl: shortUrl, canonicalProductUrl: cleanProductUrl };
           }
         } catch {}
-        return genericLink;
+        return { affiliateUrl: genericLink, canonicalProductUrl: cleanProductUrl };
       }
 
-      return cleanProductUrl;
+      return { affiliateUrl: cleanProductUrl, canonicalProductUrl: cleanProductUrl };
     } catch {
-      return finalUrl;
+      return { affiliateUrl: finalUrl, canonicalProductUrl: finalUrl };
     }
   }
 
@@ -1214,7 +1214,7 @@ export class AffiliateService {
       case 'ALIEXPRESS':
         return { affiliateUrl: await this.gerarAfiliadoAliexpress(finalUrl), canonicalProductUrl: finalUrl };
       case 'AWIN':
-        return { affiliateUrl: await this.gerarAfiliadoAwin(finalUrl), canonicalProductUrl: finalUrl };
+        return await this.gerarAfiliadoAwin(finalUrl);
       default:
         return { affiliateUrl: finalUrl, canonicalProductUrl: finalUrl };
     }

@@ -493,6 +493,58 @@ class TelegramService extends EventEmitter {
     }, 8000);
   }
 
+  /**
+   * Extracts full message text including hyperlinked entities (MessageEntityTextUrl)
+   * and inline keyboard URL buttons (KeyboardButtonUrl).
+   */
+  private extractFullMessageText(msg: any): string {
+    let text = (msg.message || '').trim();
+    const urls: string[] = [];
+
+    // 1. Extract URLs from text entities (MessageEntityTextUrl)
+    if (Array.isArray(msg.entities)) {
+      for (const ent of msg.entities) {
+        if ((ent.className === 'MessageEntityTextUrl' || ent._ === 'messageEntityTextUrl') && ent.url) {
+          const u = String(ent.url).trim();
+          if (u.startsWith('http') && !urls.includes(u) && !text.includes(u)) {
+            urls.push(u);
+          }
+        }
+      }
+    }
+
+    // 2. Extract URLs from replyMarkup buttons (e.g. KeyboardButtonUrl in inline keyboards)
+    if (msg.replyMarkup?.rows && Array.isArray(msg.replyMarkup.rows)) {
+      for (const row of msg.replyMarkup.rows) {
+        if (Array.isArray(row.buttons)) {
+          for (const btn of row.buttons) {
+            if (btn.url && typeof btn.url === 'string') {
+              const u = btn.url.trim();
+              if (u.startsWith('http') && !urls.includes(u) && !text.includes(u)) {
+                urls.push(u);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 3. If any URLs were discovered that are not yet in the text, attach or append them
+    if (urls.length > 0) {
+      const endsWithLinkRegex = /(?:🛒\s*)?(?:link(?:\s*do\s*produto)?|compre(?:\s*aqui)?|pegue(?:\s*aqui)?|acesse(?:\s*aqui)?)\s*:\s*$/i;
+      if (endsWithLinkRegex.test(text)) {
+        text = text.replace(endsWithLinkRegex, (match: string) => `${match} ${urls[0]}`);
+        if (urls.length > 1) {
+          text += '\n' + urls.slice(1).join('\n');
+        }
+      } else {
+        text += '\n🛒 Link do produto: ' + urls.join('\n');
+      }
+    }
+
+    return text;
+  }
+
   private async dispatchMessage(msg: any, channelTitle: string): Promise<void> {
     try {
       if (!msg) return;
@@ -512,7 +564,7 @@ class TelegramService extends EventEmitter {
         if (first) this.processedMessageKeys.delete(first);
       }
 
-      const text = msg.message || '';
+      const text = this.extractFullMessageText(msg);
       const hasMedia = !!msg.media;
 
       logger.info('TELEGRAM', `Nova mensagem recebida do canal "${channelTitle || this.listeningChannel}"! (ID #${msg.id}, Tamanho: ${text.length} caracteres, Mídia: ${hasMedia ? 'Sim' : 'Não'})`);
