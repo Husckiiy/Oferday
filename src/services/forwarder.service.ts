@@ -304,15 +304,6 @@ class ForwarderService extends EventEmitter {
       }
     }
 
-    // 2b. If using the forwarded Telegram image (or store image had watermarks), automatically erase any competitor watermarks/tags
-    if (finalMediaBuffer && finalMediaBuffer.length > 0 && !isBannerReplaced && config.filters?.removeWatermarks !== false) {
-      try {
-        finalMediaBuffer = await imageService.removeCompetitorWatermarks(finalMediaBuffer);
-      } catch (cleanErr: any) {
-        logger.warn('FORWARDER', `Aviso ao remover marcas d'água concorrentes: ${cleanErr.message}`);
-      }
-    }
-
     // 3. Normalize product images to standard 1:1 square canvas (prevents WhatsApp mobile zoom/distortion)
     if (finalMediaBuffer && finalMediaBuffer.length > 0) {
       try {
@@ -518,15 +509,6 @@ class ForwarderService extends EventEmitter {
         finalMediaBuffer = await imageService.processImageReplacement(text, finalMediaBuffer);
       } catch (imgErr: any) {
         logger.warn('FORWARDER', `Aviso ao processar substituição de imagem: ${imgErr.message}`);
-      }
-    }
-
-    // 2b. Automatically erase competitor watermarks if enabled
-    if (finalMediaBuffer && finalMediaBuffer.length > 0 && config.filters?.removeWatermarks !== false) {
-      try {
-        finalMediaBuffer = await imageService.removeCompetitorWatermarks(finalMediaBuffer);
-      } catch (cleanErr: any) {
-        logger.warn('FORWARDER', `Aviso ao remover marcas d'água concorrentes: ${cleanErr.message}`);
       }
     }
 
