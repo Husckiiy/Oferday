@@ -522,6 +522,12 @@ class ImageService {
     // It can ONLY be a product offer if it has an explicit canonical product URL (MLB, ASIN, Shopee item ID, etc.)
     // OR direct product sale price ("Por apenas R$...", "🔥 R$ 3757", etc.)
     if (this.isCouponAlertText(lower)) {
+      // Se tiver múltiplos cupons, múltiplos percentuais OFF ou regras de rodada de cupons (ex: TUDOCASA1111, DECORACAO1111, Limite de R$...), NUNCA é um produto!
+      const multiCouponMatches = lower.match(/(?:limite\s+de\s+r\$|\d+%\s*off|cupo[mn]s?:|[a-z0-9_]{5,}:|resgate|hor[aá]rios)/gi) || [];
+      if (multiCouponMatches.length >= 2) {
+        return false;
+      }
+
       const hasProductLink = affResults?.some(r => {
         const u = r.canonicalProductUrl || r.finalResolvedUrl || r.originalUrl;
         return u && !this.isGenericNonProductUrl(u) && productRegex.test(u);
@@ -551,10 +557,10 @@ class ImageService {
 
     // 4. If it has a price or product URL or explicit product link marker
     if (hasPrice || hasProductUrl || hasProductMarker) {
-      const isPureCouponHeadline = /^(?:🚨|⚡️|💥|🔥)?\s*(?:alerta\s+de\s+cupom|alerta\s+de\s+cupons|novos?\s+cupons?|central\s+de\s+cupons|lista\s+de\s+cupons|cupom\s+de\s+desconto|cupons\s+de\s+desconto)/i.test(lower.trim());
-      const hasCouponConditionOnly = /em\s+compras\s+a\s+partir\s+de\s+r\$|limite\s+de\s+r\$/i.test(lower);
+      const isPureCouponHeadline = /^(?:🚨|⚡️|💥|🔥)?\s*(?:alerta\s+de\s+cupom|alerta\s+de\s+cupons|novos?\s+cupons?|central\s+de\s+cupons|lista\s+de\s+cupons|cupom\s+de\s+desconto|cupons\s+de\s+desconto|cupo[mn]s?\s+(?:mercado\s*livre|amazon|shopee|magalu|aliexpress))/i.test(lower.trim());
+      const hasCouponConditionOnly = /em\s+compras\s+a\s+partir\s+de\s+r\$|limite\s+de\s+r\$|a\s+partir\s+de\s+r\$/i.test(lower);
 
-      if (isPureCouponHeadline && !hasProductUrl && !hasProductMarker && (hasCouponConditionOnly || isCouponTierLine)) {
+      if ((isPureCouponHeadline || this.isCouponAlertText(lower)) && !hasProductUrl && !hasProductMarker && (hasCouponConditionOnly || isCouponTierLine)) {
         return false;
       }
       return true;
@@ -621,6 +627,9 @@ class ImageService {
       lower.includes('shopee.com.br/m/') ||
       lower.includes('shopee.com.br/events') ||
       lower.includes('/m/cupom') ||
+      lower.includes('/social/') ||
+      lower.includes('/sec/') ||
+      lower.includes('coin-index') ||
       lower.includes('best.aliexpress.com')
     );
   }
@@ -1008,7 +1017,16 @@ class ImageService {
             }
           }
 
-          // 5. AliExpress / KaBuM / Awin / Outras
+          // 5. AliExpress Oficial
+          if (res.store === 'ALIEXPRESS' || targetUrl.includes('aliexpress.com')) {
+            const aliImg = await this.fetchAliExpressOfficialImage(targetUrl, candidateUrls);
+            if (aliImg) {
+              logger.success('IMAGE', `✨ Imagem oficial HD extraída do AliExpress (${targetUrl}) - 100% limpa sem marcas!`);
+              return aliImg;
+            }
+          }
+
+          // 6. KaBuM / Awin / Outras Lojas
           const scraped = await this.scrapeOgImageFromUrl(targetUrl);
           if (scraped) {
             logger.success('IMAGE', `✨ Imagem oficial extraída da loja (${res.store}) - 100% limpa sem marcas!`);
@@ -1021,6 +1039,98 @@ class ImageService {
     }
 
     return null;
+  }
+
+  /**
+   * Extrai imagem oficial limpa em alta resolução do AliExpress diretamente pelo Item ID ou página canônica
+   */
+  public async fetchAliExpressOfficialImage(url: string, candidateUrls: string[] = []): Promise<Buffer | null> {
+    try {
+      const urlsToTest = [url, ...candidateUrls];
+      let itemId: string | null = null;
+
+      for (const u of urlsToTest) {
+        if (!u) continue;
+        const m = u.match(/(?:item\/|productIds?=|productId=)(\d{10,20})/i);
+        if (m) {
+          itemId = m[1];
+          break;
+        }
+      }
+
+      // Se não encontrou o ID diretamente na URL, resolve redirecionamentos
+      if (!itemId) {
+        for (const u of urlsToTest) {
+          if (!u || !u.includes('aliexpress')) continue;
+          try {
+            const resp = await fetch(u, {
+              redirect: 'follow',
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+              },
+              signal: AbortSignal.timeout(6000)
+            });
+            const finalUrl = resp.url || '';
+            const m = finalUrl.match(/(?:item\/|productIds?=|productId=)(\d{10,20})/i);
+            if (m) {
+              itemId = m[1];
+              break;
+            }
+          } catch {}
+        }
+      }
+
+      if (!itemId) return null;
+
+      const itemUrl = `https://pt.aliexpress.com/item/${itemId}.html`;
+      const resp = await fetch(itemUrl, {
+        headers: {
+          'User-Agent': 'WhatsApp/2.24.6.77 i',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        },
+        signal: AbortSignal.timeout(7000)
+      });
+
+      if (!resp.ok) return null;
+      const html = await resp.text();
+
+      let imgUrl: string | null = null;
+      const ogMatch = html.match(/<meta[^>]+property=[\"']og:image[\"'][^>]+content=[\"']([^\"']+)[\"']/i) ||
+                      html.match(/<meta[^>]+content=[\"']([^\"']+)[\"'][^>]+property=[\"']og:image[\"']/i);
+
+      if (ogMatch && ogMatch[1] && !ogMatch[1].includes('Sa0202ec8a96a4085962acfc27e9ffd04F')) {
+        imgUrl = ogMatch[1].trim();
+      }
+
+      if (!imgUrl) {
+        const cdnMatches = html.match(/https?:\/\/[^\s"'<>]+\.(?:aliexpress-media\.com|alicdn\.com)\/kf\/[a-zA-Z0-9_\-\.]+/gi);
+        if (cdnMatches) {
+          for (const cdn of cdnMatches) {
+            if (!cdn.includes('Sa0202ec8a96a4085962acfc27e9ffd04F') && !cdn.includes('logo') && !cdn.includes('avatar')) {
+              imgUrl = cdn;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!imgUrl) return null;
+      if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
+      imgUrl = imgUrl.replace(/_\d+x\d+\.(?:jpg|jpeg|png|webp)/i, '');
+      if (!/\.(?:jpg|jpeg|png|webp)$/i.test(imgUrl)) imgUrl += '.jpg';
+
+      const imgRes = await fetch(imgUrl, { signal: AbortSignal.timeout(8000) });
+      if (!imgRes.ok) return null;
+
+      const buf = Buffer.from(await imgRes.arrayBuffer());
+      if (buf.length < 2000) return null;
+
+      const jpeg = await sharp(buf).jpeg({ quality: 92 }).toBuffer();
+      return jpeg;
+    } catch {
+      return null;
+    }
   }
 
   /**

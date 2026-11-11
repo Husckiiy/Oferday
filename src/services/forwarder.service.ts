@@ -156,9 +156,9 @@ class ForwarderService extends EventEmitter {
 
     this.cleanOldSentOffers();
 
-    // 1. --- BLACKLIST CHECK (BLOQUEIO TOTAL DE MENSAGEM) ---
-    // If message contains any keyword from blacklist (e.g. instagram.com, tiktok.com, grupo vip):
-    // The entire message is discarded and blocked!
+    // 1. --- BLACKLIST CHECK INTELIGENTE ---
+    // Se a mensagem for puro spam ou convite sem ofertas, descarta completamente.
+    // Mas se for uma oferta legítima contendo links das lojas ou cupom/preço, apenas limpa os termos indesejados sem matar a oferta!
     const blacklist = config.filters?.blacklist || [];
     const lowerOriginalText = (data.text || '').toLowerCase();
     
@@ -169,21 +169,31 @@ class ForwarderService extends EventEmitter {
       });
 
       if (matchedKeyword) {
-        logger.warn('FORWARDER', `🚫 Mensagem do canal "${channel}" bloqueada pelo filtro de Blacklist (termo detectado: "${matchedKeyword}").`);
-        const blockedItem: ForwardedMessageItem = {
-          id: Math.random().toString(36).substring(2, 9),
-          telegramMessageId: data.id,
-          channel,
-          text: data.text,
-          hasMedia: !!data.mediaBuffer,
-          mediaBase64: null,
-          destinationJid: destinationJid || 'Não configurado',
-          timestamp: new Date().toLocaleTimeString('pt-BR', { hour12: false }),
-          status: 'failed',
-          error: `Bloqueado por Blacklist ("${matchedKeyword}")`
-        };
-        this.addFeedItem(blockedItem);
-        return;
+        const hasStoreLink = /(?:mercadolivre|meli\.la|amazon|amzn|shopee|shp\.ee|magazineluiza|magalu|aliexpress)/i.test(lowerOriginalText);
+        const hasOfferIndicator = /r\$\s*\d+|cupo[mn]|off\b/i.test(lowerOriginalText);
+
+        if (!hasStoreLink && !hasOfferIndicator) {
+          logger.warn('FORWARDER', `🚫 Mensagem do canal "${channel}" bloqueada pelo filtro de Blacklist (spam detectado: "${matchedKeyword}").`);
+          const blockedItem: ForwardedMessageItem = {
+            id: Math.random().toString(36).substring(2, 9),
+            telegramMessageId: data.id,
+            channel,
+            text: data.text,
+            hasMedia: !!data.mediaBuffer,
+            mediaBase64: null,
+            destinationJid: destinationJid || 'Não configurado',
+            timestamp: new Date().toLocaleTimeString('pt-BR', { hour12: false }),
+            status: 'failed',
+            error: `Bloqueado por Blacklist ("${matchedKeyword}")`
+          };
+          this.addFeedItem(blockedItem);
+          return;
+        } else {
+          // É uma oferta real! Apenas limpa a ocorrência do termo para não perder a promoção
+          logger.info('FORWARDER', `🧹 Termo de blacklist "${matchedKeyword}" higienizado do rodapé da oferta para não perder o repasse.`);
+          const regexTerm = new RegExp(`.*${matchedKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*`, 'gi');
+          data.text = data.text.replace(regexTerm, '').trim();
+        }
       }
     }
 
