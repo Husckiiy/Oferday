@@ -170,6 +170,15 @@ apiRouter.post('/whatsapp/connect', async (req: Request, res: Response) => {
   }
 });
 
+apiRouter.post('/whatsapp/reset', async (req: Request, res: Response) => {
+  try {
+    await whatsappService.resetAndGenerateNewQr();
+    res.json({ success: true, status: whatsappService.getStatus() });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 apiRouter.post('/whatsapp/disconnect', async (req: Request, res: Response) => {
   try {
     await whatsappService.disconnect();

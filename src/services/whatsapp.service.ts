@@ -92,7 +92,8 @@ class WhatsAppService extends EventEmitter {
         if (connection === 'close') {
           this.isConnecting = false;
           const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
-          const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+          const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401 || statusCode === 403 || statusCode === 405;
+          const shouldReconnect = !isLoggedOut;
 
           this.qrCodeDataUrl = null;
           logger.warn('WHATSAPP', `Conexão fechada. Motivo / Status: ${statusCode || 'Desconhecido'}. Tentará reconectar: ${shouldReconnect}`);
@@ -103,9 +104,9 @@ class WhatsAppService extends EventEmitter {
             setTimeout(() => this.initialize(), 3000);
           } else {
             this.status = 'disconnected';
-            this.emit('status_change', this.getStatus());
-            logger.error('WHATSAPP', 'Sessão desconectada/encerrada. É necessário ler o QR Code novamente.');
             this.clearAuthState();
+            this.emit('status_change', this.getStatus());
+            logger.error('WHATSAPP', 'Sessão desconectada/encerrada. Credenciais antigas limpas para permitir novo QR Code.');
           }
         } else if (connection === 'open') {
           this.isConnecting = false;
@@ -135,6 +136,7 @@ class WhatsAppService extends EventEmitter {
 
   public async disconnect(): Promise<void> {
     logger.info('WHATSAPP', 'Desconectando sessão do WhatsApp...');
+    this.isConnecting = false;
     try {
       if (this.sock) {
         await this.sock.logout().catch(() => {});
@@ -149,6 +151,24 @@ class WhatsAppService extends EventEmitter {
     } catch (err: any) {
       logger.error('WHATSAPP', `Erro ao desconectar WhatsApp: ${err.message}`);
     }
+  }
+
+  public async resetAndGenerateNewQr(): Promise<void> {
+    logger.info('WHATSAPP', 'Solicitado reset forçado e emissão de novo QR Code limpo...');
+    this.isConnecting = false;
+    try {
+      if (this.sock) {
+        this.sock.ev.removeAllListeners('connection.update');
+        this.sock.ev.removeAllListeners('creds.update');
+        this.sock.end(undefined);
+        this.sock = null;
+      }
+    } catch {}
+    this.clearAuthState();
+    this.status = 'connecting';
+    this.qrCodeDataUrl = null;
+    this.emit('status_change', this.getStatus());
+    await this.initialize();
   }
 
   private clearAuthState(): void {

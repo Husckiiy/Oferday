@@ -940,8 +940,8 @@ btnWaReconnect?.addEventListener('click', async () => {
   waQrPlaceholder?.classList.remove('hidden');
   waQrImg?.classList.add('hidden');
   try {
-    await fetch('/api/whatsapp/connect', { method: 'POST' });
-    showToast('Gerando novo QR Code...', 'info');
+    await fetch('/api/whatsapp/reset', { method: 'POST' });
+    showToast('Resetando sessão e gerando novo QR Code...', 'info');
   } catch (err) {
     showToast(`Erro: ${err.message}`, 'error');
   }
